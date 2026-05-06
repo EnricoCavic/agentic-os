@@ -1330,16 +1330,18 @@ if [[ -f "$BACKLOG_FILE" ]]; then
 
     # L-3: Kind distribution sanity — warn if all non-— rows have Kind=feature (no review-finding/hotfix-spawn ever written)
     if [[ "$total_pending" -gt 9 ]]; then
-      kind_variety=$(grep '| Pending' "$BACKLOG_FILE" 2>/dev/null | grep -v '| — |' | awk -F'|' '{print $3}' | sort -u | grep -v '^\s*$' | wc -l || echo 0)
-      if [[ "$kind_variety" -le 1 ]]; then
-        record_result WARN "backlog Kind diversity: all pending items share the same Kind value — review-finding and hotfix-spawn entries may not be reaching the backlog"
+      kind_variety=$(grep '| Pending' "$BACKLOG_FILE" 2>/dev/null | grep -v '| — |' | awk -F'|' '{print $3}' | sort -u | grep -v '^\s*$' | wc -l | tr -d '[:space:]')
+      kind_variety=${kind_variety:-0}
+      if [[ "$kind_variety" -eq 1 ]]; then
+        record_result WARN "backlog Kind diversity: all assigned pending items share the same Kind value — review-finding and hotfix-spawn entries may not be reaching the backlog"
       else
         record_result PASS "backlog Kind diversity: ${kind_variety} distinct Kind values in use"
       fi
     fi
 
     # L-2: label vocabulary drift — warn if distinct label count exceeds max_distinct_labels (default 15)
-    distinct_labels=$(grep '| Pending\|In Progress' "$BACKLOG_FILE" 2>/dev/null | awk -F'|' '{print $4}' | tr ',' '\n' | sed 's/[[:space:]]//g' | grep -v '^—$' | grep -v '^$' | sort -u | wc -l || echo 0)
+    distinct_labels=$(grep '| Pending\|In Progress' "$BACKLOG_FILE" 2>/dev/null | awk -F'|' '{print $4}' | tr ',' '\n' | sed 's/[[:space:]]//g' | grep -v '^—$' | grep -v '^$' | sort -u | wc -l | tr -d '[:space:]')
+    distinct_labels=${distinct_labels:-0}
     if [[ "$distinct_labels" -gt 15 ]]; then
       record_result WARN "backlog label vocabulary: ${distinct_labels} distinct labels (>15) — possible drift across sessions; review and consolidate via /spec-intake"
     elif [[ "$distinct_labels" -gt 0 ]]; then
@@ -1347,7 +1349,8 @@ if [[ -f "$BACKLOG_FILE" ]]; then
     fi
 
     # L-4: cluster-declined marker GC — warn if too many suppressions accumulated
-    declined_count=$(grep -c 'cluster-declined:' "$BACKLOG_FILE" 2>/dev/null || echo 0)
+    declined_count=$(grep -c 'cluster-declined:' "$BACKLOG_FILE" 2>/dev/null | tr -d '[:space:]')
+    declined_count=${declined_count:-0}
     if [[ "$declined_count" -gt 5 ]]; then
       record_result WARN "backlog cluster-declined: ${declined_count} suppression markers (>5) — review expired/stale suppressions in _product-backlog.md ## Source Summary"
     elif [[ "$declined_count" -gt 0 ]]; then
