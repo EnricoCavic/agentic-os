@@ -11,14 +11,14 @@
   - Task Isolation: `.agentcortex/context/work/<worklog-key>.md`
   - Active Work Log Path: derive <worklog-key> from the raw branch name using filesystem-safe normalization before any gate checks.
   - Workflows & Policies: `.agent/workflows/*.md`, `.agent/rules/*.md`
-- **Last Updated**: 2026-05-04
-- **Last Verified**: 2026-05-04
-- **Update Sequence**: 10
+- **Last Updated**: 2026-05-06
+- **Last Verified**: 2026-05-06
+- **Update Sequence**: 11
 - **ADR Index**:
   - docs/adr/ADR-001-governance-friction-tuning.md — ADR-001: Governance Friction Tuning, accepted 2026-04-23
   - docs/adr/ADR-002-guarded-governance-writes.md — ADR-002: Guarded Governance Writes (lock unification + CI lint + lifecycle frontmatter), accepted 2026-04-25
   - docs/adr/ADR-003-hash-chained-audit-log.md — ADR-003: Hash-Chained Tamper-Evident Audit Log (INDEX.jsonl), proposed 2026-04-25
-- **Active Backlog**: (none yet)
+- **Active Backlog**: docs/specs/_product-backlog.md (40 items; Kind/Labels/Priority columns active 2026-05-06)
 - **Spec Index** (framework template specs at `.agentcortex/specs/`; project specs go to `docs/specs/`):
   - docs/specs/lock-unification.md — Guarded Governance Writes implementation spec, [Shipped 2026-04-25] (ADR-002)
 - **Canonical Commands**:
@@ -65,6 +65,22 @@
 - [Category: governance-proposal][Severity: MEDIUM][Trigger: plan-proposes-must-rule][prev: 7f5a25c3] When /plan proposes adding a MUST rule to AGENTS.md or .agent/rules/, cross-check the [enforcement][HIGH] Global Lesson immediately at plan time — not just at /implement. A MUST rule without a corresponding hook, validator, or test is honor-system theatre regardless of where in the workflow it is caught. Self-check: "What enforces this rule if the AI ignores it?" If the answer is "nothing", delete the rule or add the enforcement first.
 
 ## Ship History
+
+### Ship-feat-epic-spec-hierarchy-governance-2026-05-06
+- Feature shipped: Label-based cluster grouping system for `_product-backlog.md` — resolves downstream backlog fragmentation.
+- Edits:
+  - `.agent/workflows/spec-intake.md` — §2b single-feature label & cluster check; §2a Feature Inventory 7-col (Kind/Labels/Priority replace Finding); §8c Reprioritize with P0 push-back; merge-guard backfill on all 3 new cols
+  - `.agent/workflows/bootstrap.md` — §5 Active Backlog: Kind/Priority assignment + cluster check with suppression
+  - `.agent/workflows/review.md` — Backlog Finding Registration section (review-finding auto-log)
+  - `.agent/workflows/hotfix.md` — §5 Evidence: hotfix-spawn systemic issue auto-log
+  - `.agent/workflows/routing.md` — Reprioritize trigger phrases + P-tier tiebreaker
+  - `.agent/config.yaml` — `cluster:` section (threshold/label-cap/p0-pct/marker-cap/suppression-TTL)
+  - `.agentcortex/bin/validate.sh` — backlog schema check + L-1 P0 ratio + L-2 label count + L-3 Kind diversity + L-4 declined markers
+  - `.githooks/pre-commit.guard-ssot.sample` — new advisory git hook sample
+  - `docs/specs/_product-backlog.md` — Kind/Labels/Priority columns backfilled (merge-guard)
+- Tests: validate 81 PASS / 0 WARN / 0 FAIL (sha: 2760428).
+- PR: https://github.com/KbWen/agentic-os/pull/89 (feat/epic-spec-hierarchy-governance → main)
+- Backlog rows shipped: label-cluster system (framework-level; no row numbers — this is the system that manages rows).
 
 ### Ship-feat-optimization-batch2-2026-05-04
 - Feature shipped: 4 follow-up quick-wins on `feat/optimization-hooks-2026-05-04` branch (PR #87 same-PR addition).

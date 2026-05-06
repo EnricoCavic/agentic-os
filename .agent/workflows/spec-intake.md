@@ -74,36 +74,72 @@ After reading the input, classify it as one of:
 
 | Type | Signal | Path |
 |---|---|---|
-| **Single-feature spec** | One coherent goal, one set of ACs | → Step 3 (direct quality review) |
+| **Single-feature spec** | One coherent goal, one set of ACs | → Step 2b (label & cluster check), then Step 3 |
 | **Multi-feature / product spec** | Multiple distinct features, epics, or modules | → Step 2a (decompose first) |
 | **Vague / incomplete intent** | No clear goal or ACs | → Ask ONE targeted question, append answer to `_raw-intake.md`, then re-enter Step 2 |
+
+### 2b. Label & Cluster Check (for single-feature specs)
+
+Before generating the feature spec, do a quick backlog scan:
+
+1. **Assign Kind, Labels, and Priority**:
+   - **Kind**: `feature` (planned by user) · `review-finding` (surfaced by review/audit) · `quick-win` (small, no spec needed) · `hotfix-spawn` (systemic issue from a hotfix). Choose the one that best describes the origin.
+   - **Labels**: 1–2 domain words. **Label reuse rule**: if `_product-backlog.md` exists, read the existing label set first and reuse the closest match — do NOT invent a new label when an existing one fits. When ambiguous, show existing labels and ask the user to pick.
+   - **Priority**: Infer from context or ask: `P0` (blocking) · `P1` (high value) · `P2` (nice to have) · `—` (defer decision).
+
+2. **Scan existing backlog**: If `docs/specs/_product-backlog.md` exists, check for items sharing the same label.
+   - **Match found**: Surface it:
+     ```
+     📎 Related items found in backlog (label: '[label]'): #N <Feature>, #M <Feature>.
+     Treat this as part of that cluster, or as a standalone feature?
+     cluster    → adds this item to the backlog alongside the existing items (no new isolated entry)
+     standalone → treats this as an independent feature with its own backlog row
+     ```
+     If cluster → add this item to the backlog under that label instead of creating a new isolated spec entry. Check if 3+ same-label items now exist with no parent spec — if so, suggest creating one (same prompt as §2a step 2). **Suppression**: if the user replies "no, don't ask again" or equivalent, append `<!-- cluster-declined: <label> <YYYY-MM-DD> count:<N> -->` to the backlog's `## Source Summary` section (where `count` is the current same-label item count at decline time). Subsequent cluster checks MUST skip that label UNLESS the same-label item count has grown by ≥3 since decline, OR 90 days have passed — whichever comes first.
+   - **No match**: Proceed to Step 3 with the assigned label recorded.
 
 ### 2a. Decomposition (for multi-feature / product specs)
 
 When the spec is large, read from `docs/specs/_raw-intake.md` (NOT from conversation memory):
 
-1. Extract a **Feature Inventory** — one row per distinguishable feature/module:
+1. Extract a **Feature Inventory** — one row per distinguishable feature/module, assigning Kind, Labels, and rough Priority per item:
 
    ```
    ## Feature Inventory (extracted from spec)
-   | # | Feature | Rough Tier | Dependencies | Notes |
-   |---|---|---|---|---|
-   | 1 | User Auth | feature | — | OAuth + email |
-   | 2 | Dashboard | feature | #1 | real-time data |
-   | 3 | DB Schema | architecture-change | — | multi-tenant |
+   | # | Feature | Kind | Labels | Priority | Rough Tier | Dependencies |
+   |---|---|---|---|---|---|---|
+   | 1 | User Auth | feature | auth | P0 | feature | — |
+   | 2 | Dashboard | feature | ui, analytics | P1 | feature | #1 |
+   | 3 | DB Schema | feature | infra | P2 | architecture-change | — |
    ```
 
    Rough Tier uses classification from `engineering_guardrails.md §10.1`.
 
-2. Save full product context to `docs/specs/_product-backlog.md` (see §6 for format).
+   **Label reuse rule**: If `_product-backlog.md` already exists, extract the distinct label values currently in use (scan the `Labels` column). Match new items to existing labels first — only create a new label when none of the existing ones fit. This prevents vocabulary drift across sessions (`auth` vs `authentication` vs `login` are the same domain; pick whichever is already in the backlog). When unsure, show the existing label set and ask the user to pick.
 
-3. **Present inventory to user and STOP**:
+   **Kind assignment**: All items extracted from a user-provided spec default to `feature` or `quick-win` based on scope. Items surfaced by a `/review` or `/audit` session should be marked `review-finding`. Items that reveal a systemic issue during a hotfix are `hotfix-spawn`.
+
+   **Priority assignment**: Infer from spec signals (blocking dependencies → P0, core user-facing → P1, polish/optional → P2). When signals are ambiguous, default to `—` and ask the user after presenting the inventory.
+
+2. **Label cluster check**: Scan **the inventory just extracted** for internal clusters (3+ items in the same inventory sharing a label — these are candidates to unify before creating individual specs). Also read any existing `_product-backlog.md` `## Source Summary` for `<!-- cluster-declined: ... -->` markers and skip suppressed/unexpired labels. For each non-suppressed cluster found, surface it before saving:
+   ```
+   ⚠️ Label cluster detected: [N] items share label '[label]' with no parent spec.
+   Recommend creating a feature spec to unify them before proceeding?
+   yes → create unifying spec first, link items via Dependencies
+   no  → proceed with individual items as-is
+   never ask again → records suppression marker; re-prompts if +3 items OR 90 days
+   ```
+   **Why scan the inventory, not the backlog**: on first import the backlog does not exist yet. Scanning only the saved backlog would make this check a no-op for the most common "first PRD" scenario.
+
+3. Save full product context to `docs/specs/_product-backlog.md` (see §6 for format). **Merge guard**: if an existing backlog lacks any of the new columns (`Kind`, `Labels`, `Priority`), add those columns and backfill existing rows with `—` before appending new rows. Apply all three together — do not add columns piecemeal across multiple sessions.
+
+4. **Present inventory to user and STOP**:
    ```
    Spec decomposed into [N] features. Which feature should we start with?
    (Reply with number or name — I'll generate the feature spec and run bootstrap.)
    ```
 
-4. After user selects, proceed to Step 3 for **that feature only**.
+5. After user selects, proceed to Step 3 for **that feature only**.
 
 ---
 
@@ -262,11 +298,16 @@ last_updated: <date>
 <1-3 sentence summary of the original product spec>
 
 ## Feature Inventory
-| # | Feature | Spec File | Tier | Status | Dependencies |
-|---|---|---|---|---|---|
-| 1 | User Auth | docs/specs/user-auth.md | feature | In Progress | — |
-| 2 | Dashboard | — | feature | Pending | #1 |
-| 3 | DB Schema | — | architecture-change | Pending | — |
+| # | Feature | Kind | Labels | Priority | Spec File | Tier | Status | Dependencies |
+|---|---|---|---|---|---|---|---|---|
+| 1 | User Auth | feature | auth | P0 | docs/specs/user-auth.md | feature | In Progress | — |
+| 2 | Dashboard | feature | ui, analytics | P1 | — | feature | Pending | #1 |
+| 3 | DB Schema | feature | infra | P2 | — | architecture-change | Pending | — |
+| 4 | Fix N+1 query in UserList | review-finding | api | P1 | — | quick-win | Pending | — |
+
+## Column Reference
+- **Kind**: `feature` (planned) · `quick-win` (small planned) · `review-finding` (surfaced by review/audit) · `hotfix-spawn` (systemic issue from hotfix)
+- **Priority**: `P0` (blocking, do now) · `P1` (high value, next batch) · `P2` (nice to have) · `—` (not yet prioritized)
 
 ## Status Key
 - Pending: not yet started
@@ -350,6 +391,7 @@ Amendment: docs/specs/user-auth-sso.md [Draft]
 | Action | Trigger | What AI does |
 |---|---|---|
 | **Reorder** | "先做 #5" | Update `_product-backlog.md` order. Check dependency conflicts. |
+| **Reprioritize** | "這個 P0", "升到優先", "#3 改成 P1" | **Before updating**: if upgrading to P0, count existing P0 pending items. If count ≥ 3, ask: `"You currently have N P0 items (#A, #B, #C). Confirm adding another P0, or tell me which to downgrade?"` — wait for user reply before writing. Then update `Priority` field for the named item(s). Append an audit line to backlog `## Source Summary`: `- <YYYY-MM-DD>: #N Priority <old>→<new>`. If multiple items conflict (two P0s with dependency), warn: `"⚠️ Both #N and #M are P0 but #M depends on #N — confirm ordering?"` |
 | **Defer** | "先不做 #3" | Set status → `Deferred` in backlog. If spec was already generated, leave it as `draft` (not frozen). |
 | **Un-defer** | "恢復 #3", "un-defer #3" | Set status → `Pending` in backlog. If spec exists as `draft`, it remains usable. |
 | **Cancel** | "不做 #3 了" | Set status → `Cancelled` in backlog. If spec exists, add `status: cancelled` to frontmatter. Remove from Spec Index. |

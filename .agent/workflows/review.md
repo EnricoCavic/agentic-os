@@ -219,6 +219,15 @@ If the referenced spec contains a `## Domain Decisions` section, validate each e
 
 `tiny-fix`, `quick-win`, and `hotfix` are EXEMPT from this check.
 
+## Backlog Finding Registration
+
+If the review produces actionable findings that are NOT immediately fixed in this session, log them in `docs/specs/_product-backlog.md` via `/spec-intake` (or directly if the backlog already exists):
+- Set `Kind: review-finding`
+- Set `Labels` to the affected domain (e.g., `api`, `auth`, `infra`)
+- Set `Priority` based on severity: CRITICAL/HIGH → P0 or P1; MEDIUM → P1 or P2; LOW → P2 or `—`
+
+This ensures review findings enter the planning loop rather than being lost in the Work Log.
+
 ## Phase Summary Update
 
 After review is complete, append one line to `## Phase Summary` in the Work Log:

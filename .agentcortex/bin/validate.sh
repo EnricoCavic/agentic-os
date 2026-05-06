@@ -1305,6 +1305,64 @@ else
   record_result WARN "SSoT completeness checks skipped: current_state.md not found"
 fi
 
+# Backlog schema check: verify Kind/Labels/Priority columns present when backlog exists
+BACKLOG_FILE="$ROOT/docs/specs/_product-backlog.md"
+if [[ -f "$BACKLOG_FILE" ]]; then
+  backlog_header="$(grep -m1 '|.*Feature.*|' "$BACKLOG_FILE" 2>/dev/null || true)"
+  missing_cols=()
+  echo "$backlog_header" | grep -q 'Kind'     || missing_cols+=("Kind")
+  echo "$backlog_header" | grep -q 'Labels'   || missing_cols+=("Labels")
+  echo "$backlog_header" | grep -q 'Priority' || missing_cols+=("Priority")
+  if [[ ${#missing_cols[@]} -eq 0 ]]; then
+    record_result PASS "backlog schema: Kind/Labels/Priority columns present"
+
+    # L-1: P0 ratio lint — warn if >20% of pending items are P0
+    total_pending=$(grep -c '| Pending' "$BACKLOG_FILE" 2>/dev/null || echo 0)
+    p0_pending=$(grep '| Pending' "$BACKLOG_FILE" 2>/dev/null | grep -c '| P0 |' || echo 0)
+    if [[ "$total_pending" -gt 4 && "$p0_pending" -gt 0 ]]; then
+      p0_ratio=$(( p0_pending * 100 / total_pending ))
+      if [[ "$p0_ratio" -gt 20 ]]; then
+        record_result WARN "backlog P0 ratio: ${p0_pending}/${total_pending} pending items are P0 (${p0_ratio}% > 20% threshold — consider downgrading some)"
+      else
+        record_result PASS "backlog P0 ratio: ${p0_pending}/${total_pending} pending items are P0 (${p0_ratio}%)"
+      fi
+    fi
+
+    # L-3: Kind distribution sanity — warn if all non-— rows have Kind=feature (no review-finding/hotfix-spawn ever written)
+    if [[ "$total_pending" -gt 9 ]]; then
+      kind_variety=$(grep '| Pending' "$BACKLOG_FILE" 2>/dev/null | grep -v '| — |' | awk -F'|' '{print $3}' | sort -u | grep -v '^\s*$' | wc -l | tr -d '[:space:]')
+      kind_variety=${kind_variety:-0}
+      if [[ "$kind_variety" -eq 1 ]]; then
+        record_result WARN "backlog Kind diversity: all assigned pending items share the same Kind value — review-finding and hotfix-spawn entries may not be reaching the backlog"
+      else
+        record_result PASS "backlog Kind diversity: ${kind_variety} distinct Kind values in use"
+      fi
+    fi
+
+    # L-2: label vocabulary drift — warn if distinct label count exceeds max_distinct_labels (default 15)
+    distinct_labels=$(grep '| Pending\|In Progress' "$BACKLOG_FILE" 2>/dev/null | awk -F'|' '{print $4}' | tr ',' '\n' | sed 's/[[:space:]]//g' | grep -v '^—$' | grep -v '^$' | sort -u | wc -l | tr -d '[:space:]')
+    distinct_labels=${distinct_labels:-0}
+    if [[ "$distinct_labels" -gt 15 ]]; then
+      record_result WARN "backlog label vocabulary: ${distinct_labels} distinct labels (>15) — possible drift across sessions; review and consolidate via /spec-intake"
+    elif [[ "$distinct_labels" -gt 0 ]]; then
+      record_result PASS "backlog label vocabulary: ${distinct_labels} distinct labels"
+    fi
+
+    # L-4: cluster-declined marker GC — warn if too many suppressions accumulated
+    declined_count=$(grep -c 'cluster-declined:' "$BACKLOG_FILE" 2>/dev/null | tr -d '[:space:]')
+    declined_count=${declined_count:-0}
+    if [[ "$declined_count" -gt 5 ]]; then
+      record_result WARN "backlog cluster-declined: ${declined_count} suppression markers (>5) — review expired/stale suppressions in _product-backlog.md ## Source Summary"
+    elif [[ "$declined_count" -gt 0 ]]; then
+      record_result PASS "backlog cluster-declined: ${declined_count} suppression marker(s)"
+    fi
+  else
+    record_result WARN "backlog schema: missing column(s): ${missing_cols[*]}"
+    echo "  fix: run /spec-intake to trigger merge-guard backfill, or add columns manually"
+    echo "  manual fix: add columns to Feature Inventory header row and backfill existing rows with —"
+  fi
+fi
+
 # Routing index governance split checks
 ROUTING_INDEX="$WORKFLOWS_DIR/routing.md"
 if [[ -f "$ROUTING_INDEX" ]]; then

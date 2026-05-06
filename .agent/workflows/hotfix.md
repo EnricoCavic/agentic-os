@@ -43,6 +43,11 @@ Run `/review` then `/test`. Testing must include:
 
 Work Log must contain: root cause description, fix rationale, reproduction test output, regression test output.
 
+**Systemic issue flag**: If root cause analysis reveals a systemic issue beyond this specific bug (e.g., a missing validation pattern, a class of unsafe API calls, an architectural gap), log it in `docs/specs/_product-backlog.md`:
+- Set `Kind: hotfix-spawn`
+- Set `Labels` to the affected domain
+- Set `Priority: P1` (systemic issues warrant near-term attention but don't block the hotfix itself)
+
 ## 6. Optional: Cloud PR Auto-Fix (Claude Code CLI only)
 
 When the hotfix is pushed to a PR and the user is running inside Claude Code CLI, the user MAY invoke `/autofix-pr` to enable Anthropic's cloud auto-fix loop on the PR. Claude Code on the web watches CI + review comments and pushes fixes until green.
