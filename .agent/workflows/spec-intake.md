@@ -84,7 +84,7 @@ Before generating the feature spec, do a quick backlog scan:
 
 1. **Assign Kind, Labels, and Priority**:
    - **Kind**: `feature` (planned by user) · `review-finding` (surfaced by review/audit) · `quick-win` (small, no spec needed) · `hotfix-spawn` (systemic issue from a hotfix). Choose the one that best describes the origin.
-   - **Labels**: 1–2 domain words (same vocabulary as §2a: `auth`, `billing`, `infra`, `ui`, `api`, `storage`, etc.).
+   - **Labels**: 1–2 domain words. **Label reuse rule**: if `_product-backlog.md` exists, read the existing label set first and reuse the closest match — do NOT invent a new label when an existing one fits. When ambiguous, show existing labels and ask the user to pick.
    - **Priority**: Infer from context or ask: `P0` (blocking) · `P1` (high value) · `P2` (nice to have) · `—` (defer decision).
 
 2. **Scan existing backlog**: If `docs/specs/_product-backlog.md` exists, check for items sharing the same label.
@@ -93,7 +93,7 @@ Before generating the feature spec, do a quick backlog scan:
      📎 Related items found in backlog (label: '[label]'): #N <Feature>, #M <Feature>.
      Treat this as part of that cluster, or as a standalone feature? (cluster / standalone)
      ```
-     If cluster → add this item to the backlog under that label instead of creating a new isolated spec entry. Check if 3+ same-label items now exist with no parent spec — if so, suggest creating one (same prompt as §2a step 2).
+     If cluster → add this item to the backlog under that label instead of creating a new isolated spec entry. Check if 3+ same-label items now exist with no parent spec — if so, suggest creating one (same prompt as §2a step 2). **Suppression**: if the user replies "no, don't ask again" or equivalent, append `<!-- cluster-declined: <label> <YYYY-MM-DD> -->` to the backlog's `## Source Summary` section. Subsequent cluster checks MUST skip any label listed there.
    - **No match**: Proceed to Step 3 with the assigned label recorded.
 
 ### 2a. Decomposition (for multi-feature / product specs)
@@ -113,7 +113,7 @@ When the spec is large, read from `docs/specs/_raw-intake.md` (NOT from conversa
 
    Rough Tier uses classification from `engineering_guardrails.md §10.1`.
 
-   **Label discipline**: Use short, reusable domain words (e.g. `auth`, `billing`, `infra`, `ui`, `api`, `storage`, `notifications`). Do NOT invent a new label when an existing one fits. Labels are the primary grouping axis — they replace the need for Epic hierarchy.
+   **Label reuse rule**: If `_product-backlog.md` already exists, extract the distinct label values currently in use (scan the `Labels` column). Match new items to existing labels first — only create a new label when none of the existing ones fit. This prevents vocabulary drift across sessions (`auth` vs `authentication` vs `login` are the same domain; pick whichever is already in the backlog). When unsure, show the existing label set and ask the user to pick.
 
    **Kind assignment**: All items extracted from a user-provided spec default to `feature` or `quick-win` based on scope. Items surfaced by a `/review` or `/audit` session should be marked `review-finding`. Items that reveal a systemic issue during a hotfix are `hotfix-spawn`.
 

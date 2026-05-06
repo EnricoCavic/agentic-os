@@ -151,9 +151,9 @@ Tool exit codes:
    - **Label cluster check (quick-win only)**: If the task classifies as `quick-win` AND the backlog has a `Labels` column, identify the label(s) for the current task and count same-label pending items (excluding Shipped/Cancelled). If 3+ items share a label with no existing feature spec covering them, surface:
      ```
      📎 Label cluster: [N] '[label]' items in backlog with no parent spec.
-     Consider creating a feature spec to unify them before this quick-win? (yes / no, proceed)
+     Consider creating a feature spec to unify them before this quick-win? (yes / no / never ask again for '[label]')
      ```
-     This is advisory — user may decline and proceed directly.
+     This is advisory — user may decline and proceed directly. If user replies "never ask again" or equivalent, append `<!-- cluster-declined: <label> <YYYY-MM-DD> -->` to the backlog's `## Source Summary` section and skip this check for that label in all future sessions.
    - If no backlog exists, skip this step.
 6. **Large Raw Material Processing** (Chats, Whitepapers, Specs):
    - If user provided a spec, document, or raw material BEFORE bootstrap, check whether `/spec-intake` was already run:
