@@ -74,36 +74,60 @@ After reading the input, classify it as one of:
 
 | Type | Signal | Path |
 |---|---|---|
-| **Single-feature spec** | One coherent goal, one set of ACs | → Step 3 (direct quality review) |
+| **Single-feature spec** | One coherent goal, one set of ACs | → Step 2b (label & cluster check), then Step 3 |
 | **Multi-feature / product spec** | Multiple distinct features, epics, or modules | → Step 2a (decompose first) |
 | **Vague / incomplete intent** | No clear goal or ACs | → Ask ONE targeted question, append answer to `_raw-intake.md`, then re-enter Step 2 |
+
+### 2b. Label & Cluster Check (for single-feature specs)
+
+Before generating the feature spec, do a quick backlog scan:
+
+1. **Assign a label**: Identify 1–2 domain labels for this feature (same vocabulary as §2a: `auth`, `billing`, `infra`, `ui`, `api`, `storage`, etc.).
+
+2. **Scan existing backlog**: If `docs/specs/_product-backlog.md` exists, check for items sharing the same label.
+   - **Match found**: Surface it:
+     ```
+     📎 Related items found in backlog (label: '[label]'): #N <Feature>, #M <Feature>.
+     Treat this as part of that cluster, or as a standalone feature? (cluster / standalone)
+     ```
+     If cluster → add this item to the backlog under that label instead of creating a new isolated spec entry. Check if 3+ same-label items now exist with no parent spec — if so, suggest creating one (same prompt as §2a step 2).
+   - **No match**: Proceed to Step 3 with the assigned label recorded.
 
 ### 2a. Decomposition (for multi-feature / product specs)
 
 When the spec is large, read from `docs/specs/_raw-intake.md` (NOT from conversation memory):
 
-1. Extract a **Feature Inventory** — one row per distinguishable feature/module:
+1. Extract a **Feature Inventory** — one row per distinguishable feature/module, and assign 1–2 domain labels per item:
 
    ```
    ## Feature Inventory (extracted from spec)
-   | # | Feature | Rough Tier | Dependencies | Notes |
-   |---|---|---|---|---|
-   | 1 | User Auth | feature | — | OAuth + email |
-   | 2 | Dashboard | feature | #1 | real-time data |
-   | 3 | DB Schema | architecture-change | — | multi-tenant |
+   | # | Feature | Labels | Rough Tier | Dependencies | Notes |
+   |---|---|---|---|---|---|
+   | 1 | User Auth | auth | feature | — | OAuth + email |
+   | 2 | Dashboard | ui, analytics | feature | #1 | real-time data |
+   | 3 | DB Schema | infra | architecture-change | — | multi-tenant |
    ```
 
    Rough Tier uses classification from `engineering_guardrails.md §10.1`.
 
-2. Save full product context to `docs/specs/_product-backlog.md` (see §6 for format).
+   **Label discipline**: Use short, reusable domain words (e.g. `auth`, `billing`, `infra`, `ui`, `api`, `storage`, `notifications`). Do NOT invent a new label when an existing one fits. Labels are the primary grouping axis — they replace the need for Epic hierarchy.
 
-3. **Present inventory to user and STOP**:
+2. **Label cluster check**: After extracting all items, scan for label clusters (3+ items sharing a label with no existing feature spec covering them). For each cluster found, surface it before saving:
+   ```
+   ⚠️ Label cluster detected: [N] items share label '[label]' with no parent spec.
+   Recommend creating a feature spec to unify them before proceeding? (yes / no, continue as-is)
+   ```
+   If yes → create the unifying spec first, link items to it via Dependencies column. If no → proceed with individual items as-is.
+
+3. Save full product context to `docs/specs/_product-backlog.md` (see §6 for format). **Merge guard**: if an existing backlog lacks a `Labels` column, add the column and backfill existing rows with `—` before appending new rows. This keeps the table structurally consistent.
+
+4. **Present inventory to user and STOP**:
    ```
    Spec decomposed into [N] features. Which feature should we start with?
    (Reply with number or name — I'll generate the feature spec and run bootstrap.)
    ```
 
-4. After user selects, proceed to Step 3 for **that feature only**.
+5. After user selects, proceed to Step 3 for **that feature only**.
 
 ---
 
@@ -262,11 +286,11 @@ last_updated: <date>
 <1-3 sentence summary of the original product spec>
 
 ## Feature Inventory
-| # | Feature | Spec File | Tier | Status | Dependencies |
-|---|---|---|---|---|---|
-| 1 | User Auth | docs/specs/user-auth.md | feature | In Progress | — |
-| 2 | Dashboard | — | feature | Pending | #1 |
-| 3 | DB Schema | — | architecture-change | Pending | — |
+| # | Feature | Labels | Spec File | Tier | Status | Dependencies |
+|---|---|---|---|---|---|---|
+| 1 | User Auth | auth | docs/specs/user-auth.md | feature | In Progress | — |
+| 2 | Dashboard | ui, analytics | — | feature | Pending | #1 |
+| 3 | DB Schema | infra | — | architecture-change | Pending | — |
 
 ## Status Key
 - Pending: not yet started

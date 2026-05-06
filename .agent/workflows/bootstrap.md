@@ -145,6 +145,12 @@ Tool exit codes:
      ```
 
    - If user intent matches a pending backlog feature, route to `/spec-intake` §8a (continuation) instead of fresh bootstrap.
+   - **Label cluster check (quick-win only)**: If the task classifies as `quick-win` AND the backlog has a `Labels` column, identify the label(s) for the current task and count same-label pending items (excluding Shipped/Cancelled). If 3+ items share a label with no existing feature spec covering them, surface:
+     ```
+     📎 Label cluster: [N] '[label]' items in backlog with no parent spec.
+     Consider creating a feature spec to unify them before this quick-win? (yes / no, proceed)
+     ```
+     This is advisory — user may decline and proceed directly.
    - If no backlog exists, skip this step.
 6. **Large Raw Material Processing** (Chats, Whitepapers, Specs):
    - If user provided a spec, document, or raw material BEFORE bootstrap, check whether `/spec-intake` was already run:
