@@ -146,14 +146,14 @@ Tool exit codes:
 
    - If user intent matches a pending backlog feature, route to `/spec-intake` §8a (continuation) instead of fresh bootstrap.
    - **Kind & Priority assignment**: When adding or updating a backlog item from this bootstrap session, set:
-     - `Kind`: `quick-win` if classified as quick-win; `review-finding` if the task was surfaced by a `/review` or `/audit` output (signal: user message references a review finding, audit item, or debt surfaced during code review); `hotfix-spawn` if the task emerged from a hotfix session revealing a systemic issue; `feature` otherwise.
-     - `Priority`: ask if not already set — `P0` (blocking), `P1` (high value), `P2` (nice to have), `—` (defer).
-   - **Label cluster check (quick-win only)**: If the task classifies as `quick-win` AND the backlog has a `Labels` column, identify the label(s) for the current task and count same-label pending items (excluding Shipped/Cancelled). If 3+ items share a label with no existing feature spec covering them, surface:
+     - `Kind`: use the most specific origin — precedence: `review-finding` (surfaced by `/review` or `/audit`) > `hotfix-spawn` (systemic issue from hotfix) > `quick-win` (small, no spec needed, classification-derived) > `feature` (default). A quick-win that originated from a review finding MUST be marked `review-finding`, not `quick-win` — classification and origin are independent.
+     - `Priority`: ask if not already set — `P0` (blocking), `P1` (high value), `P2` (nice to have), `—` (not yet prioritized, default on silence — do NOT block bootstrap waiting for an answer).
+   - **Label cluster check (quick-win only)**: If the task classifies as `quick-win` AND the backlog has a `Labels` column, identify the label(s) for the current task using the **label reuse rule** (read existing label values from the backlog's `Labels` column and pick the closest match — only create a new label when none fit), then count same-label pending items (excluding Shipped/Cancelled). If 3+ items share a label with no existing feature spec covering them, surface:
      ```
      📎 Label cluster: [N] '[label]' items in backlog with no parent spec.
      Consider creating a feature spec to unify them before this quick-win? (yes / no / never ask again for '[label]')
      ```
-     This is advisory — user may decline and proceed directly. If user replies "never ask again" or equivalent, append `<!-- cluster-declined: <label> <YYYY-MM-DD> -->` to the backlog's `## Source Summary` section and skip this check for that label in all future sessions.
+     This is advisory — user may decline and proceed directly. If user replies "never ask again" or equivalent, append `<!-- cluster-declined: <label> <YYYY-MM-DD> count:<N> -->` to the backlog's `## Source Summary` (where `count` is the current same-label item count). Skip this label in future checks UNLESS the count has grown by ≥3 since decline, OR 90 days have passed — whichever comes first.
    - If no backlog exists, skip this step.
 6. **Large Raw Material Processing** (Chats, Whitepapers, Specs):
    - If user provided a spec, document, or raw material BEFORE bootstrap, check whether `/spec-intake` was already run:

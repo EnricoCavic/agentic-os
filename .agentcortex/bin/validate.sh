@@ -1305,6 +1305,22 @@ else
   record_result WARN "SSoT completeness checks skipped: current_state.md not found"
 fi
 
+# Backlog schema check: verify Kind/Labels/Priority columns present when backlog exists
+BACKLOG_FILE="$ROOT/docs/specs/_product-backlog.md"
+if [[ -f "$BACKLOG_FILE" ]]; then
+  backlog_header="$(grep -m1 '|.*Feature.*|' "$BACKLOG_FILE" 2>/dev/null || true)"
+  missing_cols=()
+  echo "$backlog_header" | grep -q 'Kind'     || missing_cols+=("Kind")
+  echo "$backlog_header" | grep -q 'Labels'   || missing_cols+=("Labels")
+  echo "$backlog_header" | grep -q 'Priority' || missing_cols+=("Priority")
+  if [[ ${#missing_cols[@]} -eq 0 ]]; then
+    record_result PASS "backlog schema: Kind/Labels/Priority columns present"
+  else
+    record_result WARN "backlog schema: missing column(s): ${missing_cols[*]}"
+    echo "  fix: run /spec-intake to trigger merge-guard backfill, or add columns manually"
+  fi
+fi
+
 # Routing index governance split checks
 ROUTING_INDEX="$WORKFLOWS_DIR/routing.md"
 if [[ -f "$ROUTING_INDEX" ]]; then

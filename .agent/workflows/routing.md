@@ -37,7 +37,7 @@ It does NOT contain governance rules — those remain in `AGENTS.md`.
 | "next feature", "下一個", "繼續做", "continue with backlog" | `/spec-intake` §8a continuation (read `_product-backlog.md`, skip decomposition) |
 | "改 spec", "amend the spec", "spec 要調整" | `/spec-intake` §8b amendment (check spec status, apply timing rules) |
 | "先做 #5", "reorder", "defer #3", "不做了" | `/spec-intake` §8c reorder/defer/cancel |
-| "這個 P0", "升到優先", "#3 改成 P1", "reprioritize", "priority 改" | `/spec-intake` §8c reprioritize |
+| "這個 P0", "升到優先", "#3 改成 P1", "reprioritize", "priority 改" | `/spec-intake` §8c reprioritize — **tiebreaker**: if phrase contains a P-tier token (P0/P1/P2), prefer reprioritize over reorder |
 | "寫規格", "write spec", "convert requirements" | `/spec` |
 
 ### Architecture & Setup
