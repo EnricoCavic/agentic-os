@@ -1315,9 +1315,32 @@ if [[ -f "$BACKLOG_FILE" ]]; then
   echo "$backlog_header" | grep -q 'Priority' || missing_cols+=("Priority")
   if [[ ${#missing_cols[@]} -eq 0 ]]; then
     record_result PASS "backlog schema: Kind/Labels/Priority columns present"
+
+    # L-1: P0 ratio lint — warn if >20% of pending items are P0
+    total_pending=$(grep -c '| Pending' "$BACKLOG_FILE" 2>/dev/null || echo 0)
+    p0_pending=$(grep '| Pending' "$BACKLOG_FILE" 2>/dev/null | grep -c '| P0 |' || echo 0)
+    if [[ "$total_pending" -gt 4 && "$p0_pending" -gt 0 ]]; then
+      p0_ratio=$(( p0_pending * 100 / total_pending ))
+      if [[ "$p0_ratio" -gt 20 ]]; then
+        record_result WARN "backlog P0 ratio: ${p0_pending}/${total_pending} pending items are P0 (${p0_ratio}% > 20% threshold — consider downgrading some)"
+      else
+        record_result PASS "backlog P0 ratio: ${p0_pending}/${total_pending} pending items are P0 (${p0_ratio}%)"
+      fi
+    fi
+
+    # L-3: Kind distribution sanity — warn if all non-— rows have Kind=feature (no review-finding/hotfix-spawn ever written)
+    if [[ "$total_pending" -gt 9 ]]; then
+      kind_variety=$(grep '| Pending' "$BACKLOG_FILE" 2>/dev/null | grep -v '| — |' | awk -F'|' '{print $3}' | sort -u | grep -v '^\s*$' | wc -l || echo 0)
+      if [[ "$kind_variety" -le 1 ]]; then
+        record_result WARN "backlog Kind diversity: all pending items share the same Kind value — review-finding and hotfix-spawn entries may not be reaching the backlog"
+      else
+        record_result PASS "backlog Kind diversity: ${kind_variety} distinct Kind values in use"
+      fi
+    fi
   else
     record_result WARN "backlog schema: missing column(s): ${missing_cols[*]}"
     echo "  fix: run /spec-intake to trigger merge-guard backfill, or add columns manually"
+    echo "  manual fix: add columns to Feature Inventory header row and backfill existing rows with —"
   fi
 fi
 

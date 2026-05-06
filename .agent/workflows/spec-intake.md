@@ -91,7 +91,9 @@ Before generating the feature spec, do a quick backlog scan:
    - **Match found**: Surface it:
      ```
      📎 Related items found in backlog (label: '[label]'): #N <Feature>, #M <Feature>.
-     Treat this as part of that cluster, or as a standalone feature? (cluster / standalone)
+     Treat this as part of that cluster, or as a standalone feature?
+     cluster    → adds this item to the backlog alongside the existing items (no new isolated entry)
+     standalone → treats this as an independent feature with its own backlog row
      ```
      If cluster → add this item to the backlog under that label instead of creating a new isolated spec entry. Check if 3+ same-label items now exist with no parent spec — if so, suggest creating one (same prompt as §2a step 2). **Suppression**: if the user replies "no, don't ask again" or equivalent, append `<!-- cluster-declined: <label> <YYYY-MM-DD> count:<N> -->` to the backlog's `## Source Summary` section (where `count` is the current same-label item count at decline time). Subsequent cluster checks MUST skip that label UNLESS the same-label item count has grown by ≥3 since decline, OR 90 days have passed — whichever comes first.
    - **No match**: Proceed to Step 3 with the assigned label recorded.
@@ -119,12 +121,15 @@ When the spec is large, read from `docs/specs/_raw-intake.md` (NOT from conversa
 
    **Priority assignment**: Infer from spec signals (blocking dependencies → P0, core user-facing → P1, polish/optional → P2). When signals are ambiguous, default to `—` and ask the user after presenting the inventory.
 
-2. **Label cluster check**: After extracting all items, check the backlog `## Source Summary` for any `<!-- cluster-declined: <label> ... -->` markers. Then scan for label clusters (3+ items sharing a label with no existing feature spec) that are NOT suppressed (or whose suppression has expired: count grown by ≥3 OR 90 days elapsed). For each non-suppressed cluster found, surface it before saving:
+2. **Label cluster check**: Scan **the inventory just extracted** for internal clusters (3+ items in the same inventory sharing a label — these are candidates to unify before creating individual specs). Also read any existing `_product-backlog.md` `## Source Summary` for `<!-- cluster-declined: ... -->` markers and skip suppressed/unexpired labels. For each non-suppressed cluster found, surface it before saving:
    ```
    ⚠️ Label cluster detected: [N] items share label '[label]' with no parent spec.
-   Recommend creating a feature spec to unify them before proceeding? (yes / no / never ask again for '[label]')
+   Recommend creating a feature spec to unify them before proceeding?
+   yes → create unifying spec first, link items via Dependencies
+   no  → proceed with individual items as-is
+   never ask again → records suppression marker; re-prompts if +3 items OR 90 days
    ```
-   If yes → create the unifying spec first, link items to it via Dependencies column. If "never ask again" → append `<!-- cluster-declined: <label> <YYYY-MM-DD> count:<N> -->` to backlog Source Summary. If no → proceed as-is.
+   **Why scan the inventory, not the backlog**: on first import the backlog does not exist yet. Scanning only the saved backlog would make this check a no-op for the most common "first PRD" scenario.
 
 3. Save full product context to `docs/specs/_product-backlog.md` (see §6 for format). **Merge guard**: if an existing backlog lacks any of the new columns (`Kind`, `Labels`, `Priority`), add those columns and backfill existing rows with `—` before appending new rows. Apply all three together — do not add columns piecemeal across multiple sessions.
 
