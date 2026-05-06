@@ -145,6 +145,9 @@ Tool exit codes:
      ```
 
    - If user intent matches a pending backlog feature, route to `/spec-intake` §8a (continuation) instead of fresh bootstrap.
+   - **Kind & Priority assignment**: When adding or updating a backlog item from this bootstrap session, set:
+     - `Kind`: `quick-win` if classified as quick-win; `review-finding` if the task was surfaced by a `/review` or `/audit` output (signal: user message references a review finding, audit item, or debt surfaced during code review); `hotfix-spawn` if the task emerged from a hotfix session revealing a systemic issue; `feature` otherwise.
+     - `Priority`: ask if not already set — `P0` (blocking), `P1` (high value), `P2` (nice to have), `—` (defer).
    - **Label cluster check (quick-win only)**: If the task classifies as `quick-win` AND the backlog has a `Labels` column, identify the label(s) for the current task and count same-label pending items (excluding Shipped/Cancelled). If 3+ items share a label with no existing feature spec covering them, surface:
      ```
      📎 Label cluster: [N] '[label]' items in backlog with no parent spec.

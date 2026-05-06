@@ -82,7 +82,10 @@ After reading the input, classify it as one of:
 
 Before generating the feature spec, do a quick backlog scan:
 
-1. **Assign a label**: Identify 1–2 domain labels for this feature (same vocabulary as §2a: `auth`, `billing`, `infra`, `ui`, `api`, `storage`, etc.).
+1. **Assign Kind, Labels, and Priority**:
+   - **Kind**: `feature` (planned by user) · `review-finding` (surfaced by review/audit) · `quick-win` (small, no spec needed) · `hotfix-spawn` (systemic issue from a hotfix). Choose the one that best describes the origin.
+   - **Labels**: 1–2 domain words (same vocabulary as §2a: `auth`, `billing`, `infra`, `ui`, `api`, `storage`, etc.).
+   - **Priority**: Infer from context or ask: `P0` (blocking) · `P1` (high value) · `P2` (nice to have) · `—` (defer decision).
 
 2. **Scan existing backlog**: If `docs/specs/_product-backlog.md` exists, check for items sharing the same label.
    - **Match found**: Surface it:
@@ -97,20 +100,24 @@ Before generating the feature spec, do a quick backlog scan:
 
 When the spec is large, read from `docs/specs/_raw-intake.md` (NOT from conversation memory):
 
-1. Extract a **Feature Inventory** — one row per distinguishable feature/module, and assign 1–2 domain labels per item:
+1. Extract a **Feature Inventory** — one row per distinguishable feature/module, assigning Kind, Labels, and rough Priority per item:
 
    ```
    ## Feature Inventory (extracted from spec)
-   | # | Feature | Labels | Rough Tier | Dependencies | Notes |
-   |---|---|---|---|---|---|
-   | 1 | User Auth | auth | feature | — | OAuth + email |
-   | 2 | Dashboard | ui, analytics | feature | #1 | real-time data |
-   | 3 | DB Schema | infra | architecture-change | — | multi-tenant |
+   | # | Feature | Kind | Labels | Priority | Rough Tier | Dependencies | Notes |
+   |---|---|---|---|---|---|---|---|
+   | 1 | User Auth | feature | auth | P0 | feature | — | OAuth + email |
+   | 2 | Dashboard | feature | ui, analytics | P1 | feature | #1 | real-time data |
+   | 3 | DB Schema | feature | infra | P2 | architecture-change | — | multi-tenant |
    ```
 
    Rough Tier uses classification from `engineering_guardrails.md §10.1`.
 
    **Label discipline**: Use short, reusable domain words (e.g. `auth`, `billing`, `infra`, `ui`, `api`, `storage`, `notifications`). Do NOT invent a new label when an existing one fits. Labels are the primary grouping axis — they replace the need for Epic hierarchy.
+
+   **Kind assignment**: All items extracted from a user-provided spec default to `feature` or `quick-win` based on scope. Items surfaced by a `/review` or `/audit` session should be marked `review-finding`. Items that reveal a systemic issue during a hotfix are `hotfix-spawn`.
+
+   **Priority assignment**: Infer from spec signals (blocking dependencies → P0, core user-facing → P1, polish/optional → P2). When signals are ambiguous, default to `—` and ask the user after presenting the inventory.
 
 2. **Label cluster check**: After extracting all items, scan for label clusters (3+ items sharing a label with no existing feature spec covering them). For each cluster found, surface it before saving:
    ```
@@ -286,11 +293,16 @@ last_updated: <date>
 <1-3 sentence summary of the original product spec>
 
 ## Feature Inventory
-| # | Feature | Labels | Spec File | Tier | Status | Dependencies |
-|---|---|---|---|---|---|---|
-| 1 | User Auth | auth | docs/specs/user-auth.md | feature | In Progress | — |
-| 2 | Dashboard | ui, analytics | — | feature | Pending | #1 |
-| 3 | DB Schema | infra | — | architecture-change | Pending | — |
+| # | Feature | Kind | Labels | Priority | Spec File | Tier | Status | Dependencies |
+|---|---|---|---|---|---|---|---|---|
+| 1 | User Auth | feature | auth | P0 | docs/specs/user-auth.md | feature | In Progress | — |
+| 2 | Dashboard | feature | ui, analytics | P1 | — | feature | Pending | #1 |
+| 3 | DB Schema | feature | infra | P2 | — | architecture-change | Pending | — |
+| 4 | Fix N+1 query in UserList | review-finding | api | P1 | — | quick-win | Pending | — |
+
+## Column Reference
+- **Kind**: `feature` (planned) · `quick-win` (small planned) · `review-finding` (surfaced by review/audit) · `hotfix-spawn` (systemic issue from hotfix)
+- **Priority**: `P0` (blocking, do now) · `P1` (high value, next batch) · `P2` (nice to have) · `—` (not yet prioritized)
 
 ## Status Key
 - Pending: not yet started
@@ -374,6 +386,7 @@ Amendment: docs/specs/user-auth-sso.md [Draft]
 | Action | Trigger | What AI does |
 |---|---|---|
 | **Reorder** | "先做 #5" | Update `_product-backlog.md` order. Check dependency conflicts. |
+| **Reprioritize** | "這個 P0", "升到優先", "#3 改成 P1" | Update `Priority` field for the named item(s). No other changes. If item had `—`, set the new value. If multiple items conflict (two P0s with dependency), warn: `"⚠️ Both #N and #M are P0 but #M depends on #N — confirm ordering?"` |
 | **Defer** | "先不做 #3" | Set status → `Deferred` in backlog. If spec was already generated, leave it as `draft` (not frozen). |
 | **Un-defer** | "恢復 #3", "un-defer #3" | Set status → `Pending` in backlog. If spec exists as `draft`, it remains usable. |
 | **Cancel** | "不做 #3 了" | Set status → `Cancelled` in backlog. If spec exists, add `status: cancelled` to frontmatter. Remove from Spec Index. |
