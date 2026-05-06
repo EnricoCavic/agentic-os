@@ -1337,6 +1337,22 @@ if [[ -f "$BACKLOG_FILE" ]]; then
         record_result PASS "backlog Kind diversity: ${kind_variety} distinct Kind values in use"
       fi
     fi
+
+    # L-2: label vocabulary drift — warn if distinct label count exceeds max_distinct_labels (default 15)
+    distinct_labels=$(grep '| Pending\|In Progress' "$BACKLOG_FILE" 2>/dev/null | awk -F'|' '{print $4}' | tr ',' '\n' | sed 's/[[:space:]]//g' | grep -v '^—$' | grep -v '^$' | sort -u | wc -l || echo 0)
+    if [[ "$distinct_labels" -gt 15 ]]; then
+      record_result WARN "backlog label vocabulary: ${distinct_labels} distinct labels (>15) — possible drift across sessions; review and consolidate via /spec-intake"
+    elif [[ "$distinct_labels" -gt 0 ]]; then
+      record_result PASS "backlog label vocabulary: ${distinct_labels} distinct labels"
+    fi
+
+    # L-4: cluster-declined marker GC — warn if too many suppressions accumulated
+    declined_count=$(grep -c 'cluster-declined:' "$BACKLOG_FILE" 2>/dev/null || echo 0)
+    if [[ "$declined_count" -gt 5 ]]; then
+      record_result WARN "backlog cluster-declined: ${declined_count} suppression markers (>5) — review expired/stale suppressions in _product-backlog.md ## Source Summary"
+    elif [[ "$declined_count" -gt 0 ]]; then
+      record_result PASS "backlog cluster-declined: ${declined_count} suppression marker(s)"
+    fi
   else
     record_result WARN "backlog schema: missing column(s): ${missing_cols[*]}"
     echo "  fix: run /spec-intake to trigger merge-guard backfill, or add columns manually"

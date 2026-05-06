@@ -106,11 +106,11 @@ When the spec is large, read from `docs/specs/_raw-intake.md` (NOT from conversa
 
    ```
    ## Feature Inventory (extracted from spec)
-   | # | Feature | Kind | Labels | Priority | Rough Tier | Dependencies | Notes |
-   |---|---|---|---|---|---|---|---|
-   | 1 | User Auth | feature | auth | P0 | feature | — | OAuth + email |
-   | 2 | Dashboard | feature | ui, analytics | P1 | feature | #1 | real-time data |
-   | 3 | DB Schema | feature | infra | P2 | architecture-change | — | multi-tenant |
+   | # | Feature | Kind | Labels | Priority | Rough Tier | Dependencies |
+   |---|---|---|---|---|---|---|
+   | 1 | User Auth | feature | auth | P0 | feature | — |
+   | 2 | Dashboard | feature | ui, analytics | P1 | feature | #1 |
+   | 3 | DB Schema | feature | infra | P2 | architecture-change | — |
    ```
 
    Rough Tier uses classification from `engineering_guardrails.md §10.1`.
@@ -391,7 +391,7 @@ Amendment: docs/specs/user-auth-sso.md [Draft]
 | Action | Trigger | What AI does |
 |---|---|---|
 | **Reorder** | "先做 #5" | Update `_product-backlog.md` order. Check dependency conflicts. |
-| **Reprioritize** | "這個 P0", "升到優先", "#3 改成 P1" | Update `Priority` field for the named item(s). Append an audit line to backlog `## Source Summary`: `- <YYYY-MM-DD>: #N Priority <old>→<new>`. If multiple items conflict (two P0s with dependency), warn: `"⚠️ Both #N and #M are P0 but #M depends on #N — confirm ordering?"` |
+| **Reprioritize** | "這個 P0", "升到優先", "#3 改成 P1" | **Before updating**: if upgrading to P0, count existing P0 pending items. If count ≥ 3, ask: `"You currently have N P0 items (#A, #B, #C). Confirm adding another P0, or tell me which to downgrade?"` — wait for user reply before writing. Then update `Priority` field for the named item(s). Append an audit line to backlog `## Source Summary`: `- <YYYY-MM-DD>: #N Priority <old>→<new>`. If multiple items conflict (two P0s with dependency), warn: `"⚠️ Both #N and #M are P0 but #M depends on #N — confirm ordering?"` |
 | **Defer** | "先不做 #3" | Set status → `Deferred` in backlog. If spec was already generated, leave it as `draft` (not frozen). |
 | **Un-defer** | "恢復 #3", "un-defer #3" | Set status → `Pending` in backlog. If spec exists as `draft`, it remains usable. |
 | **Cancel** | "不做 #3 了" | Set status → `Cancelled` in backlog. If spec exists, add `status: cancelled` to frontmatter. Remove from Spec Index. |

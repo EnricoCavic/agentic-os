@@ -2,6 +2,20 @@
 # Central source of truth for governance constants.
 # Workflows reference these values instead of hardcoding inline defaults.
 
+cluster:
+  # Minimum same-label items with no parent spec before a cluster prompt fires.
+  threshold: 3
+  # Maximum distinct label values in a backlog before validate.sh warns of vocabulary drift.
+  max_distinct_labels: 15
+  # P0 ratio threshold — WARN when more than this % of pending items are P0.
+  p0_warn_pct: 20
+  # Maximum cluster-declined suppression markers in backlog Source Summary.
+  max_declined_markers: 5
+  # Cluster prompt suppression expiry: re-prompt if same-label count grew by this many items.
+  declined_growth_threshold: 3
+  # Cluster prompt suppression expiry: re-prompt after this many days regardless of count.
+  declined_ttl_days: 90
+
 worklog:
   # Compaction triggers — when a Work Log exceeds either threshold,
   # compact per /handoff §6 before proceeding with the current phase.
