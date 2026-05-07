@@ -38,12 +38,9 @@ Global directives for all AI agents. Loaded automatically every turn
 > [!IMPORTANT]
 > `/retro` may append structured `## Global Lessons` entries to `current_state.md` via `.agentcortex/tools/guard_context_write.py`. This is the ONLY non-ship SSoT write exception. Do not generalize this precedent to `/implement`, `/review`, or any other workflow.
 
-## Multi-Person Collaboration
+## Multi-Person / Multi-Session Collaboration
 
-- **One Branch = One Owner**: Never have two AI sessions writing to the same Work Log simultaneously. See `engineering_guardrails.md` §11.
-- **Advisory Work Log Lock**: Non-`tiny-fix` sessions SHOULD write a lock file at `.agentcortex/context/work/<worklog-key>.lock.json` (schema and timeout in `.agent/config.yaml §worklog_lock`). When resuming, if a non-stale lock belongs to another session, WARN before proceeding. This is advisory — it signals, not blocks. See bootstrap §2a.
-- **Agent Identity**: Every session MUST write `## Session Info` (model name, timestamp, platform) to Work Log during bootstrap.
-- **Ship Guard**: Before shipping, check if `current_state.md` was modified by another session. If so, warn user before merge.
+When multiple AI sessions or humans work on the same repo: **one branch = one owner** (no concurrent Work Log writes), each session writes a distinct `## Session Info` (model + timestamp + platform), advisory lock file at `.agentcortex/context/work/<worklog-key>.lock.json` signals (not blocks), and ship checks `current_state.md` for cross-session modification before merge. Full rules: `engineering_guardrails.md §11`. Lock schema: `.agent/config.yaml §worklog_lock`. For multi-person on the same issue, prefer naming `.agentcortex/context/work/<owner>-<worklog-key>.md`.
 
 ## Delivery Gates
 
@@ -112,7 +109,7 @@ Global directives for all AI agents. Loaded automatically every turn
    - **Manual (Intent Router)**: User explicitly requests a skill via natural language (e.g., "用 TDD 來做"). This supplements bootstrap's recommendation — the skill activates in the current phase. However, manual activation MUST still respect the skill's `Skip when` column from the bootstrap rule table. If the rule table says skip for the current classification, manual activation is blocked.
 5. **Skill Loading at Phase Entry**: canonical contract is in `## Shared Phase Contracts — Phase-Entry Skill Loading` below. Apply it at every phase entry for `/plan`, `/implement`, `/review`, `/test`, `/handoff`, and `/ship`.
 6. **Skill Conflict Resolution**: `/bootstrap` MUST read `.agent/rules/skill_conflict_matrix.md` once when assembling `Recommended Skills`. If any recommended pair is marked `partial-conflict` or `conflict`, bootstrap MUST record the chosen precedence or partitioning strategy in `## Conflict Resolution`. Later phases rely on that Work Log record and do not re-read the matrix by default.
-7. **Skill Notes Cache Contract**: `## Skill Notes` is the approved cache for loaded skills. Leave as `none` until a phase loads a note. Each skill block MUST use: `### <skill-id>`, `- First Loaded Phase: <phase>`, `- Applies To: <phases>`, one `#### <phase>` block per completed phase (≥2 Checklist bullets + 1 Constraint, body > 50 chars). Compaction MUST preserve `## Skill Notes` verbatim. Validity thresholds: `.agent/config.yaml §skill_cache_policy`. (`cached_hash` was removed — pure honor-system, never computed in practice; structural validity check is the actual cache predicate.)
+7. **Skill Notes Cache Contract**: `## Skill Notes` is the approved cache for loaded skills. Leave as `none` until a phase loads a note. Each skill block MUST use: `### <skill-id>`, `- First Loaded Phase: <phase>`, `- Applies To: <phases>`, one `#### <phase>` block per completed phase (≥2 Checklist bullets + 1 Constraint, body > 50 chars). Compaction MUST preserve `## Skill Notes` verbatim. Validity thresholds: `.agent/config.yaml §skill_cache_policy`.
 
 8. **User Skill Preferences**: If `.agentcortex/context/private/user-preferences.yaml` exists, bootstrap merges `pinned`/`disabled` lists post conflict-resolution. Protected skills (in `config.yaml §user_preferences.protected_skills` or with `trigger_priority: hard` + `block_if_missed: true`) cannot be disabled. `force: true` pins override `skip-when` but never `phase_scope`. Full algorithm: bootstrap §3.6a. Template: `.agentcortex/templates/user-preferences.yaml`.
 9. **Verification-Before-Completion 5-Gate Contract**: canonical contract is in `## Shared Phase Contracts — Verification Before Completion (5-Gate Sequence)` below. Apply it whenever the agent claims phase completion for any non-`tiny-fix` task.
@@ -126,7 +123,7 @@ Canonical shared contracts for all phase workflows. Workflows reference these by
 At every phase entry (`/plan`, `/implement`, `/review`, `/test`, `/handoff`, `/ship`), when the Work Log contains a `Recommended Skills` entry AND those skills list the current phase in their `phases:` metadata:
 
 - **Metadata First**: BEFORE reading any full `SKILL.md` body, check `.agentcortex/metadata/trigger-compact-index.json` or `.agentcortex/metadata/trigger-registry.yaml` to confirm `load_policy` and `cost_risk`. Blindly loading multiple heavy skill bodies without consulting metadata is a Token Leak violation. **Fallback**: If neither metadata file exists (e.g., fresh repo or pre-Stage-1 deployment), fall back to the Cache Check rules below — metadata absence MUST NOT block skill loading entirely.
-- **Cache Check**: Prefer `## Skill Notes` cache when valid. Cache hit = phase block exists AND ≥2 Checklist bullets AND ≥1 Constraint AND body > 50 chars. Thresholds: `.agent/config.yaml §skill_cache_policy`. (Hash-based cache invalidation removed in 2026-04-25 cleanup — no validator computed `cached_hash` in practice; structural check is the actual predicate.)
+- **Cache Check**: Prefer `## Skill Notes` cache when valid. Cache hit = phase block exists AND ≥2 Checklist bullets AND ≥1 Constraint AND body > 50 chars. Thresholds: `.agent/config.yaml §skill_cache_policy`.
 - **On cache miss**: Only on cache miss AND metadata `load_policy` match may the AI re-read the full `SKILL.md`, then refresh that skill's `## Skill Notes` block in the Work Log. Explicitly state: "Applying [skill-name] strategy."
 - **Conflict Resolution**: Reuse `## Conflict Resolution` from bootstrap if multiple skills need precedence or scoping boundaries.
 - **Exception**: `tiny-fix` has no Work Log — skip this check entirely.
@@ -147,12 +144,7 @@ Each phase adds local scope after these 5 gates (see individual workflow files f
 
 ### Phase Output Compression
 
-When moving through `/bootstrap`, `/plan`, `/implement`, `/review`, `/test`, `/handoff`, and `/ship`, phase chat outputs MUST stay compact and delta-oriented. The chat response is a summary of what landed in the Work Log file — NOT a re-emission of everything the Work Log already captures.
-
-- No redundant "awaiting confirmation" after gate pass when the user explicitly requested the phase.
-- Reuse prior evidence by reference (`Ref: Work Log Evidence`, `Ref: Work Log §<section>`), not re-narration.
-- The Work Log file is the persistent record. Do NOT duplicate its contents in the chat response. A 1-line pointer + key decisions is sufficient.
-- Each phase outputs only its delta in chat:
+Phase chat outputs MUST be compact deltas — the Work Log is the persistent record. Do NOT duplicate Work Log contents in chat; reuse prior evidence by reference (`Ref: Work Log §<section>`); no "awaiting confirmation" after gate pass on explicit phase request. Per-phase delta:
   - `/bootstrap` → Classification (+1-line why), Goal, Skills (comma list), Context Read Receipt (1 line), Next Step. Full Constraints, AC, Non-goals, Risks, and the Read Plan live in the Work Log file, NOT in the chat response.
   - `/plan` → gate + plan (compact block: Target Files · Steps · Risk+Rollback · AC Coverage · Mode). No section headers when the block is < 15 lines.
   - `/implement` → files changed (list), tests run (1 line), checkpoint SHA. No code re-narration.
@@ -160,15 +152,11 @@ When moving through `/bootstrap`, `/plan`, `/implement`, `/review`, `/test`, `/h
   - `/test` → commands + pass/fail + coverage delta. No re-printing the test skeleton.
   - `/handoff` → pointer to archived Work Log + 3-line Resume block.
   - `/ship` → final deltas + evidence refs + remaining constraints. No multi-paragraph prose.
-- **Workflow Expected Output Format is the ceiling, not the floor.** When a workflow file prescribes an output template, that template is the MAXIMUM chat output, not a required minimum. Skip any listed field that does not change the next-phase decision — if a field's value is `none`, `n/a`, or unchanged since the previous phase, omit it. Do NOT add extra decorative sections, bonus explanations, or "summary of what I just did" blocks on top of the template. Governed by the `Response Budget (Hard Cap)` in `## Core Directives` — chat prose ≤ 8 lines + essential structured blocks.
+- **Output template is ceiling, not floor**: skip any field with value `none` / `n/a` / unchanged-from-prior-phase. No bonus explanations or self-summaries on top of the template. See `## Core Directives` Response Budget for the hard cap.
 
-## Multi-Session Concurrency (Antigravity)
+## Context-Bound Confirmation
 
-1. **Context-Bound Confirmation**: The agent MUST verify that user confirmations apply to the current branch/task context. If context has changed (e.g., branch switch), AI MUST re-confirm intent before proceeding.
-2. **Work Log Ownership**: A Work Log MUST begin with a metadata block containing `Owner` and `Branch`. Missing fields = Gate FAIL. For multi-person collaboration on the same issue, prefer naming: `.agentcortex/context/work/<owner>-<worklog-key>.md`.
-3. **Multi-Agent Rules**: If multiple agents operate on the same branch:
-   - Each session MUST use a distinct Session ID in the Work Log metadata (`## Session Info`).
-   - Agents MUST NOT overwrite other sessions' Evidence or Drift sections.
+If conversation context changes (e.g., branch switch), AI MUST re-confirm intent before proceeding — user approval applies to the original context, not transferable. Work Log header MUST contain `Owner` + `Branch` (missing = Gate FAIL). Sessions MUST NOT overwrite other sessions' Evidence or Drift sections.
 
 ## References
 
@@ -179,30 +167,7 @@ When moving through `/bootstrap`, `/plan`, `/implement`, `/review`, `/test`, `/h
 
 ## Document Lifecycle Governance
 
-### Document Taxonomy
-
-| Type | Path | Status | Owner Workflow |
-|---|---|---|---|
-| Domain Doc (L1 Synthesis) | `docs/architecture/<domain>.md` | `living` | `/govern-docs` |
-| Domain Doc (L2 Decision Log) | `docs/architecture/<domain>.log.md` | `living` | `/ship` |
-| Feature Spec | `docs/specs/<feature>.md` | `draft→frozen→shipped` | `/spec`, `/ship` |
-| ADR | `docs/adr/ADR-NNN-<name>.md` | `accepted` | `/adr` |
-| Product Backlog | `docs/specs/_product-backlog.md` | `living` | `/spec-intake` |
-| Guide | `docs/guides/<topic>.md` | `living` | varies |
-
-### Naming Axiom
-
-**One topic, one canonical file.** Before creating any new `.md` file in `docs/`, AI MUST verify no existing file covers the same domain (`ls docs/<subdir>/`). If a canonical file exists, write a pointer, not a copy. Duplicating content across documents is a governance violation.
-
-### Document Creation Gate
-
-Before creating any new governance document, AI MUST answer three questions:
-
-1. Does this topic already have a canonical home? (check `docs/` structure)
-2. Can a reader 6 months from now guess this file's location from its name alone?
-3. Can this be a section in an existing file rather than a new standalone file?
-
-If the answer to #3 is yes → add a section, do not create a new file.
+Document taxonomy, naming axiom, and creation gate live in `.agentcortex/docs/guides/doc-governance.md`. Hard rule preserved here: **one topic, one canonical file** — before creating any new `.md` in `docs/`, verify no existing file covers the same domain; write a pointer, not a copy.
 
 ## Platform Paths
 
@@ -210,20 +175,5 @@ If the answer to #3 is yes → add a section, do not create a new file.
 - Codex: `.agents/skills/`
 - Note: Both paths exist together. `.agent/skills/<name>` (Antigravity) is a **metadata stub** (~20 lines: frontmatter + Quick Reference + pointer to `runtime_anchor`). `.agents/skills/<name>/SKILL.md` is the **canonical full body** referenced by `runtime_anchor` and read on cache-miss. Workflows cite `.agents/skills/...` for cross-platform reach; bootstrap-time skill triggering reads only the stub.
 
-## Override Layer (`AGENTS.override.md`)
+<!-- Override Layer (AGENTS.override.md) is soft-launch — see `.agentcortex/docs/guides/doc-governance.md` -->
 
-Per-machine or per-fork overrides MUST live in a sibling override file rather than mutating canonical governance docs. This mirrors the Codex `AGENTS.override.md` precedence pattern (<https://developers.openai.com/codex/guides/agents-md>) so agents trained on either ecosystem reach for the same convention.
-
-**Precedence chain** (later layers override earlier):
-
-1. `AGENTS.md` (this file — canonical, committed)
-2. Project root `AGENTS.override.md` (committed only if the project intends the override to apply to all collaborators; otherwise gitignored)
-3. `~/.agentcortex/AGENTS.override.md` (per-user, never committed)
-
-**Rules**:
-- Override files MAY refine, narrow, or disable specific directives. They MUST NOT relax the gate sequence in `## Delivery Gates` or the No-Bypass Rule in `## Core Directives` — those are framework invariants.
-- Each override directive MUST cite the section it overrides: `> Overrides: AGENTS.md §<section> — <reason>`.
-- Agents MUST read override files at session start when present, in the precedence order above. Missing override files are not an error.
-- `validate.sh` SHOULD list any active override files in its summary so they are auditable.
-
-**Soft-launch status**: The runtime read step is documented but not yet enforced by automation. Treat absence of an override file as the default; the rule activates the moment one is created.

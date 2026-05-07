@@ -83,6 +83,7 @@ get_tier() {
         .agentcortex/context/current_state.md) echo "scaffold" ;;
         .agentcortex/adr/*) echo "scaffold" ;;
         .agentcortex/templates/*) echo "scaffold" ;;
+        .claude/settings.json) echo "scaffold" ;;
         .github/ISSUE_TEMPLATE/*) echo "scaffold" ;;
         .github/PULL_REQUEST_TEMPLATE.md) echo "scaffold" ;;
 
@@ -358,7 +359,7 @@ if $DRY_RUN; then
     echo "Directories that would be created:"
     for d in \
         ".agent/rules" ".agent/workflows" ".agent/skills" \
-        ".antigravity" ".agents/skills" ".claude/commands" \
+        ".antigravity" ".agents/skills" ".claude/commands" ".claude/agents" \
         ".codex" "codex/rules" ".github/ISSUE_TEMPLATE" \
         ".agentcortex/bin" ".agentcortex/metadata" ".agentcortex/tools" \
         ".agentcortex/docs/guides" ".agentcortex/context/work" \
@@ -384,6 +385,8 @@ if $DRY_RUN; then
              "$REPO_ROOT"/.agentcortex/metadata/trigger-registry.yaml "$REPO_ROOT"/.agentcortex/metadata/trigger-compact-index.json \
              "$REPO_ROOT"/.agentcortex/templates/* \
              "$REPO_ROOT"/.agentcortex/adr/*.md \
+             "$REPO_ROOT"/.claude/settings.json \
+             "$REPO_ROOT"/.claude/agents/*.md \
              "$REPO_ROOT"/.codex/INSTALL.md \
              "$REPO_ROOT"/.github/ISSUE_TEMPLATE/*.md "$REPO_ROOT"/.github/PULL_REQUEST_TEMPLATE.md; do
         [ -f "$f" ] || continue
@@ -439,6 +442,7 @@ mkdir -p "$TARGET/.agent/skills"
 mkdir -p "$TARGET/.antigravity"
 mkdir -p "$TARGET/.agents/skills"
 mkdir -p "$TARGET/.claude/commands"
+mkdir -p "$TARGET/.claude/agents"
 mkdir -p "$TARGET/.codex"
 mkdir -p "$TARGET/codex/rules"
 mkdir -p "$TARGET/.github/ISSUE_TEMPLATE"
@@ -613,6 +617,21 @@ if [ -d "$REPO_ROOT/.claude/commands" ]; then
         [ -f "$f" ] || continue
         deploy_file "$f" ".claude/commands/$(basename "$f")"
     done
+fi
+
+# --- Deploy: .claude/agents (core — acx-* sub-agent shims for native skill injection) ---
+if [ -d "$REPO_ROOT/.claude/agents" ]; then
+    mkdir -p "$TARGET/.claude/agents"
+    for f in "$REPO_ROOT"/.claude/agents/*.md; do
+        [ -f "$f" ] || continue
+        deploy_file "$f" ".claude/agents/$(basename "$f")"
+    done
+fi
+
+# --- Deploy: .claude/settings.json (scaffold — user may extend permissions/env) ---
+if [ -f "$REPO_ROOT/.claude/settings.json" ]; then
+    mkdir -p "$TARGET/.claude"
+    deploy_file "$REPO_ROOT/.claude/settings.json" ".claude/settings.json"
 fi
 
 # --- Deploy: .codex/INSTALL.md (core) ---

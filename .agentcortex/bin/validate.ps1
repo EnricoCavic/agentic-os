@@ -291,7 +291,12 @@ $claudeRequiredFiles = @(
     (Join-NormalPath $claudeCommandsDir 'ship.md'),
     (Join-NormalPath $claudeCommandsDir 'decide.md'),
     (Join-NormalPath $claudeCommandsDir 'test-classify.md'),
-    (Join-NormalPath $claudeCommandsDir 'claude-cli.md')
+    (Join-NormalPath $claudeCommandsDir 'claude-cli.md'),
+    (Join-NormalPath $root '.claude/agents/acx-implementer.md'),
+    (Join-NormalPath $root '.claude/agents/acx-reviewer.md'),
+    (Join-NormalPath $root '.claude/agents/acx-tester.md'),
+    (Join-NormalPath $root '.claude/agents/acx-handoff.md'),
+    (Join-NormalPath $root '.claude/agents/acx-shipper.md')
 )
 
 $requiredDirs = @(
@@ -1021,31 +1026,40 @@ else {
     Add-Result -Level 'WARN' -Message 'optional guard hook sample is not present; guarded-write checks remain advisory only'
 }
 
-# Hook violation receipts — surface counts written by Claude Code Stop /
-# PreCompact hooks so the framework sees what the harness saw. WARN-only.
-$sentinelReceipts = Join-NormalPath $root '.agentcortex/context/sentinel-violations.jsonl'
-$precompactReceipts = Join-NormalPath $root '.agentcortex/context/precompact-violations.jsonl'
-$sentinelViolations = 0
-$precompactViolations = 0
-if (Test-Path -LiteralPath $sentinelReceipts) {
-    $sentinelViolations = (Select-String -LiteralPath $sentinelReceipts -Pattern '"violation"' -SimpleMatch -AllMatches |
-        Measure-Object).Count
+# Work Log Phase Summary audit — pure PowerShell, no Python hooks.
+# Sentinel (⚡ ACX) and PreCompact enforcement is model self-attestation per
+# AGENTS.md. Audit happens here at validate-time on archived Work Logs:
+# every archived non-tiny-fix Work Log MUST have a non-empty `## Phase
+# Summary` section (replaces the runtime PreCompact hook intent).
+$archiveDir = Join-NormalPath $root '.agentcortex/context/archive'
+$phaseSummaryViolations = 0
+$phaseSummaryViolationList = New-Object System.Collections.Generic.List[string]
+if (Test-Path -Path $archiveDir -PathType Container) {
+    $archivedLogs = Get-ChildItem -Path $archiveDir -Filter '*.md' -File -Recurse -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -notlike '.gitkeep*' }
+    foreach ($wl in $archivedLogs) {
+        $content = Get-Content -Path $wl.FullName -Raw -Encoding utf8
+        $classification = ''
+        if ($content -match '(?m)^- \*\*Classification\*\*:\s*(.+?)\s*$') {
+            $classification = $Matches[1].Trim()
+        }
+        if ($classification -eq 'tiny-fix') { continue }
+        $summaryBody = ''
+        if ($content -match '(?ms)^## Phase Summary\s*\r?\n(.*?)(?=\r?\n## |\z)') {
+            $summaryBody = ($Matches[1] -replace '\s', '')
+        }
+        if ([string]::IsNullOrEmpty($summaryBody) -or $summaryBody -eq 'none') {
+            $phaseSummaryViolations++
+            $phaseSummaryViolationList.Add("  empty Phase Summary: $($wl.FullName.Substring($root.Length).TrimStart('/','\'))")
+        }
+    }
 }
-if (Test-Path -LiteralPath $precompactReceipts) {
-    $precompactViolations = (Select-String -LiteralPath $precompactReceipts -Pattern '"violation"' -SimpleMatch -AllMatches |
-        Measure-Object).Count
-}
-if ($sentinelViolations -gt 0) {
-    Add-Result -Level 'WARN' -Message "sentinel hook violations recorded: $sentinelViolations (see $sentinelReceipts)"
+if ($phaseSummaryViolations -gt 0) {
+    Add-Result -Level 'WARN' -Message "archived Work Logs with empty Phase Summary: $phaseSummaryViolations"
+    foreach ($line in $phaseSummaryViolationList) { Write-Output $line }
 }
 else {
-    Add-Result -Level 'PASS' -Message 'no sentinel hook violations recorded'
-}
-if ($precompactViolations -gt 0) {
-    Add-Result -Level 'WARN' -Message "precompact hook violations recorded: $precompactViolations (see $precompactReceipts)"
-}
-else {
-    Add-Result -Level 'PASS' -Message 'no precompact hook violations recorded'
+    Add-Result -Level 'PASS' -Message 'archived Work Logs have non-empty Phase Summary (or none archived yet)'
 }
 
 $gitignore = Join-NormalPath $root '.gitignore'

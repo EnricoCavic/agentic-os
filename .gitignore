@@ -5,8 +5,6 @@
 !.agentcortex/context/work/.gitkeep.md
 .agentcortex/context/.guard_receipt.json
 .agentcortex/context/.guard_locks/
-.agentcortex/context/sentinel-violations.jsonl
-.agentcortex/context/precompact-violations.jsonl
 .agentcortex/context/private/
 .agent/private/
 
