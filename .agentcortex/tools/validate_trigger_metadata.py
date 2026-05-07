@@ -206,7 +206,7 @@ def validate_resolver_parity(root: Path, registry: dict[str, Any], errors: list[
             "manual_skills": [],
             "scope_signals": ["testable logic", "api endpoint", "token"],
             "failure_signals": [],
-            "expected": {"executing-plans", "verification-before-completion", "test-driven-development", "api-design", "auth-security"},
+            "expected": {"verification-before-completion", "test-driven-development", "api-design", "auth-security", "karpathy-principles"},
         },
         {
             "classification": "feature",
@@ -214,7 +214,7 @@ def validate_resolver_parity(root: Path, registry: dict[str, Any], errors: list[
             "manual_skills": [],
             "scope_signals": ["token", "dependency"],
             "failure_signals": [],
-            "expected": {"red-team-adversarial", "requesting-code-review", "auth-security", "production-readiness"},
+            "expected": {"red-team-adversarial", "auth-security", "production-readiness", "karpathy-principles"},
         },
         {
             "classification": "hotfix",
@@ -222,7 +222,7 @@ def validate_resolver_parity(root: Path, registry: dict[str, Any], errors: list[
             "manual_skills": [],
             "scope_signals": [],
             "failure_signals": ["test-failure"],
-            "expected": {"executing-plans", "systematic-debugging", "verification-before-completion"},
+            "expected": {"systematic-debugging", "verification-before-completion", "karpathy-principles"},
         },
     ]
 

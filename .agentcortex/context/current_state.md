@@ -11,9 +11,9 @@
   - Task Isolation: `.agentcortex/context/work/<worklog-key>.md`
   - Active Work Log Path: derive <worklog-key> from the raw branch name using filesystem-safe normalization before any gate checks.
   - Workflows & Policies: `.agent/workflows/*.md`, `.agent/rules/*.md`
-- **Last Updated**: 2026-05-06
-- **Last Verified**: 2026-05-06
-- **Update Sequence**: 11
+- **Last Updated**: 2026-05-07
+- **Last Verified**: 2026-05-07
+- **Update Sequence**: 12
 - **ADR Index**:
   - docs/adr/ADR-001-governance-friction-tuning.md — ADR-001: Governance Friction Tuning, accepted 2026-04-23
   - docs/adr/ADR-002-guarded-governance-writes.md — ADR-002: Guarded Governance Writes (lock unification + CI lint + lifecycle frontmatter), accepted 2026-04-25
@@ -65,6 +65,16 @@
 - [Category: governance-proposal][Severity: MEDIUM][Trigger: plan-proposes-must-rule][prev: 7f5a25c3] When /plan proposes adding a MUST rule to AGENTS.md or .agent/rules/, cross-check the [enforcement][HIGH] Global Lesson immediately at plan time — not just at /implement. A MUST rule without a corresponding hook, validator, or test is honor-system theatre regardless of where in the workflow it is caught. Self-check: "What enforces this rule if the AI ignores it?" If the answer is "nothing", delete the rule or add the enforcement first.
 
 ## Ship History
+
+### Ship-claude-modest-antonelli-da2aec-2026-05-07
+- Feature shipped: Zero-Python downstream + AGENTS.md trim + deploy-gap fix + skill cleanup (PR #91, quick-win, 4 commits).
+  - aec35d6: delete `.claude/hooks/check-{sentinel,precompact}.py`, strip hook wiring from `.claude/settings.json`, replace runtime hook intent with bash/PowerShell-native Work Log Phase Summary audit in `validate.{sh,ps1}`. AGENTS.md 229 → 181 lines (-993 tokens). Deploy `.claude/agents/acx-*.md` (5 shims) + `.claude/settings.json` as scaffold tier in `deploy.sh`.
+  - d3d6e67: repair 3 cross-file anchor refs broken by AGENTS.md heading rename (`.agent/config.yaml`, `engineering_guardrails.md` §11 redirect, add `### Skill Activation Triggers` heading).
+  - 9c23982: post-review cleanup — move `### Skill Activation Triggers` out of indented numbered list to top-level placement; fix pre-existing `validate.sh:1329` bash quirk (`grep -c` + `|| echo 0` → `0\n0` syntax error); remove `.claude/hooks/__pycache__/` residue.
+  - f3d97fc: delete 5 redundant process skills (`executing-plans`, `writing-plans`, `requesting-code-review`, `receiving-code-review`, `finishing-a-development-branch`); inline content into `implement.md` / `plan.md` / `handoff.md` / `review.md` / `ship.md` workflows as always-on rules. Demote Skill Notes MUST → SHOULD per Lesson L4. Skills 19 → 14, all remaining have at least one of (inlined-content / acx-shim native injection / workflow `IF active` block) — zero pure-honor-system.
+- Tests: validate 74 PASS / 0 WARN / 0 FAIL / 2 SKIP (consistent across all 4 commits) + CI 7/7 green (Markdown Links, Deploy Smoke Test, Deploy Smoke Test (No Python), Framework Validation, Framework Validation Python 3.9, Framework Validation Windows, ShellCheck — run 25484303443).
+- Commits: `aec35d6`, `d3d6e67`, `9c23982`, `f3d97fc`.
+- PR: https://github.com/KbWen/agentic-os/pull/91
 
 ### Ship-feat-epic-spec-hierarchy-governance-2026-05-06
 - Feature shipped: Label-based cluster grouping system for `_product-backlog.md` — resolves downstream backlog fragmentation.

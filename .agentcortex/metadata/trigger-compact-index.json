@@ -40,24 +40,6 @@
       "kind": "skill",
       "user_disableable": true
     },
-    "writing-plans": {
-      "load_policy": "phase-entry",
-      "cost_risk": "low",
-      "kind": "skill",
-      "user_disableable": true
-    },
-    "executing-plans": {
-      "load_policy": "phase-entry",
-      "cost_risk": "medium",
-      "kind": "skill",
-      "user_disableable": true
-    },
-    "finishing-a-development-branch": {
-      "load_policy": "on-match",
-      "cost_risk": "medium",
-      "kind": "skill",
-      "user_disableable": true
-    },
     "api-design": {
       "load_policy": "on-match",
       "cost_risk": "medium",
@@ -97,18 +79,6 @@
     "subagent-driven-development": {
       "load_policy": "on-match",
       "cost_risk": "high",
-      "kind": "skill",
-      "user_disableable": true
-    },
-    "requesting-code-review": {
-      "load_policy": "on-match",
-      "cost_risk": "low",
-      "kind": "skill",
-      "user_disableable": true
-    },
-    "receiving-code-review": {
-      "load_policy": "on-match",
-      "cost_risk": "low",
       "kind": "skill",
       "user_disableable": true
     },
@@ -175,7 +145,7 @@
         ]
       },
       "load_policy": "always",
-      "content_hash": "30e63766"
+      "content_hash": "1f39dafb"
     },
     {
       "id": "test-driven-development",
@@ -269,62 +239,6 @@
       },
       "load_policy": "on-match",
       "content_hash": "22dddc01"
-    },
-    {
-      "id": "writing-plans",
-      "kind": "skill",
-      "phase_scope": [
-        "plan"
-      ],
-      "detect_by": {
-        "classification": [
-          "quick-win",
-          "feature",
-          "architecture-change",
-          "hotfix"
-        ]
-      },
-      "load_policy": "phase-entry",
-      "content_hash": "cdcfe0ce"
-    },
-    {
-      "id": "executing-plans",
-      "kind": "skill",
-      "phase_scope": [
-        "implement"
-      ],
-      "detect_by": {
-        "classification": [
-          "quick-win",
-          "feature",
-          "architecture-change",
-          "hotfix"
-        ]
-      },
-      "load_policy": "phase-entry",
-      "content_hash": "e4fe373a"
-    },
-    {
-      "id": "finishing-a-development-branch",
-      "kind": "skill",
-      "phase_scope": [
-        "ship",
-        "handoff"
-      ],
-      "detect_by": {
-        "classification": [
-          "quick-win",
-          "feature",
-          "architecture-change",
-          "hotfix"
-        ],
-        "scope_signals": [
-          "branch work complete",
-          "ready for closure"
-        ]
-      },
-      "load_policy": "on-match",
-      "content_hash": "7f5b5b98"
     },
     {
       "id": "api-design",
@@ -492,50 +406,6 @@
       },
       "load_policy": "on-match",
       "content_hash": "96d1736e"
-    },
-    {
-      "id": "requesting-code-review",
-      "kind": "skill",
-      "phase_scope": [
-        "review",
-        "handoff"
-      ],
-      "detect_by": {
-        "classification": [
-          "quick-win",
-          "feature",
-          "architecture-change",
-          "hotfix"
-        ],
-        "scope_signals": [
-          "changes ready for review",
-          "handoff prepared"
-        ]
-      },
-      "load_policy": "on-match",
-      "content_hash": "6d9d0491"
-    },
-    {
-      "id": "receiving-code-review",
-      "kind": "skill",
-      "phase_scope": [
-        "review"
-      ],
-      "detect_by": {
-        "classification": [
-          "quick-win",
-          "feature",
-          "architecture-change",
-          "hotfix"
-        ],
-        "scope_signals": [
-          "review comments",
-          "inline feedback",
-          "blocking feedback"
-        ]
-      },
-      "load_policy": "on-match",
-      "content_hash": "c0330735"
     },
     {
       "id": "using-git-worktrees",

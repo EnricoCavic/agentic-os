@@ -43,7 +43,7 @@ skill_cache_policy:
   # above (1-4) is the actual cache predicate. See AGENTS.md §Skill Safety #7.
 
 # Advisory Work Log locking — prevents accidental concurrent edits.
-# Contract: AGENTS.md §Multi-Person Collaboration.
+# Contract: AGENTS.md §Multi-Person / Multi-Session Collaboration.
 worklog_lock:
   # Lock file: .agentcortex/context/work/<worklog-key>.lock.json
   # Schema: { "owner", "session", "branch", "phase", "updated_at", "stale_timeout_minutes" }

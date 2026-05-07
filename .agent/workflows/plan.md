@@ -99,9 +99,9 @@ If the plan depends on a repo-external library, external API, package manager ch
 
 Apply the Phase-Entry Skill-Loading Protocol (AGENTS.md §Phase-Entry Skill Loading) for all skills listing `/plan` in their phases. Read `Recommended Skills` from the active Work Log before selecting which skill guidance to apply in this phase. Then apply planning-specific constraints from those skills when shaping steps, verification, and rollback.
 
-**IF `writing-plans` is active:**
-- Use the skill's plan structure as the default plan skeleton.
-- Keep every step independently verifiable and revertible.
+**Plan structure (always applies during /plan):**
+- Required fields: Goals & Non-goals, Blast Radius (files/modules), Step-by-step (2–5 minute granularity), Verification commands + expected results, Risks & Rollback plans.
+- Keep every step independently verifiable and revertible. Small reversible steps before larger ones. No scope crossing without confirmation.
 
 **IF `database-design` is active:**
 - Include migration safety, rollback shape, and schema verification in the plan.

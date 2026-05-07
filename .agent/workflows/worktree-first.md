@@ -6,7 +6,7 @@ tasks:
   - plan
   - implement
   - review
-  - finishing-a-development-branch
+  - ship
 ---
 
 # Worktree-first Workflow
@@ -15,5 +15,5 @@ tasks:
 2. `/plan`: Define scope exclusively within the new worktree.
 3. `/implement`: Complete all modifications and commits inside the worktree.
 4. `/review` + `/test`: Confirm zero side-effects.
-5. Finalize using `skills/finishing-a-development-branch` (Merge / PR / Keep / Archive).
+5. Finalize via `/handoff` + `/ship` — choose closure option explicitly: Merge now / Open PR / Keep branch / Archive-Close (decision tree inlined in `ship.md`).
 

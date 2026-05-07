@@ -251,6 +251,11 @@ claude_required_files=(
   "$CLAUDE_COMMANDS_DIR/decide.md"
   "$CLAUDE_COMMANDS_DIR/test-classify.md"
   "$CLAUDE_COMMANDS_DIR/claude-cli.md"
+  "$ROOT/.claude/agents/acx-implementer.md"
+  "$ROOT/.claude/agents/acx-reviewer.md"
+  "$ROOT/.claude/agents/acx-tester.md"
+  "$ROOT/.claude/agents/acx-handoff.md"
+  "$ROOT/.claude/agents/acx-shipper.md"
 )
 
 required_dirs=(
@@ -1131,28 +1136,30 @@ else
   record_result WARN "optional guard hook sample is not present; guarded-write checks remain advisory only"
 fi
 
-# Hook violation receipts — surface counts written by Claude Code Stop /
-# PreCompact hooks so the framework sees what the harness saw. WARN-only.
-# Capability-by-presence: absent file = 0 violations = PASS.
-SENTINEL_RECEIPTS="$ROOT/.agentcortex/context/sentinel-violations.jsonl"
-PRECOMPACT_RECEIPTS="$ROOT/.agentcortex/context/precompact-violations.jsonl"
-sentinel_violations=0
-precompact_violations=0
-if [[ -f "$SENTINEL_RECEIPTS" ]]; then
-  sentinel_violations="$(grep -c '"violation"' "$SENTINEL_RECEIPTS" 2>/dev/null || echo 0)"
+# Work Log Phase Summary audit — pure bash, no Python hooks.
+# Sentinel (⚡ ACX) and PreCompact enforcement is model self-attestation per
+# AGENTS.md. Audit happens here at validate-time on archived Work Logs:
+# every archived non-tiny-fix Work Log MUST have a non-empty `## Phase
+# Summary` section (replaces the runtime PreCompact hook intent).
+ARCHIVE_DIR="$ROOT/.agentcortex/context/archive"
+phase_summary_violations=0
+phase_summary_violation_list=""
+if [[ -d "$ARCHIVE_DIR" ]]; then
+  while IFS= read -r -d '' wl; do
+    classification="$(grep -m1 -E '^- \*\*Classification\*\*:' "$wl" 2>/dev/null | sed -E 's/.*\*\*Classification\*\*:\s*//; s/\s*$//')"
+    [[ "$classification" == "tiny-fix" ]] && continue
+    summary_body="$(awk '/^## Phase Summary/{found=1; next} found && /^## /{exit} found{print}' "$wl" 2>/dev/null | tr -d '[:space:]')"
+    if [[ -z "$summary_body" || "$summary_body" == "none" ]]; then
+      phase_summary_violations=$((phase_summary_violations + 1))
+      phase_summary_violation_list="${phase_summary_violation_list}  empty Phase Summary: ${wl#$ROOT/}\n"
+    fi
+  done < <(find "$ARCHIVE_DIR" -name '*.md' -not -name '.gitkeep*' -print0 2>/dev/null || true)
 fi
-if [[ -f "$PRECOMPACT_RECEIPTS" ]]; then
-  precompact_violations="$(grep -c '"violation"' "$PRECOMPACT_RECEIPTS" 2>/dev/null || echo 0)"
-fi
-if [[ "$sentinel_violations" -gt 0 ]]; then
-  record_result WARN "sentinel hook violations recorded: ${sentinel_violations} (see ${SENTINEL_RECEIPTS})"
+if [[ "$phase_summary_violations" -gt 0 ]]; then
+  record_result WARN "archived Work Logs with empty Phase Summary: ${phase_summary_violations}"
+  printf '%b' "$phase_summary_violation_list"
 else
-  record_result PASS "no sentinel hook violations recorded"
-fi
-if [[ "$precompact_violations" -gt 0 ]]; then
-  record_result WARN "precompact hook violations recorded: ${precompact_violations} (see ${PRECOMPACT_RECEIPTS})"
-else
-  record_result PASS "no precompact hook violations recorded"
+  record_result PASS "archived Work Logs have non-empty Phase Summary (or none archived yet)"
 fi
 
 GITIGNORE="$ROOT/.gitignore"
@@ -1317,8 +1324,12 @@ if [[ -f "$BACKLOG_FILE" ]]; then
     record_result PASS "backlog schema: Kind/Labels/Priority columns present"
 
     # L-1: P0 ratio lint — warn if >20% of pending items are P0
-    total_pending=$(grep -c '| Pending' "$BACKLOG_FILE" 2>/dev/null || echo 0)
-    p0_pending=$(grep '| Pending' "$BACKLOG_FILE" 2>/dev/null | grep -c '| P0 |' || echo 0)
+    # NOTE: grep -c outputs "0" + exit 1 when no matches; `|| echo 0` then appends
+    # another "0" → `total_pending="0\n0"` breaks `[[ ]]`. tr -d '\n' coalesces.
+    total_pending=$(grep -c '| Pending' "$BACKLOG_FILE" 2>/dev/null | tr -d '\n' || echo 0)
+    p0_pending=$(grep '| Pending' "$BACKLOG_FILE" 2>/dev/null | grep -c '| P0 |' | tr -d '\n' || echo 0)
+    total_pending="${total_pending:-0}"
+    p0_pending="${p0_pending:-0}"
     if [[ "$total_pending" -gt 4 && "$p0_pending" -gt 0 ]]; then
       p0_ratio=$(( p0_pending * 100 / total_pending ))
       if [[ "$p0_ratio" -gt 20 ]]; then
