@@ -61,9 +61,7 @@ When multiple AI sessions or humans work on the same repo: **one branch = one ow
 
    **Optional Modules** (explicit opt-in only): `/ask-openrouter`, `/codex-cli`, `/claude-cli`. The AI MUST NOT silently choose any optional module unless the user clearly requests it. See `.agent/workflows/routing.md §2` for trigger phrases and ambiguity rules.
 
-   ### Skill Activation Triggers
-
-   **Skill Activation** (user explicit request or bootstrap auto-rule): See `.agent/workflows/routing.md §3` for trigger phrase lookup. **HARD RULE**: Skills activated via Intent Router attach to the CURRENT workflow phase only. They MUST NOT replace, skip, or alter workflow phase order. Attempting to use a skill to skip a phase is a gate violation.
+   Skill activation rules: see `### Skill Activation Triggers` below.
 
 2. **tiny-fix fast path**:
    < 3 files, no semantic change (typo, docs, non-functional config) → execute directly with minimal evidence (diff + 1-line verification).
@@ -100,6 +98,10 @@ When multiple AI sessions or humans work on the same repo: **one branch = one ow
     - DO NOT fail ship or Gates.
     - Append missing template sections to the Work Log silently.
     - Record `"Migrated from legacy format"` in the Drift Log.
+
+### Skill Activation Triggers
+
+**Skill Activation** (user explicit request or bootstrap auto-rule): See `.agent/workflows/routing.md §3` for trigger phrase lookup. **HARD RULE**: Skills activated via Intent Router attach to the CURRENT workflow phase only. They MUST NOT replace, skip, or alter workflow phase order. Attempting to use a skill to skip a phase is a gate violation.
 
 ## Skill Safety & Precedence (Antigravity)
 

@@ -1324,8 +1324,12 @@ if [[ -f "$BACKLOG_FILE" ]]; then
     record_result PASS "backlog schema: Kind/Labels/Priority columns present"
 
     # L-1: P0 ratio lint — warn if >20% of pending items are P0
-    total_pending=$(grep -c '| Pending' "$BACKLOG_FILE" 2>/dev/null || echo 0)
-    p0_pending=$(grep '| Pending' "$BACKLOG_FILE" 2>/dev/null | grep -c '| P0 |' || echo 0)
+    # NOTE: grep -c outputs "0" + exit 1 when no matches; `|| echo 0` then appends
+    # another "0" → `total_pending="0\n0"` breaks `[[ ]]`. tr -d '\n' coalesces.
+    total_pending=$(grep -c '| Pending' "$BACKLOG_FILE" 2>/dev/null | tr -d '\n' || echo 0)
+    p0_pending=$(grep '| Pending' "$BACKLOG_FILE" 2>/dev/null | grep -c '| P0 |' | tr -d '\n' || echo 0)
+    total_pending="${total_pending:-0}"
+    p0_pending="${p0_pending:-0}"
     if [[ "$total_pending" -gt 4 && "$p0_pending" -gt 0 ]]; then
       p0_ratio=$(( p0_pending * 100 / total_pending ))
       if [[ "$p0_ratio" -gt 20 ]]; then
