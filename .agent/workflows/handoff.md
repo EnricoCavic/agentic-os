@@ -77,11 +77,12 @@ Files the next agent can SKIP (already processed, no changes expected):
 
 Apply the Phase-Entry Skill-Loading Protocol (AGENTS.md §Phase-Entry Skill Loading) for all skills listing `/handoff` in their phases. Read `Recommended Skills` from the active Work Log before selecting which skill guidance to apply in this phase. Then apply each skill's handoff-specific expectations as additional summary requirements. Explicitly state: "Applying [skill-name] strategy for handoff."
 
-**IF `requesting-code-review` is active:**
+**Reviewer-facing handoff (always applies for review-bound handoff):**
 - Include reviewer-facing risk focus and any high-attention files in Layer 2.
+- Provide a concise PR-style summary: Context (background/goals), Scope (affected files + boundaries), Validation (tests run + results), Risks (side effects + mitigations), Questions (specific reviewer focus).
 
-**IF `finishing-a-development-branch` is active:**
-- State the current closure recommendation explicitly: Merge now / Open PR / Keep branch / Archive-Close.
+**Branch closure recommendation (always applies):**
+- State the current closure recommendation explicitly: **Merge now** (verified, risks acceptable) / **Open PR** (needs reviewer) / **Keep branch** (remaining work) / **Archive-Close** (canceled).
 - If merge is NOT yet appropriate, say what remains before closure.
 
 ## 4. Minimum References (HARD GATE)

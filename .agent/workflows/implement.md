@@ -106,7 +106,7 @@ When a skill is loaded, it **changes how you implement** — not just what you s
   4. Fix: Minimal fix + regression test
 - Resume implementation only after root cause is confirmed with evidence.
 
-**IF `executing-plans` is active:**
+**Plan execution discipline (always applies during /implement):**
 - Execute exactly ONE plan step at a time (not batched)
 - After each step: validate immediately, record result in Work Log
 - If deviating from plan: update the plan BEFORE proceeding

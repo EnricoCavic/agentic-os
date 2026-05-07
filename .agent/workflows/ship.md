@@ -126,8 +126,7 @@ Before evaluating entry conditions, apply the Phase-Entry Skill-Loading Protocol
 Apply the Verification-Before-Completion 5-Gate Contract (AGENTS.md §Verification Before Completion (5-Gate Sequence)). If ANY gate fails → `verdict: fail`. Do NOT proceed to Entry Conditions.
 Phase-specific: Evidence = specific commands, outputs, versions; Communication Gate = include constraints that remain.
 
-**IF `finishing-a-development-branch` is active:**
-Before merge/PR, execute:
+**Pre-merge / pre-PR closure (always applies before /ship):**
 1. Re-sync with mainline: `git fetch origin && git merge origin/<main-branch>` (use repo's default branch) — verify no conflicts or behavioral drift
 2. Re-run minimal required tests + critical regression tests after sync
 3. Verify documentation, migration scripts, configuration changes are all committed
@@ -137,6 +136,12 @@ Before merge/PR, execute:
    - **Keep branch**: Has remaining work; keep active
    - **Archive/Close**: Requirement canceled or strategy changed
 Entering "Merge now" is PROHIBITED if evidence is insufficient.
+
+**Production observability check (always applies for feature / architecture-change):**
+- Audit every `catch` / error-handling block in changed files: Logger MUST be production-observable (`Logger.error()`, crash reporter, structured stdout) — NOT debug-only (`debugPrint`, `console.log`, `print`).
+- Document the error sink in Work Log `## Observability` (e.g., `Sentry via Logger.error()` / `Crashlytics` / `stdout → CloudWatch`). If no production logging infrastructure exists, log this as Known Risk.
+- Rollback plan MUST answer: how operators detect the rollback is needed AND that it succeeded (alert / dashboard / health check).
+- Full body: `.agents/skills/production-readiness/SKILL.md`.
 
 ## Entry Conditions (HARD)
 

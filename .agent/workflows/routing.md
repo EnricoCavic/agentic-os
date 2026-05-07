@@ -125,13 +125,9 @@ It does NOT contain governance rules — those remain in `AGENTS.md`.
 | "平行開發", "parallel agents", "dispatch subtasks" | `dispatching-parallel-agents` |
 | "subagent", "分派 agent", "multi-agent" | `subagent-driven-development` |
 | "完成前檢查", "verify before done", "completion check" | `verification-before-completion` |
-| "執行計畫", "execute the plan", "follow the plan" | `executing-plans` |
-| "完成分支", "finish branch", "wrap up branch", "merge 準備" | `finishing-a-development-branch` |
-| "接收 review", "review feedback", "收到 review 意見" | `receiving-code-review` |
-| "請求 review", "request code review", "送 review", "要 review" | `requesting-code-review` |
 | "用 worktree", "git worktree", "worktree 隔離" | `using-git-worktrees` |
-| "寫計畫", "write plan", "規劃怎麼做" | `writing-plans` |
 | "查文件", "check docs", "查官方文檔", "read the docs", "看文件再做" | `doc-lookup` |
+| "執行計畫" / "execute the plan" / "完成分支" / "merge 準備" / "請求 review" / "接收 review" / "寫計畫" | inlined into `/plan`, `/implement`, `/handoff`, `/ship`, `/review` workflows — no skill load needed |
 
 ---
 

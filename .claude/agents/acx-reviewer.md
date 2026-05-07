@@ -2,7 +2,6 @@
 name: acx-reviewer
 description: AgentCortex /review phase executor. Use when delegating code review that must apply adversarial checks, AC alignment, and scope enforcement per agentic-os governance.
 skills:
-  - requesting-code-review
   - red-team-adversarial
 model: opus
 ---

@@ -312,12 +312,12 @@ Write the result to Work Log `## Recommended Skills` (provenance tags as per §3
 
    | Skill | Phases | Condition | Skip when |
    |---|---|---|---|
-   | `writing-plans` | plan | Classification ≠ tiny-fix AND entering /plan | tiny-fix |
-   | `executing-plans` | implement | Approved plan exists in Work Log | Never |
    | `verification-before-completion` | implement, test, ship | Any phase completion claim | tiny-fix |
    | `systematic-debugging` | implement, review, test | Bug, error, or unexpected behavior encountered | Never |
    | `red-team-adversarial` | review, test | /review: hotfix→Lite, feature→Full, arch→Full+Beast | tiny-fix, quick-win |
    | `karpathy-principles` | plan, implement, review | All non-trivial coding tasks (behavioral baseline) | tiny-fix |
+
+   *Plan / implement execution discipline previously held in `writing-plans` / `executing-plans` skills is now inlined directly into `plan.md` and `implement.md` workflows (always-on, no skill load).*
 
    **Scope-Detected Skills (activate when task touches that domain):**
 
@@ -331,13 +331,7 @@ Write the result to Work Log `## Recommended Skills` (provenance tags as per §3
    | `production-readiness` | review, ship | Adds or modifies error handling, catch blocks, or logging | feature, architecture-change |
    | `doc-lookup` | implement, review | Task uses any framework/library in the project ADR tech stack | feature, architecture-change, hotfix, quick-win |
 
-   **Phase-Triggered Skills (auto-activate at phase entry):**
-
-   | Skill | Phases | Condition |
-   |---|---|---|
-   | `finishing-a-development-branch` | ship, handoff | Branch work complete |
-   | `receiving-code-review` | review | PR review comments received |
-   | `requesting-code-review` | review, handoff | Changes ready for external review |
+   *Branch closure (4 closure options), code-review request template, and 5-axis review quality standard previously held in `finishing-a-development-branch` / `requesting-code-review` / `receiving-code-review` skills are now inlined directly into `ship.md` / `handoff.md` / `review.md` workflows (always-on, no skill load).*
 
    **Complexity-Conditional Skills (recommend when scale warrants):**
 

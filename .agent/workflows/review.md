@@ -44,6 +44,24 @@ When `/review` dispatches a sub-agent for adversarial review (e.g., `acx-reviewe
 
 ## Minimum Checks
 
+Apply the **5-Axis Quality Standard** across ALL changed files (block on any axis with critical/high severity miss):
+
+| Axis | Key Questions | Severity if Missed |
+|---|---|---|
+| **Correctness** | Does it do what it claims? Edge cases handled? Error paths covered? | Critical |
+| **Security** | Input validation? Auth checks? Injection vectors? Secrets exposure? | Critical |
+| **Performance** | N+1 queries? Unbounded loops? Missing pagination? Memory leaks? | High |
+| **Readability** | Clear naming? Reasonable function length? Comments where non-obvious? | Medium |
+| **Architecture** | Right abstraction level? Consistent with existing patterns? Coupling minimized? | Medium |
+
+**Sizing guideline**: Review effectiveness drops sharply above ~100 changed lines. If a diff exceeds 100 lines, flag for splitting into smaller reviewable units.
+
+**Feedback categorization**: Blocking (correctness/security/stability) → must fix before merge. Non-blocking → advisory. Question → needs design context.
+
+**Common rationalizations to reject**: "It works, that's good enough" / "Tests pass, so it's good" / "AI-generated is probably fine" / "We'll clean it up later". All four are review-bypassing patterns; the review IS the quality gate.
+
+Plus:
+
 - Logic correctness
 - Compatibility risks
 - Violation of `.agent/rules/engineering_guardrails.md`

@@ -11,18 +11,12 @@
       "probe_strategy": "platform-only",
       "phase_repeats": {},
       "candidate_skills": [
-        "writing-plans",
-        "executing-plans",
         "verification-before-completion",
         "systematic-debugging",
-        "finishing-a-development-branch",
         "karpathy-principles"
       ],
       "triggered_skills": [
-        "writing-plans",
-        "executing-plans",
         "verification-before-completion",
-        "finishing-a-development-branch",
         "karpathy-principles"
       ],
       "notes": "Required gates per AGENTS.md hard rules: bootstrap → plan → implement → evidence → ship. Review/test are optional coverage, NOT required phases."
@@ -38,25 +32,17 @@
         "test": 2
       },
       "candidate_skills": [
-        "writing-plans",
-        "executing-plans",
         "verification-before-completion",
         "test-driven-development",
         "systematic-debugging",
         "red-team-adversarial",
-        "requesting-code-review",
-        "finishing-a-development-branch",
         "production-readiness",
         "karpathy-principles"
       ],
       "triggered_skills": [
-        "writing-plans",
-        "executing-plans",
         "verification-before-completion",
         "test-driven-development",
         "red-team-adversarial",
-        "requesting-code-review",
-        "finishing-a-development-branch",
         "production-readiness",
         "karpathy-principles"
       ],
@@ -73,8 +59,6 @@
         "test": 2
       },
       "candidate_skills": [
-        "writing-plans",
-        "executing-plans",
         "verification-before-completion",
         "test-driven-development",
         "api-design",
@@ -83,14 +67,10 @@
         "doc-lookup",
         "systematic-debugging",
         "red-team-adversarial",
-        "requesting-code-review",
-        "finishing-a-development-branch",
         "production-readiness",
         "karpathy-principles"
       ],
       "triggered_skills": [
-        "writing-plans",
-        "executing-plans",
         "verification-before-completion",
         "test-driven-development",
         "api-design",
@@ -98,8 +78,6 @@
         "auth-security",
         "doc-lookup",
         "red-team-adversarial",
-        "requesting-code-review",
-        "finishing-a-development-branch",
         "production-readiness",
         "karpathy-principles"
       ],
@@ -116,21 +94,15 @@
         "test": 2
       },
       "candidate_skills": [
-        "executing-plans",
         "verification-before-completion",
         "systematic-debugging",
         "red-team-adversarial",
-        "requesting-code-review",
-        "finishing-a-development-branch",
         "karpathy-principles"
       ],
       "triggered_skills": [
-        "executing-plans",
         "verification-before-completion",
         "systematic-debugging",
         "red-team-adversarial",
-        "requesting-code-review",
-        "finishing-a-development-branch",
         "karpathy-principles"
       ],
       "notes": "Models a bug-fix path where repeated observe-hypothesize-verify loops inflate implement and test passes."
@@ -147,8 +119,6 @@
         "test": 2
       },
       "candidate_skills": [
-        "writing-plans",
-        "executing-plans",
         "verification-before-completion",
         "api-design",
         "database-design",
@@ -160,14 +130,10 @@
         "using-git-worktrees",
         "systematic-debugging",
         "red-team-adversarial",
-        "requesting-code-review",
-        "finishing-a-development-branch",
         "production-readiness",
         "karpathy-principles"
       ],
       "triggered_skills": [
-        "writing-plans",
-        "executing-plans",
         "verification-before-completion",
         "api-design",
         "database-design",
@@ -178,8 +144,6 @@
         "subagent-driven-development",
         "using-git-worktrees",
         "red-team-adversarial",
-        "requesting-code-review",
-        "finishing-a-development-branch",
         "production-readiness",
         "karpathy-principles"
       ],
@@ -197,23 +161,15 @@
         "test": 2
       },
       "candidate_skills": [
-        "receiving-code-review",
-        "requesting-code-review",
-        "executing-plans",
         "verification-before-completion",
         "systematic-debugging",
         "red-team-adversarial",
-        "finishing-a-development-branch",
         "production-readiness",
         "karpathy-principles"
       ],
       "triggered_skills": [
-        "receiving-code-review",
-        "requesting-code-review",
-        "executing-plans",
         "verification-before-completion",
         "red-team-adversarial",
-        "finishing-a-development-branch",
         "production-readiness",
         "karpathy-principles"
       ],
