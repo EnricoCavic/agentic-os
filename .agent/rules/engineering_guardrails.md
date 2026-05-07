@@ -369,7 +369,7 @@ When AI detects a task is nearing completion (e.g., user says "done", "完成了
 
 ## 11. Multi-Person Collaboration Rules
 
-> Canonical rules are in `AGENTS.md` §Multi-Person Collaboration and §Multi-Session Concurrency. This section adds implementation details.
+> Canonical rules are in `AGENTS.md` §Multi-Person / Multi-Session Collaboration and §Context-Bound Confirmation. This section adds implementation details.
 
 - **Work Log Naming**: `.agentcortex/context/work/<worklog-key>.md` for single-person, `.agentcortex/context/work/<owner>-<worklog-key>.md` for multi-person.
 - Missing active Work Logs are recoverable during bootstrap/plan/handoff: resolve `<worklog-key>`, create or recover the active log.
