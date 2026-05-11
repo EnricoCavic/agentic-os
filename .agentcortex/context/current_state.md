@@ -68,6 +68,12 @@
 - [Category: spec-factual-claims][Severity: MEDIUM][Trigger: domain-decision-tool-behavior-claim][prev: eea362e5] Domain Decisions that make factual claims about tool behavior (e.g., 'no external API call', 'language-agnostic') MUST be verified against tool documentation before the spec is frozen. Factual errors in Domain Decisions survive implementation and review phases because reviewers check AC compliance, not rationale accuracy. Self-check at spec-write: for each [DECISION] that asserts tool behavior, find one authoritative source confirming the claim.
 ## Ship History
 
+### Ship-claude-relaxed-pare-db9f89-2026-05-11-merged
+- PR #94 merged to main: squash commit `2467f9ab` (2026-05-11T15:52:08Z).
+  - Post-ship CI fixes: `--metrics=off` removed (Semgrep 1.123.0 incompatibility with `--config auto`); semgrep job Python 3.11 (`pkg_resources` missing on 3.12 runner).
+  - AC-11 added: `.semgrepignore` existence + exclusions structurally tested; test count 31→32.
+  - All 11 CI checks green on merge commit.
+
 ### Ship-claude-relaxed-pare-db9f89-2026-05-11-r8
 - Feature shipped (continuation r5–r8): CI security scanning governance hardening.
   - TruffleHog SHA-pinned: `47e7b7cd74f578e1e3145d48f669f22fd1330ca6` (was semver `@v3.94.3`)
