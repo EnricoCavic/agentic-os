@@ -13,7 +13,7 @@
   - Workflows & Policies: `.agent/workflows/*.md`, `.agent/rules/*.md`
 - **Last Updated**: 2026-05-12
 - **Last Verified**: 2026-05-12
-- **Update Sequence**: 17
+- **Update Sequence**: 18
 - **ADR Index**:
   - docs/adr/ADR-001-governance-friction-tuning.md — ADR-001: Governance Friction Tuning, accepted 2026-04-23
   - docs/adr/ADR-002-guarded-governance-writes.md — ADR-002: Guarded Governance Writes (lock unification + CI lint + lifecycle frontmatter), accepted 2026-04-25
@@ -67,6 +67,15 @@
 
 - [Category: spec-factual-claims][Severity: MEDIUM][Trigger: domain-decision-tool-behavior-claim][prev: eea362e5] Domain Decisions that make factual claims about tool behavior (e.g., 'no external API call', 'language-agnostic') MUST be verified against tool documentation before the spec is frozen. Factual errors in Domain Decisions survive implementation and review phases because reviewers check AC compliance, not rationale accuracy. Self-check at spec-write: for each [DECISION] that asserts tool behavior, find one authoritative source confirming the claim.
 ## Ship History
+
+### Ship-claude-peaceful-aryabhata-fe5644-2026-05-12-pass3
+- **PR #103** (squash `e732349`) — README/cross-doc broken-link fix, expert-reviewed (Plan subagent). The framework README is dual-purpose (GitHub face + downstream reference); a multi-angle audit found 6 broken `.md` links (33% of internal links) in the deployed README. Per-link triage:
+  - Framework-internal (CONTRIBUTING, LIFECYCLE_BENCHMARK) → absolute GitHub URLs.
+  - AGENT_MODEL_GUIDE: already deployed but README path wrong → absolute URL.
+  - token-optimization-quickstart: genuinely downstream-needed actionable guide → **added to deploy whitelist** + absolute URL in README. File now ships to `.agentcortex/docs/guides/`.
+  - Plus: fixed internal cross-refs inside `token-optimization-quickstart.md` (+ zh-TW) and `NONLINEAR_SCENARIOS.md` (+ zh-TW) that had the same source-vs-deployed mismatch.
+- Verified post-merge: fresh downstream deploy → 0 broken relative `.md` links in deployed README (was 6); +2 files deployed (183 total, was 181). validate.sh 77/0/0/2.
+- Audit residual: zero known broken-link or path-mismatch issues remaining in deployed scope.
 
 ### Ship-claude-peaceful-aryabhata-fe5644-2026-05-12-pass2
 - Multi-angle downstream-UX audit pass after #99/#100. 11 scenarios tested across fresh install, update install, legacy v5→v6 upgrade, user-modified scaffold, post-install validators, /app-init flow, workflow cross-refs, Python tool functional, dry-run, first-run UX, and broken-link audit. Three findings surfaced and shipped:
