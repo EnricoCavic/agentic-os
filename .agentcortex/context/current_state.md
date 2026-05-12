@@ -13,7 +13,7 @@
   - Workflows & Policies: `.agent/workflows/*.md`, `.agent/rules/*.md`
 - **Last Updated**: 2026-05-12
 - **Last Verified**: 2026-05-12
-- **Update Sequence**: 16
+- **Update Sequence**: 17
 - **ADR Index**:
   - docs/adr/ADR-001-governance-friction-tuning.md — ADR-001: Governance Friction Tuning, accepted 2026-04-23
   - docs/adr/ADR-002-guarded-governance-writes.md — ADR-002: Guarded Governance Writes (lock unification + CI lint + lifecycle frontmatter), accepted 2026-04-25
@@ -67,6 +67,14 @@
 
 - [Category: spec-factual-claims][Severity: MEDIUM][Trigger: domain-decision-tool-behavior-claim][prev: eea362e5] Domain Decisions that make factual claims about tool behavior (e.g., 'no external API call', 'language-agnostic') MUST be verified against tool documentation before the spec is frozen. Factual errors in Domain Decisions survive implementation and review phases because reviewers check AC compliance, not rationale accuracy. Self-check at spec-write: for each [DECISION] that asserts tool behavior, find one authoritative source confirming the claim.
 ## Ship History
+
+### Ship-claude-peaceful-aryabhata-fe5644-2026-05-12-pass2
+- Multi-angle downstream-UX audit pass after #99/#100. 11 scenarios tested across fresh install, update install, legacy v5→v6 upgrade, user-modified scaffold, post-install validators, /app-init flow, workflow cross-refs, Python tool functional, dry-run, first-run UX, and broken-link audit. Three findings surfaced and shipped:
+  - **PR #101** (squash `469a2a5`, scaffold-preservation fix in `deploy.sh`) — legacy v5→v6 upgrade silently destroyed user's `.agentcortex/context/current_state.md` content. The migrated file landed at a path the manifest didn't track, hitting a "treat as new" branch that overwrote without sidecar. Fix: in the no-manifest-entry scaffold branch, compare dst hash to src and write `.acx-incoming` sidecar on mismatch (mirroring the existing `!$is_update` branch).
+  - **PR #102** (squash `71f7a07`, version + skill-count alignment) — `deploy.sh ACX_VERSION` was 4 patch releases behind (`1.0.0` vs CHANGELOG `1.1.2`); 8 downstream-deployed docs (README badge, AGENT_MODEL_GUIDE, TESTING_PROTOCOL, antigravity-v5-runtime, migration EN+zh-TW, zh-TW README) said `v1.1`; README claimed `17 professional skills` (actual `14` post-f3d97fc consolidation). All bumped to `v1.1.2` / `14`.
+- Tests: validate 77 PASS / 0 WARN / 0 FAIL / 2 SKIP (full python). Legacy-upgrade simulation: user content preserved at migrated path; framework template lands at `.acx-incoming`. All 11 audit scenarios pass.
+- Remaining flagged (NOT yet shipped, recommended as separate follow-ups):
+  - `.agentcortex/docs/README.md` (deployed framework README) has 6 broken internal `.md` links downstream — references to `docs/AGENT_MODEL_GUIDE.md`, `docs/LIFECYCLE_BENCHMARK.md` (+ zh-TW), `docs/guides/token-optimization-quickstart.md` (+ zh-TW), `CONTRIBUTING.md`. Class A (deployed at different path) + Class B (not deployed). Needs link rewrite or deploy-time URL substitution. Medium severity — README is key onboarding doc.
 
 ### Ship-claude-peaceful-aryabhata-fe5644-2026-05-12
 - Two quick-win PRs merged: downstream guidance correctness pass + companion installer bug fix.
