@@ -11,9 +11,9 @@
   - Task Isolation: `.agentcortex/context/work/<worklog-key>.md`
   - Active Work Log Path: derive <worklog-key> from the raw branch name using filesystem-safe normalization before any gate checks.
   - Workflows & Policies: `.agent/workflows/*.md`, `.agent/rules/*.md`
-- **Last Updated**: 2026-05-11
-- **Last Verified**: 2026-05-11
-- **Update Sequence**: 15
+- **Last Updated**: 2026-05-12
+- **Last Verified**: 2026-05-12
+- **Update Sequence**: 16
 - **ADR Index**:
   - docs/adr/ADR-001-governance-friction-tuning.md — ADR-001: Governance Friction Tuning, accepted 2026-04-23
   - docs/adr/ADR-002-guarded-governance-writes.md — ADR-002: Guarded Governance Writes (lock unification + CI lint + lifecycle frontmatter), accepted 2026-04-25
@@ -67,6 +67,14 @@
 
 - [Category: spec-factual-claims][Severity: MEDIUM][Trigger: domain-decision-tool-behavior-claim][prev: eea362e5] Domain Decisions that make factual claims about tool behavior (e.g., 'no external API call', 'language-agnostic') MUST be verified against tool documentation before the spec is frozen. Factual errors in Domain Decisions survive implementation and review phases because reviewers check AC compliance, not rationale accuracy. Self-check at spec-write: for each [DECISION] that asserts tool behavior, find one authoritative source confirming the claim.
 ## Ship History
+
+### Ship-claude-peaceful-aryabhata-fe5644-2026-05-12
+- Two quick-win PRs merged: downstream guidance correctness pass + companion installer bug fix.
+  - **PR #99** (squash `5c282c2`, 2026-05-12T04:19:39Z) — strip phantom `.agentcortex/specs|adr/` "framework template fixtures" claim from Write Path Guard and SSoT template; drop attributions to framework-internal ADR-001/002/003 and Global Lessons L4/L5 from workflows, rules, AGENTS.md, .agent/config.yaml, .agentcortex/tools/*.py docstrings, and validate.{sh,ps1} section header comments; `/app-init` now creates `ADR-001-project-architecture.md` (was hardcoded to `ADR-002`); regenerated `trigger-compact-index.json` for the one content_hash that shifted.
+  - **PR #100** (squash `8db2900`, 2026-05-12T04:24:??Z) — `deploy.sh` orphan-ADR recovery: replace prefix-based `ADR-001-*` skip with the same `_framework_adrs` known-filename match already used for `_framework_specs`. Bug surfaced because #99's `/app-init` change made the prefix-match wrongly classify the downstream's own ADR-001 as framework-owned. Verified via 4-scenario sim (framework legacy ADR kept, project ADR-001/002/007 migrated).
+- Tests: `validate.sh` 77 PASS / 0 WARN / 0 FAIL / 2 SKIP (full Python); fresh-install downstream sim 72/2/0/3 (full) and 67/2/0/8 (`--no-python`).
+- CI: all 11 checks green on both merge commits.
+- Audit residual: zero remaining ADR-00X / Lesson L4-L5 references in `.agent/**/*.md`, `AGENTS.md`, `.agent/config.yaml`, `.agentcortex/tools/*.py`, `.agentcortex/bin/validate.{sh,ps1}` (only legitimate match left is `app-init.md` instructing creation of `ADR-001-project-architecture.md`).
 
 ### Ship-claude-relaxed-pare-db9f89-2026-05-11-merged
 - PR #94 merged to main: squash commit `2467f9ab` (2026-05-11T15:52:08Z).
