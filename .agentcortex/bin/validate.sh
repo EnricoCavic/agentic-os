@@ -95,6 +95,7 @@ check_file_group() {
     for f in "${missing[@]}"; do
       printf '  missing: %s\n' "$f"
     done
+    printf '  fix: re-run deploy (installers/deploy_brain.sh) to restore missing framework files\n'
   else
     record_result PASS "$label"
   fi
@@ -131,6 +132,7 @@ check_dir_group() {
     for d in "${missing[@]}"; do
       printf '  missing: %s\n' "$d"
     done
+    printf '  fix: re-run deploy (installers/deploy_brain.sh) to restore missing framework directories\n'
   else
     record_result PASS "$label"
   fi
@@ -942,6 +944,15 @@ if [[ -d "$WORKLOG_DIR" ]]; then
   gate_progression_skipped=0
   phase_summary_missing=0
   sentinel_marker_missing=0
+  test_gate_results_missing=0
+  current_phase_incoherent=0
+  shipped_not_archived=0
+  evidence_placeholder_only=0
+  review_pass_with_unproven=0
+  reclassify_header_not_reset=0
+  handoff_resume_incomplete=0
+  hotfix_ship_no_evidence=0
+  adr_coverage_undocumented=0
   for wl in "$WORKLOG_DIR"/*.md; do
     [[ -f "$wl" ]] || continue
     wl_content="$(cat "$wl" 2>/dev/null)"
@@ -980,38 +991,237 @@ if [[ -d "$WORKLOG_DIR" ]]; then
       if [[ -n "$PYTHON_BIN" ]]; then
         gate_check="$("$PYTHON_BIN" -c "
 import sys, re
-LEGAL = {
+# quick-win / unknown: implement can go directly to ship (fast path)
+LEGAL_DEFAULT = {
     'bootstrap': ['plan'],
     'plan':      ['implement'],
     'implement': ['review','test','ship'],
     'review':    ['implement','test','ship'],
-    'test':      ['handoff','ship','implement'],
+    'test':      ['ship','implement'],
     'handoff':   ['ship','retro'],
     'ship':      [],
 }
-lines = sys.stdin.read().splitlines()
-gates = []
+# feature / architecture-change: must go through review+test+handoff; no shortcuts
+LEGAL_STRICT = {
+    'bootstrap': ['plan'],
+    'plan':      ['implement'],
+    'implement': ['review','test'],
+    'review':    ['implement','test'],
+    'test':      ['handoff','implement'],
+    'handoff':   ['ship','retro'],
+    'ship':      [],
+}
+# hotfix: must review+test but handoff is optional (goes test->ship directly)
+# plan is always required per engineering_guardrails.md §10.2 — no implement shortcut
+LEGAL_HOTFIX = {
+    'bootstrap': ['plan'],
+    'plan':      ['implement'],
+    'implement': ['review','test'],
+    'review':    ['implement','test'],
+    'test':      ['ship','implement'],
+    'ship':      [],
+}
+content = sys.stdin.read()
+lines = content.splitlines()
+wl_class = ''
 for l in lines:
-    m = re.match(r'^(?:\x60?- )?[Gg]ate:\s*(\w+)\s*\|', l)
+    m = re.match(r'^-\s+(?:\*\*)?[Cc]lassification(?:\*\*)?\s*:\s+\`?([a-zA-Z][\w-]*)', l)
+    if not m:
+        # table form: | Classification | `feature` |
+        m = re.match(r'^\|\s*(?:\*\*)?[Cc]lassification(?:\*\*)?\s*\|\s*\`?([a-zA-Z][\w-]*)', l)
     if m:
-        gates.append(m.group(1))
-if len(gates) < 2:
+        wl_class = m.group(1).lower()
+        break
+if wl_class in ('feature', 'architecture-change'):
+    LEGAL = LEGAL_STRICT
+elif wl_class == 'hotfix':
+    LEGAL = LEGAL_HOTFIX
+elif wl_class in ('quick-win', 'tiny-fix'):
+    LEGAL = LEGAL_DEFAULT
+else:
+    # H1: fail-closed for unknown/misspelled classification — use strictest transitions
+    # (mirrors the completeness check which also treats unknown as feature-level)
+    LEGAL = LEGAL_STRICT
+# H4: count STRUCTURED reclassification records in Drift Log (count-based, not position-based)
+# Requires format: Reclassif* <sep> ... <arrow> — rejects prose mentions like "considered but rejected"
+# e.g. "Reclassification: quick-win -> feature" matches; "reclassification considered" does not
+# Count-based: allows one reset per record; normal drift entries after reclassif do NOT invalidate it
+in_drift = False
+reclassify_count = 0
+for l in lines:
+    if re.match(r'^## Drift Log', l):
+        in_drift = True
+        continue
+    elif in_drift and re.match(r'^## ', l):
+        break
+    elif in_drift:
+        _rm = re.search(r'\bReclassif\w*\s*[:\-]\s*([\w-]+)\s*->\s*([\w-]+)', l)
+        if _rm and _rm.group(1).lower() != _rm.group(2).lower():
+            reclassify_count += 1
+# T48: section-scope gate parsing to ## Gate Evidence section only
+# T154: only the FIRST ## Gate Evidence section is authoritative
+# T175/T178/T241: fenced code blocks (backtick/tilde, 0-3 space indent per CommonMark)
+# T181/T242: HTML comment blocks (order-aware finditer left-to-right)
+# T243: fail-closed — if heading exists but suppressed, emit error
+# T244: run fence/comment tracking on EVERY line (was: only outside section)
+#   Prevents fenced content inside ## Gate Evidence from being collected as real receipts
+#   and prevents fence-parity leakage across the section boundary (opener inside → closer outside)
+# T247: track masked receipt-format lines inside the section during the main loop
+#   (replaces post-loop raw-rescan which had false-positives and false-negatives)
+RECEIPT_RE = re.compile(r'^(?:\x60?- )?gate:\s*\w+\s*\|', re.IGNORECASE)
+# Inside fences, lines may be indented; allow leading whitespace for masked-receipt detection
+MASKED_RECEIPT_RE = re.compile(r'^\s*(?:\x60?- )?gate:\s*\w+\s*\|', re.IGNORECASE)
+in_gate_evidence_section = False
+gate_evidence_seen = False
+gate_lines = []
+masked_receipt_in_section = False  # T247: receipt-format line was present but masked
+in_code_fence = False
+in_html_comment = False
+for l in lines:
+    was_in_fence = in_code_fence
+    if re.match(r'^ {0,3}(\x60{3,}|~{3,})', l):
+        in_code_fence = not in_code_fence
+    was_in_comment = in_html_comment
+    for _m in re.finditer(r'<!--|-->', l):
+        in_html_comment = (_m.group() == '<!--')
+    # masked: line is/was inside a fence or comment (fence marker lines are also masked)
+    masked = (was_in_fence or in_code_fence) or (was_in_comment or in_html_comment)
+    if re.match(r'^## Gate Evidence', l) and not gate_evidence_seen and not in_code_fence and not in_html_comment:
+        in_gate_evidence_section = True
+        gate_evidence_seen = True
+        continue
+    if in_gate_evidence_section and re.match(r'^## ', l) and not masked:
+        in_gate_evidence_section = False
+        continue
+    if in_gate_evidence_section:
+        if masked:
+            if MASKED_RECEIPT_RE.match(l):
+                masked_receipt_in_section = True  # T247: real receipt hidden in fence/comment
+        else:
+            gate_lines.append(l)
+# T243: fail-closed if heading exists but was suppressed (fence/comment blocked recognition)
+if not gate_evidence_seen:
+    if any(re.match(r'^## Gate Evidence', l) for l in lines):
+        print('incomplete:gate-evidence-suppressed (unclosed fence or HTML comment above ## Gate Evidence -- validate manually)')
+        sys.exit(0)
+# T245: fail-closed if fence/comment was left unclosed INSIDE Gate Evidence
+# (receipts inside the unclosed block are silently masked — signal rather than returning ok)
+if in_code_fence or in_html_comment:
+    print('incomplete:unterminated-fence-or-comment (unclosed code fence or HTML comment in ## Gate Evidence -- validate manually)')
+    sys.exit(0)
+# T247: no unmasked receipt collected but at least one was masked — targeted error
+# Uses main-loop masking state (no separate rescan), so it correctly respects
+# the first-section guard, fence/comment state, and masked ## headings.
+unmasked_receipt = any(RECEIPT_RE.match(l) for l in gate_lines)
+if gate_evidence_seen and not unmasked_receipt and masked_receipt_in_section:
+    print('incomplete:receipts-in-fence (Gate Evidence has receipt-format lines but all are inside code fences or HTML comments -- move receipts out of code blocks)')
+    sys.exit(0)
+gates = []
+has_ship_receipt = False  # H3: track ANY ship receipt regardless of verdict
+review_not_ready = False  # track pending re-review requirement after NOT READY reverse edge
+resets_used = 0  # H4: track consumed reclassification records
+for l in gate_lines:
+    m = re.match(r'^(?:\x60?- )?gate:\s*(\w+)\s*\|', l, re.IGNORECASE)
+    if m:
+        phase = m.group(1).lower()
+        # H3: record ship presence BEFORE the verdict filter
+        if phase == 'ship':
+            has_ship_receipt = True
+        # supporting workflows are out-of-band; exclude to avoid false illegal-transition flags
+        if phase in ('retro', 'research', 'brainstorm', 'decide', 'audit'):
+            continue
+        # Only count PASS verdicts; NOT READY / FAIL are reverse edges, not forward progress
+        v = re.search(r'\|[^|]*verdict:\s*([A-Za-z _]+?)(\s*\||$)', l, re.IGNORECASE)
+        if v and v.group(1).strip().upper() != 'PASS':
+            # NOT READY / FAIL review is a reverse edge — discard the preceding
+            # implement to avoid a false-positive implement→implement pair after
+            # re-implementation (test.md §Step 5 reverse-edge; review.md §NOT READY)
+            if phase == 'review' and gates and gates[-1] == 'implement':
+                gates.pop()
+                review_not_ready = True  # flag: re-review required before test/ship
+            continue
+        # PASS verdict: if review PASS, clear the pending re-review flag
+        if phase == 'review':
+            review_not_ready = False
+        # H4: Reclassification reset — one reset per structured drift record; count-based
+        if phase == 'bootstrap' and gates and reclassify_count > resets_used:
+            gates = []
+            resets_used += 1
+        gates.append(phase)
+# Completeness check first — valid even with 1 gate (avoids early-return bypass)
+gate_set = set(gates)
+# H3: completeness triggers on ANY ship receipt, not just PASS ones
+if has_ship_receipt or 'ship' in gate_set:
+    if wl_class in ('feature', 'architecture-change'):
+        required = {'bootstrap','plan','implement','review','test','handoff'}
+    elif wl_class == 'hotfix':
+        required = {'bootstrap','plan','implement','review','test'}
+    elif wl_class == 'quick-win':
+        # H1: quick-win has real required phases — not an empty set
+        required = {'bootstrap','plan','implement'}
+    elif wl_class == 'tiny-fix':
+        # tiny-fix is exempt from gate ceremony (AGENTS.md §tiny-fix fast path)
+        required = set()
+    else:
+        # H1: fail-closed for unknown/misspelled classification — treat as feature
+        required = {'bootstrap','plan','implement','review','test','handoff'}
+    missing_phases = required - gate_set
+    if missing_phases:
+        print(f'incomplete:{\",\".join(sorted(missing_phases))} (classification:{wl_class or \"unknown\"})')
+        sys.exit(0)
+# NOT READY reverse-edge check: if review_not_ready is still set (no subsequent review
+# PASS cleared it), any test/handoff/ship in gates = re-review was skipped
+if review_not_ready and any(g in ('test','handoff','ship') for g in gates):
+    bad_next = next(g for g in gates if g in ('test','handoff','ship'))
+    print(f'illegal:NOT_READY-review->{bad_next} (re-review skipped after NOT READY — implement→review required per review.md)')
+    sys.exit(0)
+# Progression check requires 2+ gates; tiny-fix has no required phase sequence
+if len(gates) < 2 or wl_class == 'tiny-fix':
     print('ok')
     sys.exit(0)
 for i in range(1, len(gates)):
     prev, curr = gates[i-1], gates[i]
     allowed = LEGAL.get(prev, [])
     if curr not in allowed:
-        print(f'illegal:{prev}->{curr}')
+        print(f'illegal:{prev}->{curr} (classification:{wl_class or \"unknown\"})')
         sys.exit(0)
+# M10: stale-review check — if most recent implement follows most recent review,
+# then test/handoff/ship without a new review = stale review violation
+# (test.md §Step 5 reverse edge: implement-after-review MUST re-review before test)
+# quick-win and tiny-fix treat review as optional — re-review is NOT required.
+# Unknown/H1 fail-closed classifications follow feature rules, so M10 applies.
+if wl_class not in ('quick-win', 'tiny-fix'):
+    last_review_idx = max((i for i, g in enumerate(gates) if g == 'review'), default=-1)
+    last_impl_idx   = max((i for i, g in enumerate(gates) if g == 'implement'), default=-1)
+    if last_review_idx >= 0 and last_impl_idx > last_review_idx:
+        post_impl = gates[last_impl_idx + 1:]
+        if any(g in ('test', 'handoff', 'ship') for g in post_impl):
+            bad_next = next(g for g in post_impl if g in ('test', 'handoff', 'ship'))
+            print(f'illegal:implement-after-review->{bad_next} (stale review: implement occurred after last review PASS; re-review required)')
+            sys.exit(0)
 print('ok')
 " <<< "$wl_content" 2>/dev/null)"
         if [[ "$gate_check" == illegal:* ]]; then
           printf '  illegal gate progression in %s: %s\n' "$(basename "$wl")" "${gate_check#illegal:}"
           gate_progression_illegal=$((gate_progression_illegal + 1))
+        elif [[ "$gate_check" == incomplete:* ]]; then
+          printf '  incomplete gate receipts in %s: missing %s\n' "$(basename "$wl")" "${gate_check#incomplete:}"
+          gate_progression_illegal=$((gate_progression_illegal + 1))
         fi
       else
         gate_progression_skipped=1
+        # Bash-only fallback (M9): even without Python, catch ship receipts missing
+        # minimum prerequisite gates (plan + implement). Cannot verify legal ordering
+        # but can detect obvious bypasses. Increments gate_progression_illegal so FAIL
+        # is recorded — a shipped log without plan/implement is always a violation.
+        if printf '%s' "$wl_content" | grep -qiE 'Gate:[[:space:]]*ship[[:space:]]*\|[^|]*Verdict:[[:space:]]*PASS'; then
+          has_plan=$(printf '%s' "$wl_content" | grep -ciE 'Gate:[[:space:]]*plan[[:space:]]*\|[^|]*Verdict:[[:space:]]*PASS')
+          has_impl=$(printf '%s' "$wl_content" | grep -ciE 'Gate:[[:space:]]*implement[[:space:]]*\|[^|]*Verdict:[[:space:]]*PASS')
+          if [[ "$has_plan" -eq 0 ]] || [[ "$has_impl" -eq 0 ]]; then
+            printf '  [bash-fallback] shipped without plan/implement gate in %s\n' "$(basename "$wl")"
+            gate_progression_illegal=$((gate_progression_illegal + 1))
+          fi
+        fi
       fi
     fi
     # Runtime section: ## Phase Summary
@@ -1026,6 +1236,112 @@ print('ok')
     if printf '%s' "$wl_content" | grep -q '^## Phase Summary' \
        && ! printf '%s' "$wl_content" | grep -qE '(⚡[[:space:]]?ACX|[[:space:]]ACX([[:space:]]|$))'; then
       sentinel_marker_missing=$((sentinel_marker_missing + 1))
+    fi
+    # Test Gate Results — engineering_guardrails.md §12.2 requires evidence be recorded
+    # under "Test Gate Results" for feature/architecture-change work logs that have
+    # reached the implement or later phase. WARN-only: converts §12.2 from honor-system
+    # to auditable evidence requirement.
+    # Parse classification from list form ("- Classification:") or table form ("| Classification |")
+    if [[ -n "$PYTHON_BIN" ]]; then
+      wl_class="$(printf '%s' "$wl_content" | "$PYTHON_BIN" -c "
+import re,sys
+for l in sys.stdin:
+    m=re.match(r'^-\s+\*{0,2}[Cc]lassification\*{0,2}\s*:\s*\x60?([a-zA-Z][\w-]*)',l)
+    if not m: m=re.match(r'^\|\s*\*{0,2}[Cc]lassification\*{0,2}\s*\|\s*\x60?([a-zA-Z][\w-]*)',l)
+    if m: print(m.group(1).lower()); break
+" 2>/dev/null)"
+    else
+      # Python unavailable: list-form-only fallback
+      wl_class="$(printf '%s' "$wl_content" | sed -n 's/^- \(**\)\?Classification\1\?:[[:space:]]*//p' | head -n 1 | tr -d '\r\`')"
+    fi
+    if [[ "$wl_class" == "feature" || "$wl_class" == "architecture-change" ]]; then
+      if printf '%s' "$wl_content" | grep -q 'Gate: implement'; then
+        if ! printf '%s' "$wl_content" | grep -qiE '^#+[[:space:]]+Test Gate Results'; then
+          test_gate_results_missing=$((test_gate_results_missing + 1))
+        fi
+      fi
+    fi
+    # MEDIUM-1 (review PASS with UNPROVEN rows): check for review PASS receipt alongside
+    # unresolved UNPROVEN table rows — review.md §Burden of Proof requires NOT READY in this case.
+    # Direct approach: flag if review PASS co-exists with any UNPROVEN row not tagged [NEEDS_HUMAN].
+    # (The prior ! grep -qvE condition was always false because header/gate lines don't match
+    # the UNPROVEN pattern, causing grep -qvE to succeed and the check to be permanently skipped.)
+    if printf '%s' "$wl_content" | grep -qiE 'Gate:[[:space:]]*review[[:space:]]*\|.*Verdict:[[:space:]]*PASS'; then
+      unproven_untagged="$(printf '%s' "$wl_content" | grep '✗ UNPROVEN' | grep -v '\[NEEDS_HUMAN\]' | head -1)"
+      if [[ -n "$unproven_untagged" ]]; then
+        review_pass_with_unproven=$((review_pass_with_unproven + 1))
+      fi
+    fi
+    # MEDIUM-3 (M5): evidence non-empty check for shipped feature/arch-change/quick-win logs.
+    # The bootstrap placeholder "Pending: bootstrap only" is not real evidence.
+    if [[ "$wl_class" == "feature" || "$wl_class" == "architecture-change" || "$wl_class" == "quick-win" ]]; then
+      if printf '%s' "$wl_content" | grep -qiE 'Gate:[[:space:]]*ship[[:space:]]*\|.*Verdict:[[:space:]]*PASS'; then
+        evidence_body="$(printf '%s' "$wl_content" | sed -n '/^## Evidence/,/^## /p' | tail -n +2 | grep -v '^## ' | grep -v '^$' | head -5)"
+        if [[ -z "$evidence_body" || "$evidence_body" == *"Pending: bootstrap only"* ]]; then
+          evidence_placeholder_only=$((evidence_placeholder_only + 1))
+        fi
+      fi
+    fi
+    # Current Phase consistency (HIGH-2): if a ship PASS receipt exists,
+    # Current Phase should be 'ship'. Divergence means the header was not updated.
+    if printf '%s' "$wl_content" | grep -qiE 'Gate:[[:space:]]*ship[[:space:]]*\|.*Verdict:[[:space:]]*PASS'; then
+      cp_val="$(printf '%s' "$wl_content" | grep -m1 -iE '^-[[:space:]]*\*?\*?Current Phase\*?\*?:' \
+        | sed 's/.*Current Phase[^:]*:[[:space:]]*//' | tr -d '`\r' | tr '[:upper:]' '[:lower:]' | xargs)"
+      if [[ -n "$cp_val" && "$cp_val" != "ship" ]]; then
+        current_phase_incoherent=$((current_phase_incoherent + 1))
+      fi
+      # Archival check (Item 1): if Current Phase is 'ship' and ship PASS receipt exists,
+      # this Work Log should have been archived. Presence in work/ means /ship step 3 was skipped.
+      if [[ -z "$cp_val" || "$cp_val" == "ship" ]]; then
+        shipped_not_archived=$((shipped_not_archived + 1))
+      fi
+    fi
+    # Finding 9 (HIGH): Reclassification state inconsistency — Drift Log records
+    # "Reclassification:" but Classification header was never reset to CLASSIFIED,
+    # leaving downstream agents with a stale classification tier.
+    if printf '%s' "$wl_content" | grep -q '## Drift Log' \
+       && printf '%s' "$wl_content" | grep -qiE '^\s*-\s+Reclassif'; then
+      cls_hdr="$(printf '%s' "$wl_content" | grep -m1 -iE '^-[[:space:]]*\*?\*?Classification\*?\*?:' \
+        | sed 's/.*Classification[^:]*:[[:space:]]*//' | tr -d '`\r' | tr '[:upper:]' '[:lower:]' | xargs)"
+      if [[ -n "$cls_hdr" && "$cls_hdr" != "classified" ]]; then
+        reclassify_header_not_reset=$((reclassify_header_not_reset + 1))
+      fi
+    fi
+    # Finding 5 (MEDIUM): Handoff Resume Block completeness — prose rule (handoff.md §1a)
+    # requires all sub-sections. Warn when ## Resume section exists but is missing
+    # any of the mandatory headings: Read Map, Skip List, Context Snapshot.
+    if printf '%s' "$wl_content" | grep -q '^## Resume'; then
+      resume_body="$(printf '%s' "$wl_content" | sed -n '/^## Resume/,/^## /p')"
+      missing_subsections=0
+      for subsec in "Read Map" "Skip List" "Context Snapshot"; do
+        if ! printf '%s' "$resume_body" | grep -qiE "^###[[:space:]]+${subsec}"; then
+          missing_subsections=$((missing_subsections + 1))
+        fi
+      done
+      if [[ "$missing_subsections" -gt 0 ]]; then
+        handoff_resume_incomplete=$((handoff_resume_incomplete + 1))
+      fi
+    fi
+    # Finding 13 (MEDIUM): hotfix fast-path evidence check — hotfix is exempt from
+    # /handoff but MUST provide evidence. Warn when a hotfix reaches ship phase
+    # but ## Evidence section is missing or contains only the bootstrap placeholder.
+    if [[ "$wl_class" == "hotfix" ]]; then
+      if printf '%s' "$wl_content" | grep -qiE 'Gate:[[:space:]]*ship[[:space:]]*\|.*Verdict:[[:space:]]*PASS'; then
+        hotfix_evidence="$(printf '%s' "$wl_content" | sed -n '/^## Evidence/,/^## /p' | tail -n +2 | grep -v '^## ' | grep -v '^$' | head -5)"
+        if [[ -z "$hotfix_evidence" || "$hotfix_evidence" == *"Pending: bootstrap only"* ]]; then
+          hotfix_ship_no_evidence=$((hotfix_ship_no_evidence + 1))
+        fi
+      fi
+    fi
+    # Finding 14 (MEDIUM): ADR Coverage gap — for feature/architecture-change Work Logs,
+    # bootstrap should have run the ADR Coverage Check and recorded the result (yes/skip)
+    # in ## Drift Log. Missing record means the check was silently bypassed.
+    if [[ "$wl_class" == "feature" || "$wl_class" == "architecture-change" ]]; then
+      if printf '%s' "$wl_content" | grep -q 'Gate: plan\|Gate: implement'; then
+        if ! printf '%s' "$wl_content" | grep -qiE 'ADR.*[Cc]overage|[Cc]overage.*ADR|adr.*check|no.*adr.*found'; then
+          adr_coverage_undocumented=$((adr_coverage_undocumented + 1))
+        fi
+      fi
     fi
   done
   if [[ "$phase_field_missing" -gt 0 ]]; then
@@ -1066,6 +1382,51 @@ print('ok')
     record_result WARN "work logs missing sentinel marker (⚡ ACX) in Phase Summary: ${sentinel_marker_missing}"
   elif [[ "$worklog_count" -gt 0 ]] && [[ "$phase_summary_missing" -eq 0 ]]; then
     record_result PASS "all active work logs carry sentinel marker for audit trail"
+  fi
+  if [[ "$test_gate_results_missing" -gt 0 ]]; then
+    record_result WARN "feature/architecture-change work logs missing Test Gate Results section (engineering_guardrails.md §12.2): ${test_gate_results_missing}"
+  elif [[ "$worklog_count" -gt 0 ]]; then
+    record_result PASS "test gate results evidence present in applicable work logs"
+  fi
+  if [[ "$current_phase_incoherent" -gt 0 ]]; then
+    record_result WARN "work logs with ship PASS receipt but Current Phase != ship (header not updated): ${current_phase_incoherent}"
+  elif [[ "$worklog_count" -gt 0 ]]; then
+    record_result PASS "Current Phase field is consistent with last gate receipt in all work logs"
+  fi
+  if [[ "$shipped_not_archived" -gt 0 ]]; then
+    record_result WARN "shipped work logs still in active work/ directory (archival incomplete — /ship step 3 skipped?): ${shipped_not_archived}"
+  elif [[ "$worklog_count" -gt 0 ]]; then
+    record_result PASS "no shipped work logs found in active work/ directory"
+  fi
+  if [[ "$evidence_placeholder_only" -gt 0 ]]; then
+    record_result FAIL "feature/arch-change/quick-win shipped work logs with bootstrap-placeholder ## Evidence (NO EVIDENCE = NO SHIP per AGENTS.md §Delivery Gates): ${evidence_placeholder_only}"
+  elif [[ "$worklog_count" -gt 0 ]]; then
+    record_result PASS "shipped feature/arch-change work logs have non-placeholder Evidence sections"
+  fi
+  if [[ "$review_pass_with_unproven" -gt 0 ]]; then
+    record_result WARN "work logs with review PASS receipt but unresolved UNPROVEN rows (receipt should be NOT READY per review.md §Burden of Proof): ${review_pass_with_unproven}"
+  elif [[ "$worklog_count" -gt 0 ]]; then
+    record_result PASS "no review PASS receipts with unresolved UNPROVEN rows detected"
+  fi
+  if [[ "$reclassify_header_not_reset" -gt 0 ]]; then
+    record_result WARN "work logs with Reclassification in Drift Log but Classification header not reset to CLASSIFIED (implement.md §Mid-Execution Guard step c incomplete): ${reclassify_header_not_reset}"
+  elif [[ "$worklog_count" -gt 0 ]]; then
+    record_result PASS "no reclassification header inconsistency detected"
+  fi
+  if [[ "$handoff_resume_incomplete" -gt 0 ]]; then
+    record_result WARN "work logs with ## Resume section missing required sub-sections (handoff.md §1a — Read Map, Skip List, Context Snapshot required): ${handoff_resume_incomplete}"
+  elif [[ "$worklog_count" -gt 0 ]]; then
+    record_result PASS "handoff Resume Blocks have required sub-sections where present"
+  fi
+  if [[ "$hotfix_ship_no_evidence" -gt 0 ]]; then
+    record_result WARN "hotfix work logs shipped without ## Evidence (hotfix fast-path still requires diff + behavior verification per handoff.md §Trigger Conditions): ${hotfix_ship_no_evidence}"
+  elif [[ "$worklog_count" -gt 0 ]]; then
+    record_result PASS "hotfix shipped work logs carry evidence where present"
+  fi
+  if [[ "$adr_coverage_undocumented" -gt 0 ]]; then
+    record_result WARN "feature/architecture-change work logs past plan phase with no ADR Coverage Check record in Drift Log (bootstrap.md §ADR Coverage Check result should be logged): ${adr_coverage_undocumented}"
+  elif [[ "$worklog_count" -gt 0 ]]; then
+    record_result PASS "ADR Coverage Check records present in applicable work logs"
   fi
   # Advisory lock staleness check — reads JSON fields per config.yaml §worklog_lock.
   # All JSON parsing and stale logic stays inside Python to avoid eval/injection.
@@ -1160,6 +1521,91 @@ if [[ "$phase_summary_violations" -gt 0 ]]; then
   printf '%b' "$phase_summary_violation_list"
 else
   record_result PASS "archived Work Logs have non-empty Phase Summary (or none archived yet)"
+fi
+
+# M7: Gate completeness audit for archived Work Logs (bash-only, WARN — historical records).
+# Checks that ship receipts are preceded by minimum required gates. WARN not FAIL
+# because archives are immutable historical records; violations indicate past governance gaps.
+archive_gate_violations=0
+archive_gate_violation_list=""
+if [[ -d "$ARCHIVE_DIR" ]]; then
+  while IFS= read -r -d '' wl; do
+    wl_content="$(cat "$wl" 2>/dev/null)"
+    [[ -z "$wl_content" ]] && continue
+    arc_class="$(printf '%s' "$wl_content" | grep -m1 -E '^- \*?\*?[Cc]lassification\*?\*?:' | sed -E 's/.*[Cc]lassification[^:]*:\s*`?//; s/`.*//; s/\s*$//' | tr '[:upper:]' '[:lower:]')"
+    [[ "$arc_class" == "tiny-fix" ]] && continue
+    if printf '%s' "$wl_content" | grep -qiE 'Gate:[[:space:]]*ship[[:space:]]*\|[^|]*Verdict:[[:space:]]*PASS'; then
+      arc_has_plan=$(printf '%s' "$wl_content" | grep -ciE 'Gate:[[:space:]]*plan[[:space:]]*\|[^|]*Verdict:[[:space:]]*PASS')
+      arc_has_impl=$(printf '%s' "$wl_content" | grep -ciE 'Gate:[[:space:]]*implement[[:space:]]*\|[^|]*Verdict:[[:space:]]*PASS')
+      if [[ "$arc_has_plan" -eq 0 ]] || [[ "$arc_has_impl" -eq 0 ]]; then
+        archive_gate_violations=$((archive_gate_violations + 1))
+        archive_gate_violation_list="${archive_gate_violation_list}  archived gate bypass: ${wl#$ROOT/}\n"
+      fi
+    fi
+  done < <(find "$ARCHIVE_DIR" -name '*.md' -not -name '.gitkeep*' -print0 2>/dev/null || true)
+fi
+if [[ "$archive_gate_violations" -gt 0 ]]; then
+  record_result WARN "archived Work Logs with ship receipt but missing plan/implement gates (historical governance gap): ${archive_gate_violations}"
+  printf '%b' "$archive_gate_violation_list"
+else
+  record_result PASS "archived Work Logs gate completeness ok (or none archived yet)"
+fi
+
+# M8: Relative-link depth check for archived markdown files.
+# Content copy-pasted from current_state.md (at depth 2) into archive/ (depth 3)
+# keeps the original relative paths, which silently break one directory level deeper.
+# Scan all archive/*.md for relative links (not http/https, not anchor-only #...) and
+# verify the resolved target exists. WARN-only — historical archives are immutable.
+if [[ -z "$PYTHON_BIN" ]]; then
+  record_result SKIP "M8 archive relative-link check -- python unavailable"
+elif [[ ! -d "$ARCHIVE_DIR" ]]; then
+  record_result PASS "archived markdown files: no archive directory yet (fresh deploy)"
+elif [[ -n "$PYTHON_BIN" ]] && [[ -d "$ARCHIVE_DIR" ]]; then
+  archive_broken_links=0
+  archive_broken_link_list=""
+  while IFS= read -r -d '' arch_file; do
+    broken_output="$("$PYTHON_BIN" -c "
+import re, sys
+from pathlib import Path
+f = Path(sys.argv[1])
+try:
+    text = f.read_text(encoding='utf-8', errors='replace')
+except Exception:
+    print(0)
+    sys.exit(0)
+# Match [label](target) where target is not http/https and not anchor-only
+link_re = re.compile(r'\[(?:[^\]]*)\]\(([^)]+)\)')
+count = 0
+for m in link_re.finditer(text):
+    tgt = m.group(1).strip()
+    # Skip external URLs and pure anchors
+    if tgt.startswith(('http://', 'https://')) or tgt.startswith('#'):
+        continue
+    # Strip inline anchor from path
+    path_part = tgt.split('#')[0]
+    if not path_part:
+        continue
+    resolved = (f.parent / path_part).resolve()
+    if not resolved.exists():
+        print(f'  broken relative link in {str(f)}: {tgt}')
+        count += 1
+# Print count as last line so caller reads from stdout (exit-code wraps at 256)
+print(count)
+" "$arch_file" 2>/dev/null)"
+    file_count=$(printf '%s\n' "$broken_output" | tail -1)
+    file_count=${file_count:-0}
+    if [[ "$file_count" =~ ^[0-9]+$ ]] && [[ "$file_count" -gt 0 ]]; then
+      archive_broken_links=$((archive_broken_links + file_count))
+      diagnostic=$(printf '%s\n' "$broken_output" | head -n -1)
+      [[ -n "$diagnostic" ]] && archive_broken_link_list="${archive_broken_link_list}${diagnostic}\n"
+    fi
+  done < <(find "$ARCHIVE_DIR" -maxdepth 2 -name '*.md' -not -name '.gitkeep*' -print0 2>/dev/null)
+  if [[ "$archive_broken_links" -gt 0 ]]; then
+    record_result WARN "archived markdown files contain broken relative links (depth mismatch — strip or fix links when archiving from current_state.md): ${archive_broken_links}"
+    printf '%b' "$archive_broken_link_list"
+  else
+    record_result PASS "archived markdown files: no broken relative links detected"
+  fi
 fi
 
 GITIGNORE="$ROOT/.gitignore"
@@ -1312,8 +1758,18 @@ else
   record_result WARN "SSoT completeness checks skipped: current_state.md not found"
 fi
 
-# Backlog schema check: verify Kind/Labels/Priority columns present when backlog exists
+# Backlog Feature Inventory check (MEDIUM-2): spec-intake multi-feature decomposition gate
+# requires a ## Feature Inventory section per AGENTS.md §Delivery Gates.
 BACKLOG_FILE="$ROOT/docs/specs/_product-backlog.md"
+if [[ -f "$BACKLOG_FILE" ]]; then
+  if ! grep -qiE '^#+[[:space:]]+Feature Inventory' "$BACKLOG_FILE" 2>/dev/null; then
+    record_result WARN "backlog missing Feature Inventory section: _product-backlog.md exists but has no '## Feature Inventory' heading -- spec-intake multi-feature decomposition gate may have been skipped"
+  else
+    record_result PASS "backlog Feature Inventory section present"
+  fi
+fi
+
+# Backlog schema check: verify Kind/Labels/Priority columns present when backlog exists
 if [[ -f "$BACKLOG_FILE" ]]; then
   backlog_header="$(grep -m1 '|.*Feature.*|' "$BACKLOG_FILE" 2>/dev/null || true)"
   missing_cols=()
@@ -1460,10 +1916,107 @@ if [[ -d "$ROOT/docs/specs" ]]; then
   fi
 fi
 
+# Project spec template check: if /app-init has run (at least one docs/adr/ADR-*.md
+# exists) but no project-customized spec template was created, WARN so the user
+# knows spec-intake will fall back to the generic template instead of the
+# project-specific one.
+adr_count=0
+for adr_dir in "$ROOT/docs/adr" "$ROOT/.agentcortex/adr"; do
+  if [[ -d "$adr_dir" ]]; then
+    for f in "$adr_dir"/ADR-*.md; do [[ -f "$f" ]] && adr_count=$((adr_count + 1)); done
+  fi
+done
+if [[ "$adr_count" -gt 0 ]]; then
+  has_project_template=0
+  for tmpl in "$ROOT"/.agentcortex/templates/spec-app-feature-*.md; do
+    [[ -f "$tmpl" ]] && has_project_template=1 && break
+  done
+  if [[ "$has_project_template" -eq 0 ]]; then
+    record_result WARN "project spec template missing: docs/adr/ has ADR(s) but no .agentcortex/templates/spec-app-feature-<project>.md found — run /app-init to create one, or spec-intake will use the generic template"
+  else
+    record_result PASS "project spec template present alongside ADR(s)"
+  fi
+  # Round-15 Finding 1/10: Project Name SSoT presence check — if /app-init ran,
+  # current_state.md must have a non-empty, non-placeholder Project Name field.
+  cs_file="$ROOT/.agentcortex/context/current_state.md"
+  if [[ -f "$cs_file" ]]; then
+    proj_name="$(grep -m1 -i '\*\*Project Name\*\*:' "$cs_file" | sed 's/.*Project Name\*\*:[[:space:]]*//' | tr -d '\r' | xargs)"
+    if [[ -z "$proj_name" || "$proj_name" == "(set by /app-init)" ]]; then
+      record_result WARN "Project Name field absent or placeholder in current_state.md — /app-init has run (ADRs exist) but SSoT Project Name was not set; spec-intake will fall back to glob template resolution"
+    else
+      record_result PASS "SSoT Project Name is set: ${proj_name}"
+    fi
+  fi
+fi
+
+# Round-16 Finding 7: Domain Decisions entry cap — spec.md §8 hard cap is 10 entries.
+# Each [DECISION], [TRADEOFF], or [CONSTRAINT] line counts toward the cap.
+domain_decisions_exceeded=0
+if [[ -d "$ROOT/docs/specs" ]]; then
+  shopt -s nullglob
+  for spec in "$ROOT/docs/specs"/*.md; do
+    [[ -f "$spec" ]] || continue
+    [[ "$(basename "$spec")" == ".gitkeep.md" ]] && continue
+    if grep -q '^## Domain Decisions' "$spec"; then
+      entry_count="$(awk '/^## Domain Decisions/{found=1;next} found && /^## /{exit} found && /\[(DECISION|TRADEOFF|CONSTRAINT)\]/{c++} END{print c+0}' "$spec")"
+      if [[ "$entry_count" -gt 10 ]]; then
+        printf '  spec Domain Decisions cap exceeded: %s (%d entries > 10)\n' "$(basename "$spec")" "$entry_count"
+        domain_decisions_exceeded=$((domain_decisions_exceeded + 1))
+      fi
+    fi
+  done
+  shopt -u nullglob
+fi
+if [[ "$domain_decisions_exceeded" -gt 0 ]]; then
+  record_result WARN "docs/specs/ files with Domain Decisions exceeding 10-entry cap (spec.md §8 — requires user acknowledgment): ${domain_decisions_exceeded}"
+else
+  spec_dd_count=0
+  for f in "$ROOT/docs/specs"/*.md; do grep -q '^## Domain Decisions' "$f" 2>/dev/null && spec_dd_count=$((spec_dd_count + 1)); done
+  [[ "$spec_dd_count" -gt 0 ]] && record_result PASS "all specs with Domain Decisions sections are within 10-entry cap"
+fi
+
+# Round-15 Finding 7: Spec frontmatter status validation — each docs/specs/*.md
+# must have YAML frontmatter with a recognized 'status:' value.
+VALID_SPEC_STATUSES="draft|frozen|shipped|cancelled|living"
+spec_bad_status=0
+spec_missing_frontmatter=0
+if [[ -d "$ROOT/docs/specs" ]]; then
+  shopt -s nullglob
+  for spec in "$ROOT/docs/specs"/*.md; do
+    [[ -f "$spec" ]] || continue
+    # Skip .gitkeep.md placeholder files
+    [[ "$(basename "$spec")" == ".gitkeep.md" ]] && continue
+    # Check YAML frontmatter presence (first line must be ---)
+    first_line="$(head -n1 "$spec" 2>/dev/null | tr -d '\r')"
+    if [[ "$first_line" != "---" ]]; then
+      spec_missing_frontmatter=$((spec_missing_frontmatter + 1))
+      continue
+    fi
+    # Extract status: value from frontmatter
+    status_val="$(awk '/^---/{if(n++) exit} /^status:/{print}' "$spec" | sed 's/status:[[:space:]]*//' | tr -d '\r' | xargs)"
+    if [[ -z "$status_val" ]]; then
+      spec_missing_frontmatter=$((spec_missing_frontmatter + 1))
+    elif ! printf '%s' "$status_val" | grep -qE "^(${VALID_SPEC_STATUSES})$"; then
+      spec_bad_status=$((spec_bad_status + 1))
+    fi
+  done
+  shopt -u nullglob
+fi
+if [[ "$spec_missing_frontmatter" -gt 0 ]]; then
+  record_result WARN "docs/specs/ files missing YAML frontmatter or status field: ${spec_missing_frontmatter} (engineering_guardrails.md §4.2 requires status: draft|frozen|shipped|cancelled)"
+elif [[ "$spec_bad_status" -gt 0 ]]; then
+  record_result WARN "docs/specs/ files with unrecognized status value: ${spec_bad_status} (valid: draft, frozen, shipped, cancelled, living)"
+else
+  # Only emit PASS when specs directory has files to check
+  spec_file_count=0
+  for f in "$ROOT/docs/specs"/*.md; do [[ -f "$f" ]] && spec_file_count=$((spec_file_count + 1)); done
+  [[ "$spec_file_count" -gt 0 ]] && record_result PASS "all docs/specs/ files have valid status frontmatter"
+fi
+
 # ACX phase shim skill-existence check: for each .claude/agents/acx-*.md,
 # verify that any skill name listed under skills: which maps to a .agent/skills/
-# directory actually has a SKILL.md body. Claude Code built-in skills (no
-# corresponding directory) are silently skipped.
+# stub file actually has a SKILL.md body in .agents/skills/. Claude Code
+# built-in skills (no corresponding stub file) are silently skipped.
 AGENTS_DIR="$ROOT/.claude/agents"
 if [[ -d "$AGENTS_DIR" ]]; then
   shim_skill_errors=0
@@ -1475,14 +2028,15 @@ if [[ -d "$AGENTS_DIR" ]]; then
     in_frontmatter=0
     in_skills=0
     while IFS= read -r line; do
+      line="${line%$'\r'}"
       [[ "$line" == "---" ]] && { in_frontmatter=$(( 1 - in_frontmatter )); in_skills=0; continue; }
       [[ "$in_frontmatter" -eq 0 ]] && break
       if [[ "$line" =~ ^skills: ]]; then in_skills=1; continue; fi
       if [[ "$in_skills" -eq 1 ]]; then
         if [[ "$line" =~ ^[[:space:]]+-[[:space:]]+(.+)$ ]]; then
-          skill_name="${BASH_REMATCH[1]}"
+          skill_name="${BASH_REMATCH[1]%$'\r'}"
           skill_dir="$ROOT/.agent/skills/$skill_name"
-          if [[ -d "$skill_dir" ]]; then
+          if [[ -f "$skill_dir" ]]; then
             if [[ ! -f "$ROOT/.agents/skills/$skill_name/SKILL.md" ]]; then
               printf '  shim skill missing SKILL.md: %s (referenced in %s)\n' "$skill_name" "$(basename "$shim")"
               shim_skill_errors=$((shim_skill_errors + 1))

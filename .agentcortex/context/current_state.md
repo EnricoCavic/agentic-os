@@ -11,9 +11,10 @@
   - Task Isolation: `.agentcortex/context/work/<worklog-key>.md`
   - Active Work Log Path: derive <worklog-key> from the raw branch name using filesystem-safe normalization before any gate checks.
   - Workflows & Policies: `.agent/workflows/*.md`, `.agent/rules/*.md`
-- **Last Updated**: 2026-05-12
-- **Last Verified**: 2026-05-12
-- **Update Sequence**: 18
+- **Project Name**: (set by /app-init)
+- **Last Updated**: 2026-05-18
+- **Last Verified**: 2026-05-18
+- **Update Sequence**: 20
 - **ADR Index**:
   - docs/adr/ADR-001-governance-friction-tuning.md — ADR-001: Governance Friction Tuning, accepted 2026-04-23
   - docs/adr/ADR-002-guarded-governance-writes.md — ADR-002: Guarded Governance Writes (lock unification + CI lint + lifecycle frontmatter), accepted 2026-04-25
@@ -55,8 +56,8 @@
 > `/implement` reviews active HIGH-severity lessons before code changes. `/retro` may append new structured entries via guarded write.
 
 - [Category: classification-flow][Severity: MEDIUM][Trigger: polish-pass-or-audit-batch][prev: GENESIS] When the task is a batch of audit-driven polish edits that touch governance files (AGENTS.md, .agent/rules/*), the governance-file exclusion pushes it to `quick-win` minimum — not automatically `feature`. Classify by the flow you actually intend to run (quick-win skips spec + handoff legitimately); do not silently adopt `feature` label while running the quick-win flow. Self-check at bootstrap: "Am I going to write a spec? Will I run /handoff? If no to both, classification is quick-win."
-- [Category: worklog-format][Severity: LOW][Trigger: worklog-creation][prev: 7d331603] Worklog header fields MUST use markdown list format (`- Branch: ...`) to match `validate.sh` regex `^- (\*\*Branch\*\*|Branch):`. YAML frontmatter and markdown tables both fail the check. Template at `.agentcortex/templates/worklog.md` uses a table for readability but the validator accepts only the list form today.
-- [Category: branch-awareness][Severity: LOW][Trigger: session-start-multi-turn-task][prev: ea7ae3df] Run `git branch --show-current` at the start of any non-trivial task before deriving the worklog-key. The system-prompt gitStatus snapshot is taken once at session start and can become stale if the branch changed externally.
+- [Category: worklog-format][Severity: LOW][Trigger: worklog-creation][prev: 7d331603] Worklog header fields accept EITHER markdown list form (`- Branch: ...`) or table form (`| Branch | ... |`) — both pass `validate.sh` as of 2026-05-12. YAML frontmatter still fails (no `---` block parser). Template at `.agentcortex/templates/worklog.md` uses table form for readability; list form is also valid. Gate Evidence receipts MUST use `|` pipe separators exactly: `- Gate: <phase> | Verdict: PASS | Classification: <tier> | Timestamp: <ISO>` — and MUST NOT be placed inside markdown code fences (fenced receipts are silently masked and not counted).
+- [Category: branch-awareness][Severity: LOW][Trigger: session-start-multi-turn-task][prev: 73247dab] Run `git branch --show-current` at the start of any non-trivial task before deriving the worklog-key. The system-prompt gitStatus snapshot is taken once at session start and can become stale if the branch changed externally.
 - [Category: windows-install][Severity: MEDIUM][Trigger: windows-cmd-lightweight-install][prev: 285f5c5e] On Windows, installer wrappers should prefer PowerShell or a real Git Bash path over PATH `bash.exe`; the WindowsApps `bash.exe` can be a WSL placeholder and break lightweight downstream installs when no distro is configured.
 - [Category: audit-method][Severity: HIGH][Trigger: multi-agent-roundtable-same-vendor][prev: 4faa557a] When using sub-agent "expert roundtable" for adversarial review, ALL sub-agents are the same model with shared training data and shared blind spots. The "diversity of perspective" is theatre. For architecture-level audits or trust-boundary work, MUST include at least one external signal: WebFetch of published external sources, `/ask-openrouter` to a different vendor, OR human review. Confirmed during the 2026-04-25 governance audit when a 4-Claude roundtable agreed on a CRITICAL finding (skill missing on Antigravity path) that turned out to be a false alarm — only spot-verification with `file` and `head` revealed the dual-path stub design was intentional.
 - [Category: prioritization][Severity: HIGH][Trigger: audit-with-mixed-severity-findings][prev: 8afe0300] When an audit finds mixed CRITICAL/HIGH/MEDIUM and the agent ships fixes for the easy infrastructure (locks, lint, frontmatter) while deferring CRITICAL structural issues (prompt injection, state-machine reverse transition, honor-system enforcement) to "future ADR", that IS the easy-fix bias pattern. Self-check before ship: "Are all CRITICAL findings fixed OR scheduled with a specific PR # and date?" If still abstract "future work", ship is incomplete. Confirmed: ADR-002 shipped 3 infrastructure decisions while leaving SEC-N1 prompt injection and CC-2 honor-system both unfixed.
@@ -66,7 +67,19 @@
 - [Category: governance-proposal][Severity: MEDIUM][Trigger: plan-proposes-must-rule][prev: 7f5a25c3] When /plan proposes adding a MUST rule to AGENTS.md or .agent/rules/, cross-check the [enforcement][HIGH] Global Lesson immediately at plan time — not just at /implement. A MUST rule without a corresponding hook, validator, or test is honor-system theatre regardless of where in the workflow it is caught. Self-check: "What enforces this rule if the AI ignores it?" If the answer is "nothing", delete the rule or add the enforcement first.
 
 - [Category: spec-factual-claims][Severity: MEDIUM][Trigger: domain-decision-tool-behavior-claim][prev: eea362e5] Domain Decisions that make factual claims about tool behavior (e.g., 'no external API call', 'language-agnostic') MUST be verified against tool documentation before the spec is frozen. Factual errors in Domain Decisions survive implementation and review phases because reviewers check AC compliance, not rationale accuracy. Self-check at spec-write: for each [DECISION] that asserts tool behavior, find one authoritative source confirming the claim.
+- [Category: scope-expansion][Severity: HIGH][Trigger: procedure-header-scope-change][prev: 95082304] When expanding a procedure's tier scope (e.g., "quick-win only" → "all tiers"), MUST audit every step inside the procedure body for correctness under the new scope BEFORE committing. Changing only the header/trigger misses procedure-body invariants — e.g., a receipt-writing step that was safe for quick-win becomes a governance hole for feature/hotfix. Self-check: for each step N in the procedure, ask "does this step still hold correctly for every new tier I just added?"
 ## Ship History
+
+### Ship-claude-blissful-jemison-27dfb2-2026-05-18
+- **PR #104** — Multi-round adversarial governance audit: validator gate-injection hardening + downstream UX gaps (feature).
+  - `validate.sh`/`validate.ps1`: T175–T247 (22 gate-injection scenarios closed) — code-fence bypass, HTML-comment bypass, indented-receipt masking, unclosed-fence masking, multi-section masking, self-reclassification reset abuse (H4), receipts-in-fence diagnostic (T247).
+  - `test.md` no-test-runner fallback path hardened: hotfix moved to sign-off-required group (§12.2); Gate 2 exception scoped to quick-win/tiny-fix; fallback step 5 tier-scoped receipt; step 6 scoped to quick-win/tiny-fix only (terminal for feature/hotfix); Drift Log write added to quick-win/tiny-fix trigger; Step 4b Gate-2 exception now satisfiable from both paths.
+  - `bootstrap.md §3.7`: feature full-chain removed from `Next:` field (8-line budget breach); chain recorded in Work Log Task Description only.
+  - `.codex/INSTALL.md`: bash required on ALL platforms; Windows Git Bash prerequisite explicit; PS1 -ExecutionPolicy Bypass.
+  - `validate.sh`/`validate.ps1` M8: archive relative-link depth check; `ship.md §2`: depth-hazard warning.
+  - M8 counter overflow fix: switched from `sys.exit(count)` to stdout count read (avoids mod-256 wrap on >255 broken links).
+  - 7 Opus adversarial review rounds (rounds 1–7); validate.sh M8 parity-harden (try/except + numeric guard); CHANGELOG completeness; wording fixes.
+- Tests: validate 80/4/0. PR: https://github.com/KbWen/agentic-os/pull/104
 
 ### Ship-claude-peaceful-aryabhata-fe5644-2026-05-12-pass3
 - **PR #103** (squash `e732349`) — README/cross-doc broken-link fix, expert-reviewed (Plan subagent). The framework README is dual-purpose (GitHub face + downstream reference); a multi-angle audit found 6 broken `.md` links (33% of internal links) in the deployed README. Per-link triage:
@@ -164,44 +177,4 @@
 - Backlog rows shipped: #10, #12, #23, #28. Pending count 20 → 16.
 - Commits: `c0f63c3`; merged via `30e6fcc` (PR #87).
 
-### Ship-feat-optimization-hooks-2026-05-04
-- Feature shipped: Closing the Claude-platform half of backlog #30 — PreCompact hook + framework receipt integration. Stop hook (`check-sentinel.py`) was previously shipped under CC-2/L4 but its violations.jsonl was never read by validate; this ship closes that loop. PreToolUse + UserPromptSubmit deferred (risk > ROI per design review).
-- Edits:
-  - `.claude/hooks/check-precompact.py` — new PreCompact hook; refuses compaction when active Work Log `## Phase Summary` is empty or stale relative to `Current Phase`. WARN by default, blocks (exit 2) when `AGENTIC_OS_PRECOMPACT_BLOCK=1`. Violation receipts at `.agentcortex/context/precompact-violations.jsonl`.
-  - `.claude/settings.json` — wired PreCompact hook alongside existing Stop hook.
-  - `tests/guard/test_precompact_hook.py` — 13 unit tests covering header parsing (list + table form), Phase Summary extraction, evaluate logic, end-to-end with temp Work Logs, and block-mode exit code.
-  - `.agentcortex/bin/validate.{sh,ps1}` — read both `sentinel-violations.jsonl` and `precompact-violations.jsonl`; emit WARN with count when non-zero, PASS when zero. Capability-by-presence (absent file = PASS).
-  - `.gitignore` — added `precompact-violations.jsonl` (alongside existing sentinel entry).
-- Tests: Pass — `python -m unittest tests.guard.test_sentinel_hook tests.guard.test_precompact_hook` → 27/27 in 0.1s. validate: 72 PASS / 7 WARN / 0 FAIL (new WARN: 3 historical sentinel violations now surfaced — these were silently accumulating in the receipt file before this ship).
-- Commits: `0ca5788`; merged via `30e6fcc` (PR #87).
-- Scope cuts: PreToolUse phase-discipline hook and UserPromptSubmit warn hook were evaluated and deferred — false-positive risk on legitimate edits/chat outweighs the catch rate. Document in Drift Log of work log.
-
-### Ship-feat-optimization-round-2026-05-04
-- Feature shipped: Quick-win batch from optimization-round-2026-05-04 — backlog rows #31, #32, #34, #35, #36, #37, #39, #40 (8 governance enhancements). Zero behavioral change to runtime; pure rule additions across 5 workflows + AGENTS.md + validate (sh/ps1).
-- Edits:
-  - `.agent/workflows/review.md` — Adversarial Reviewer Freshness Invariant H2 (codifies HIGH lesson 4faa557a) + Cloud Adversarial Review (`/ultrareview`) callout
-  - `.agent/workflows/plan.md` — `[P]` parallel-task marker rule + template line (spec-kit pattern)
-  - `.agent/workflows/spec-intake.md` — §4.5 Clarification Pass (≤3 questions, optional, single-round)
-  - `.agent/workflows/app-init.md` — §10 Onboard Mode (read-only stdout, no doc writes; absorbs `/recap` pointer for active sessions)
-  - `.agent/workflows/hotfix.md` — §6 Cloud PR Auto-Fix (`/autofix-pr`) callout
-  - `AGENTS.md` — `## Override Layer (AGENTS.override.md)` precedence chain (mirrors Codex pattern)
-  - `.agentcortex/bin/validate.{sh,ps1}` — Work Log Phase Summary sentinel marker (⚡ ACX) WARN check
-- Tests: Pass — validate 71 PASS / 6 WARN / 0 FAIL (the new sentinel WARN counts 6 legacy logs without ⚡ ACX, by design WARN-only).
-- Commits: `7b7071b`; merged via `30e6fcc` (PR #87).
-- Source: external research round (Claude Code w14-w17, OpenAI Codex 2026 AGENTS.md docs, github/spec-kit, dsifry/metaswarm, sshh).
-- Deferred: #30 (Claude hooks enforcement layer — feature), #33 (plugin packaging — feature), #38 (AGENTS.md token-budget pass — risky restructure).
-
-### Ship-feat-acx-phase-shims-2026-05-04
-- Feature shipped: acx-* phase shims for Claude Code native skill injection — 5 shims (.claude/agents/acx-{implementer,reviewer,tester,handoff,shipper}.md), validate.sh+ps1 shim skill-existence check, review.md acx-* enforcement check.
-- Tests: Pass — validate 63 PASS / 0 FAIL; simulation confirmed native skill injection active at subagent startup.
-- Commits: `94ab322`
-
-### Ship-architecture-change-adr-002-lock-unification-2026-04-25
-- Feature shipped: ADR-002 Guarded Governance Writes — D2.1 lock generalization (policy-driven scope, append mode, per-target receipts, configurable TTL, PID-liveness, lock_group stub for ADR-003); D2.2 CI lint `tools/lint_governed_writes.py` enforces guard usage on protected paths; D2.3 lifecycle frontmatter checker for governance docs (audit/, guides/governance-*, adr/, architecture L1).
-- Tests: Pass — 56/56 in 0.4s + 8 Beast Mode adversarial scenarios green; live lint scan 0 FAIL / 67 WARN; live lifecycle scan 2 PASS / 3 WARN (grandfathered) / 0 FAIL.
-- Commits: `65c5890` (ADR/spec), `20f2c21` (D2.1), `618ea61` (D2.2), `8eaf284` (D2.3) + ship commit.
-- Spec drift: AC-24/AC-25 (ownership matrix doc + AGENTS.md pointer) deferred per Pragmatist roundtable + user direction; Architect content preserved in audit §0.4 + Work Log archive.
-
-- **v1.1.2** (2026-04-17): Polish batch 2 — Python advisory in deploy.sh (1.1), guardrails Loaded-Sections Receipt (3.2), bootstrap Reading Mode Table + §0 decision table (3.3 + 2.1), Confidence Gate harmonized with structured receipts + step-level in /implement (2.3), Read-Once Drift Log audit receipt in AGENTS.md (4.3). Commit `4976a92`. Closes remaining 6 of 12 post-v1.1.0 audit findings. [CHANGELOG](../../CHANGELOG.md#112---2026-04-17)
-- **v1.1.1-batch1** (2026-04-17): Polish pass — installer UX (Git-bash detection, clone progress), governance wiring (Confidence Gate receipt in /plan + /ship, No-Bypass scope clarified in AGENTS.md), token discipline (CLAUDE.md 51→27 lines), skill index signposted in routing.md §3. Commit `95ceafb`. Addresses 6 of 12 audit findings; remaining 6 deferred to batch 2 on same branch. [CHANGELOG](../../CHANGELOG.md#111---2026-04-17)
-- **v1.1.0** (2026-04-16): Token optimization & governance hardening. SKILL.md heading-scope (#57), phase output compression (#54), expert review quick-wins (#56), deploy fixes (#52, #53, #55). [CHANGELOG](../../CHANGELOG.md#110---2026-04-16)
+*(Older entries archived to `.agentcortex/context/archive/ship-history-2026.md`)*

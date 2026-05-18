@@ -68,7 +68,8 @@ none
 
 ## Gate Evidence
 
-> Gate receipts written by each phase. Format: `gate: <phase> | verdict: pass/fail | classification: <type> | timestamp: <ISO>`
+> Gate receipts written by each phase. Format: `- Gate: <phase> | Verdict: PASS | Classification: <type> | Timestamp: <ISO>`
+> **Critical**: `|` pipe separators are mandatory. Receipts placed inside markdown code fences are silently masked and NOT counted by validate.sh — always write receipts as plain list lines.
 
 none
 
@@ -114,6 +115,32 @@ none
 ## Drift Log
 
 > Record deviations from the original plan, reclassifications, or unexpected scope changes.
+
+none
+
+---
+
+## Design Reference
+
+> Populated by /plan for UI tasks. If not a UI task, write `none`.
+> Format: `Link: <DSoT URL or file path> | Tool: <Stitch | Figma | Pencil | other>`
+
+none
+
+---
+
+## Observability
+
+> Populated by /ship for feature/architecture-change tasks. Document the production error sink used in changed code.
+> Format: `Sink: <logger name or API> | Scope: <files> | Verified: <yes/no>`
+
+none
+
+---
+
+## Resume
+
+> Populated by /handoff for feature/architecture-change tasks. Required: `State`, `Completed`, `Next`, `Context` fields; then `### Read Map`, `### Skip List`, `### Context Snapshot`; optionally `### Backlog Status`. validate.sh enforces the three `###` headings. Leave as `none` until /handoff runs.
 
 none
 

@@ -1,5 +1,41 @@
 # Changelog
 
+## [Unreleased] - 2026-05-18
+
+### Adversarial Governance Audit + Downstream UX Hardening (PR #104)
+
+**Validator (validate.sh / validate.ps1) — gate-injection hardening:**
+- T175–T247: 22 gate-injection scenarios closed — code-fence bypass, HTML-comment bypass, indented-receipt masking, unclosed-fence masking, multi-section masking, self-reclassification reset abuse (H4), receipts-in-fence diagnostic (T247)
+- Validator maintained 80 PASS / 4 WARN / 0 FAIL throughout 20+ commits
+- ACX phase shim check (`validate.sh`): guard fixed from `-d` (directory) to `-f` (file) — `.agent/skills/<name>` stubs are flat files; `-d` made the SKILL.md existence check dead code
+- ACX phase shim check (`validate.sh`): CRLF line-ending strip added to frontmatter parser — frontmatter `---` delimiter failed to match on Windows checkouts with CRLF line endings
+- ACX phase shim check (`validate.ps1`): `-PathType Container` → `-PathType Leaf` — same dead-code fix as validate.sh
+- `routing.md §5` / `bootstrap.md §6`: stale "Runtime v5" version token corrected to "Runtime v1"
+
+**Validator — M8 archive relative-link depth check:**
+- `validate.sh` / `validate.ps1` M8: scan `archive/*.md` for relative links and WARN when target does not exist — catches depth-mismatch breakage from content copied out of `current_state.md` (depth 2) into `archive/` (depth 3)
+- M8 link counter uses stdout read (not `sys.exit(count)`) to avoid mod-256 silent-PASS on ≥256 broken links
+- `validate.sh` M8 parity-hardened: `try/except` file-read guard + `^\d+$` numeric pre-check (matches `validate.ps1`)
+- `ship.md §2 State Update`: prose warning about relative-link depth hazard when archiving Ship History
+
+**Validator — validate.ps1 loop-termination parity fix (T243/T245/T247):**
+- `validate.ps1` T243/T245/T247 fail-closed branches used bare `exit 0` inside the `foreach ($wl in $worklogs)` loop — in PowerShell this terminates the entire script (not just the current iteration), silently skipping ~60 downstream checks and never printing a Summary line; Windows CI falsely reported exit 0 while `validate.sh` on Linux correctly reported exit 1
+- Fix: replaced `exit 0` with `$gateProgressionIllegal++; continue` in all three branches — mirrors `validate.sh` behavior where `sys.exit(0)` exits only the Python subprocess and bash continues the outer loop
+
+**test.md — no-test-runner fallback path:**
+- `hotfix` moved to sign-off-required group (`engineering_guardrails.md §12.2 no-exceptions`)
+- Gate 2 exception (5-Gate Contract) scoped to `quick-win`/`tiny-fix` only
+- Fallback procedure step 5 tier-scoped: `quick-win`/`tiny-fix` write PASS; `feature`/`arch-change`/`hotfix` do not write PASS receipt when Gate 2 unsatisfied
+- Step 6 tier-scoped: `quick-win`/`tiny-fix` → skip "Run all tests" and proceed to Step 4b; `feature`/`arch-change`/`hotfix` → step 5 terminal, do not proceed
+- `quick-win`/`tiny-fix` fallback trigger now writes a Drift Log entry, satisfying Step 4b Gate 2 exception precondition from both paths
+
+**bootstrap.md §3.7 — Next: field overflow fix:**
+- Feature full-phase chain (`[/brainstorm →] /spec → ... → /ship`) removed from `Next:` field to prevent 8-line Response Budget breach; chain now recorded in Work Log `## Task Description` only
+
+**`.codex/INSTALL.md` — bash dependency clarified:**
+- Bash required on ALL platforms (Windows PS1 installer wraps bash internally)
+- Git for Windows prerequisite explicit; PS1 commands include `-ExecutionPolicy Bypass`
+
 ## [1.1.2] - 2026-04-17
 
 ### Polish Batch 2: Governance Depth

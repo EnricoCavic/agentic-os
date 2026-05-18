@@ -28,6 +28,9 @@ It does NOT contain governance rules — those remain in `AGENTS.md`.
 | "review this", "幫我看看", "code review" | `/review` |
 | "run tests", "跑測試", "verify" | `/test` |
 | "typo", "rename variable" | tiny-fix (execute directly) |
+| "I want to add X", "我想加 X", "新增功能 X", "我要實作 X", "加一個 X", "幫我做 X" | `/bootstrap` (single feature) — if multi-feature intent detected, route to `/spec-intake` instead |
+| "review failed", "review 沒過", "review 不通過", "fix review findings", "補齊 review" | `/implement` — REVIEWED→IMPLEMENTING reverse transition |
+| "tests failed", "test 沒過", "tests are failing", "修測試", "fix test failures" | `/implement` — TESTED→IMPLEMENTING reverse transition |
 
 ### Spec & Intake
 
@@ -137,7 +140,7 @@ It does NOT contain governance rules — those remain in `AGENTS.md`.
 
 2. **Optional module ambiguity**: A phrase like "用 claude" requires clear delegation intent. Ambiguous phrasing (e.g., "can Claude do this?") does NOT trigger `/claude-cli`. Require explicit delegation request before routing to any optional module.
 
-3. **tiny-fix vs quick-win escalation**: Modifying `docs/specs/`, `docs/architecture/`, any file with `status: frozen`, `AGENTS.md`, `.agent/rules/*.md`, or `.agent/config.yaml` always escalates to quick-win minimum — even if fewer than 3 files are touched. (Authoritative rule in AGENTS.md §Agentic OS Runtime v5 rule 2.)
+3. **tiny-fix vs quick-win escalation**: Modifying `docs/specs/`, `docs/architecture/`, any file with `status: frozen`, `AGENTS.md`, `.agent/rules/*.md`, `.agent/config.yaml`, `.agentcortex/templates/*`, or `.agentcortex/bin/validate.*` always escalates to quick-win minimum — even if fewer than 3 files are touched. (Authoritative rule in AGENTS.md §Agentic OS Runtime v1 rule 2.)
 
 4. **Skill vs workflow**: If a user's request matches both a skill phrase (§3) and a workflow route (§1), route to the workflow phase first and activate the skill within that phase. Skills do not replace phase routing.
 
@@ -149,7 +152,7 @@ It does NOT contain governance rules — those remain in `AGENTS.md`.
 
 ## 5. Command Discovery Notes
 
-All commands are dispatched per `AGENTS.md §Agentic OS Runtime v5` and execute canonical workflows from `.agent/workflows/<command>.md`. For the Claude platform, dispatcher stubs live in `.claude/commands/<command>.md`.
+All commands are dispatched per `AGENTS.md §Agentic OS Runtime v1` and execute canonical workflows from `.agent/workflows/<command>.md`. For the Claude platform, dispatcher stubs live in `.claude/commands/<command>.md`.
 
 > **Note**: `.agent/workflows/commands.md` is a compatibility alias. This routing index is the canonical source for command discovery.
 

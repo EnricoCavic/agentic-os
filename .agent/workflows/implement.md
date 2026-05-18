@@ -9,7 +9,19 @@ description: Workflow for implement
 
 **Phase Verification** (per bootstrap §2b): Read `Current Phase` from Work Log header. Verify transition to `implement` is legal. If illegal, STOP. Otherwise update `Current Phase: implement`.
 
+**Resume-after-review**: If the prior phase was `review` (Work Log gate evidence shows a NOT READY verdict with `Transition: REVIEWED→IMPLEMENTING`), read Work Log `## Review Feedback` before writing any code. The resume scope is ONLY the UNPROVEN/blocking rows from the burden-of-proof table — do NOT re-implement already-passing items.
+
 **Checkpoint SHA**: Before any code changes, record `Checkpoint SHA: <git HEAD>` in the Work Log header. This anchors the resume point for interrupted sessions. The next agent can `git diff <checkpoint>..HEAD` to scope unfinished work.
+
+**Gate Receipt (on completion)**: After the final commit (Checkpoint SHA is current), append to Work Log `## Gate Evidence`:
+```
+- Gate: implement | Verdict: PASS | Classification: <tier> | Timestamp: <ISO>
+```
+
+**Next phase (classification-aware)**:
+- `feature` / `architecture-change`: proceed to `/review`, then `/test`, then `/handoff`, then `/ship`.
+- `quick-win`: MAY proceed directly to `/ship` (review/test optional per `engineering_guardrails.md §10.4`). Record inline evidence and go straight to `/ship`.
+- `hotfix`: MUST proceed to `/review` then `/test` then `/ship` (handoff exempt).
 
 ## Direct Execution Rule (Turn 1 — feature / architecture-change only)
 
@@ -145,7 +157,7 @@ When a skill is loaded, it **changes how you implement** — not just what you s
      a. `git stash push -m "scope-creep escalation: <branch>"` — preserves uncommitted code; avoids losing work.
      b. Append to Work Log `## Drift Log`: `- Reclassification: <old-tier> → <new-tier> on <ISO-date>; reason: <one-line scope-creep summary>; stashed-WIP: <stash-ref>; original-checkpoint-SHA: <prior commit>`.
      c. Update Work Log header `Classification: CLASSIFIED` (rollback to bootstrap classification state).
-     d. Re-enter `/bootstrap §0–§3` to re-classify at the higher tier (the new classification's full gate sequence applies — spec-gated for feature/architecture-change, etc.).
+     d. Re-enter `/bootstrap §0–§3` to re-classify at the higher tier (the new classification's full gate sequence applies). **For escalation to `feature` or `architecture-change`: `/spec` is now mandatory before `/plan` — the escalated task MUST produce a frozen spec at `docs/specs/<feature>.md` before reaching IMPLEMENTABLE. Do not resume the stash until the spec gate passes.**
      e. After re-bootstrap completes the new tier's CLASSIFIED → ... → IMPLEMENTABLE path, `git stash pop` to restore the WIP, then continue under the new classification's gates.
   4. **Why the reverse transition exists**: prior to this fix (NR-5 in audit), the rule said "rollback to CLASSIFIED" but the state machine had no `IMPLEMENTING → CLASSIFIED` transition, leaving agents three illegal options: silent continue (banned), dead-lock, or fake the Work Log header. Now there is a defined, gated reverse path with stash-protection so no work is lost.
 

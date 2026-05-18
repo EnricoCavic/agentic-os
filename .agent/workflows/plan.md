@@ -37,12 +37,12 @@ missing: []
 - If classification is `quick-win` or `hotfix`:
   - Proceed directly to plan output.
 
-## Gate Evidence Receipt
+## Gate Receipt
 
 After outputting the gate block, append a compact gate receipt to the Work Log under `## Gate Evidence`:
 
 ```markdown
-- Gate: plan | Verdict: pass | Classification: <tier> | At: <ISO-timestamp>
+- Gate: plan | Verdict: PASS | Classification: <tier> | Timestamp: <ISO>
 ```
 
 If `verdict: fail`, the receipt records the failure and missing items. This makes gate progression auditable by `validate` without requiring a runtime hard blocker.
@@ -165,7 +165,7 @@ Rules:
 After plan is approved, AI MUST append to the current Work Log:
 
 ```markdown
-## Risks (from /plan)
+## Risks
 - [Risk 1]: [brief description + mitigation]
 - [Risk 2]: ...
 - [Risk 3]: ...

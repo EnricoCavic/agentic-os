@@ -87,6 +87,9 @@ get_tier() {
         .github/ISSUE_TEMPLATE/*) echo "scaffold" ;;
         .github/PULL_REQUEST_TEMPLATE.md) echo "scaffold" ;;
 
+        # scaffold — user may customize advisory hook samples before activating
+        .githooks/*) echo "scaffold" ;;
+
         # core — everything else is framework, always overwrite
         *) echo "core" ;;
     esac
@@ -676,6 +679,12 @@ for f in "$REPO_ROOT"/.github/ISSUE_TEMPLATE/*.md; do
     deploy_file "$f" ".github/ISSUE_TEMPLATE/$(basename "$f")"
 done
 deploy_file "$REPO_ROOT/.github/PULL_REQUEST_TEMPLATE.md" ".github/PULL_REQUEST_TEMPLATE.md"
+
+# --- Deploy: .githooks/ advisory hook samples (scaffold) ---
+if [ -f "$REPO_ROOT/.githooks/pre-commit.guard-ssot.sample" ]; then
+    mkdir -p "$TARGET/.githooks"
+    deploy_file "$REPO_ROOT/.githooks/pre-commit.guard-ssot.sample" ".githooks/pre-commit.guard-ssot.sample"
+fi
 
 # ============================================================
 # .gitignore management (special — block-managed, not file-level)

@@ -53,6 +53,18 @@ Create `docs/adr/ADR-001-project-architecture.md` using the template at `.agentc
 
 Fill in all sections from user answers. For `[TBD]` items, include a `## Open Decisions` section listing them.
 
+**SSoT Update (mandatory)**: After writing the ADR file, insert the new ADR into `current_state.md` under the `**ADR Index**` heading. Edit the file directly — find the `**ADR Index**` line and append the new entry immediately below it:
+
+```
+- docs/adr/ADR-00N-project-architecture.md: Project Architecture · applies_to: **
+```
+
+This is an `/app-init`-specific SSoT write exception (documented alongside the `/retro` exception). It is safe to write directly because `/app-init` runs at session start before any concurrent session is active on the branch.
+
+**Do NOT use `guard_context_write.py` for this write** — that tool supports whole-file replace or end-of-file append only; it has no section-targeting capability. A direct text edit under the heading is the correct and only approach.
+
+**Why mandatory**: `validate.sh` checks ADR disk presence vs. SSoT index. Without this update, every greenfield project fails validation immediately after `/app-init` with `[FAIL] SSoT ADR Index completeness` — before the user has had a chance to run `/ship`.
+
 ---
 
 ## 3. Generate Domain Skills (Scaffolds)
@@ -195,6 +207,16 @@ This allows `/spec-intake` to recommend relevant skills during feature decomposi
 ---
 
 ## 7. Output & Handoff
+
+**Write Project Name to SSoT (mandatory)**: Before outputting the summary, edit `current_state.md` directly to set the `**Project Name**` field to the project identifier derived in §4c (i.e., the same `<project>` value used in the spec template filename). Find the `- **Project Name**:` line and replace its value:
+
+```
+- **Project Name**: <project>
+```
+
+This is an `/app-init`-specific SSoT write exception (same scope as the ADR Index write in §2). It is safe to write directly because `/app-init` runs at session start before any concurrent session is active. Do NOT use `guard_context_write.py` — no section-targeting capability.
+
+**Why mandatory**: `/spec-intake §3` reads this field to resolve the project-customized spec template filename (`spec-app-feature-<project>.md`) without a full glob. If this field is absent, every subsequent `/spec-intake` run must fall back to glob search and may silently use the wrong template.
 
 Output a summary:
 

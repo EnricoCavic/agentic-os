@@ -895,19 +895,60 @@ if (Test-Path -Path $worklogDir -PathType Container) {
     $gateProgressionIllegal = 0
     $phaseSummaryMissing = 0
     $sentinelMarkerMissing = 0
-    # Legal phase transitions for gate evidence validation
-    $legalTransitions = @{
+    $testGateResultsMissing = 0
+    $currentPhaseIncoherent = 0
+    $shippedNotArchived = 0
+    $evidencePlaceholderOnly = 0
+    $reviewPassWithUnproven = 0
+    $reclassifyHeaderNotReset = 0
+    $handoffResumeIncomplete = 0
+    $hotfixShipNoEvidence = 0
+    $adrCoverageUndocumented = 0
+    # Legal phase transitions for gate evidence validation (classification-aware)
+    # quick-win / unknown: implement can go directly to ship (fast path)
+    $legalDefault = @{
         'bootstrap' = @('plan')
         'plan'      = @('implement')
         'implement' = @('review','test','ship')
         'review'    = @('implement','test','ship')
-        'test'      = @('handoff','ship','implement')
+        'test'      = @('ship','implement')
         'handoff'   = @('ship','retro')
         'ship'      = @()
     }
+    # feature / architecture-change: must go through review+test+handoff; no shortcuts
+    $legalStrict = @{
+        'bootstrap' = @('plan')
+        'plan'      = @('implement')
+        'implement' = @('review','test')
+        'review'    = @('implement','test')
+        'test'      = @('handoff','implement')
+        'handoff'   = @('ship','retro')
+        'ship'      = @()
+    }
+    # hotfix: must review+test but handoff is optional (goes test->ship directly)
+    # plan is always required per engineering_guardrails.md §10.2 — no implement shortcut
+    $legalHotfix = @{
+        'bootstrap' = @('plan')
+        'plan'      = @('implement')
+        'implement' = @('review','test')
+        'review'    = @('implement','test')
+        'test'      = @('ship','implement')
+        'ship'      = @()
+    }
     foreach ($wl in $worklogs) {
-        $content = Get-Content -Path $wl.FullName -Raw -ErrorAction SilentlyContinue
+        $content = Get-Content -Path $wl.FullName -Raw -Encoding utf8 -ErrorAction SilentlyContinue
         if (-not $content) { continue }
+        # Select legal-transition dict based on classification (accept list and table form)
+        $wlClassForGates = ''
+        $wlClassForGatesMatch = [regex]::Match($content, '(?m)^-\s+(?:\*\*)?[Cc]lassification(?:\*\*)?\s*:\s+`?([a-zA-Z][\w-]*)`?')
+        if (-not $wlClassForGatesMatch.Success) {
+            $wlClassForGatesMatch = [regex]::Match($content, '(?m)^\|\s*(?:\*\*)?[Cc]lassification(?:\*\*)?\s*\|\s*`?([a-zA-Z][\w-]*)')
+        }
+        if ($wlClassForGatesMatch.Success) { $wlClassForGates = $wlClassForGatesMatch.Groups[1].Value.ToLower() }
+        $legalTransitions = if ($wlClassForGates -in @('feature','architecture-change')) { $legalStrict }
+                            elseif ($wlClassForGates -eq 'hotfix') { $legalHotfix }
+                            elseif ($wlClassForGates -in @('quick-win','tiny-fix')) { $legalDefault }
+                            else { $legalStrict }  # H1 fail-closed: unknown → strictest transitions
         $createdDate = ''
         $createdDateMatch = [regex]::Match($content, '(?m)^- \*\*Created Date\*\*:\s*(.+)$')
         if ($createdDateMatch.Success) {
@@ -930,17 +971,161 @@ if (Test-Path -Path $worklogDir -PathType Container) {
                 $gateEvidenceMissing++
             }
         } else {
-            # Parse gate receipts and verify phase progression
-            $gates = @([regex]::Matches($content, '(?mi)^(`?- )?gate:\s*(\w+)\s*\|') | ForEach-Object { $_.Groups[2].Value })
-            if ($gates.Count -ge 2) {
+            # Parse gate receipts: only PASS verdicts are forward transitions;
+            # NOT READY / FAIL receipts are reverse edges and must be excluded.
+            # supporting workflows are out-of-band — exclude to avoid false illegal-transition flags.
+            # H4: count STRUCTURED reclassification records in Drift Log (count-based, not position-based)
+            # Requires: Reclassif* <sep> ... -> — rejects prose mentions like "considered but rejected"
+            $reclassifyCount = 0
+            $inDrift = $false
+            foreach ($line in ($content -split "\r?\n")) {
+                if ($line -match '^## Drift Log') { $inDrift = $true; continue }
+                if ($inDrift -and $line -match '^## ') { break }
+                if ($inDrift) {
+                    $rm = [regex]::Match($line, '\bReclassif\w*\s*[:\-]\s*([\w-]+)\s*->\s*([\w-]+)')
+                    if ($rm.Success -and $rm.Groups[1].Value.ToLower() -ne $rm.Groups[2].Value.ToLower()) { $reclassifyCount++ }
+                }
+            }
+            $resetsUsed = 0
+            # T48/T154/T175/T178/T241/T181/T242/T243: section-scoped gate parsing with full
+            # fence/comment injection protection. T244: tracking runs on EVERY line.
+            # T247: masked receipt tracking in main loop (replaces post-loop raw-rescan
+            # which had false-positives on lone-## inside fences and multiple-section
+            # ambiguity, and false-negatives on indented receipts inside fences).
+            $receiptRe = '(?i)^(?:`?- )?gate:\s*\w+\s*\|'
+            # Inside fences lines may be indented; allow leading whitespace for masked-receipt detection
+            $maskedReceiptRe = '(?i)^\s*(?:`?- )?gate:\s*\w+\s*\|'
+            $inGateEvidenceSection = $false
+            $gateEvidenceSeen = $false
+            $maskedReceiptInSection = $false  # T247
+            $inCodeFence = $false
+            $inHtmlComment = $false
+            $gateLines = [System.Collections.Generic.List[string]]::new()
+            foreach ($line in ($content -split "\r?\n")) {
+                $wasInFence = $inCodeFence
+                if ($line -match '^ {0,3}(`{3,}|~{3,})') { $inCodeFence = -not $inCodeFence }
+                $wasInComment = $inHtmlComment
+                foreach ($cm in [regex]::Matches($line, '<!--|-->')) { $inHtmlComment = ($cm.Value -eq '<!--') }
+                $masked = ($wasInFence -or $inCodeFence) -or ($wasInComment -or $inHtmlComment)
+                if ($line -match '^## Gate Evidence' -and -not $gateEvidenceSeen -and -not $inCodeFence -and -not $inHtmlComment) { $inGateEvidenceSection = $true; $gateEvidenceSeen = $true; continue }
+                if ($inGateEvidenceSection -and $line -match '^## ' -and -not $masked) { $inGateEvidenceSection = $false; continue }
+                if ($inGateEvidenceSection) {
+                    if ($masked) {
+                        if ($line -match $maskedReceiptRe) { $maskedReceiptInSection = $true }
+                    } else {
+                        $gateLines.Add($line)
+                    }
+                }
+            }
+            # T243: fail-closed if heading exists but was suppressed (fence/comment blocked recognition)
+            if (-not $gateEvidenceSeen) {
+                if (($content -split "\r?\n") | Where-Object { $_ -match '^## Gate Evidence' }) {
+                    Write-Output 'incomplete:gate-evidence-suppressed (unclosed fence or HTML comment above ## Gate Evidence -- validate manually)'
+                    $gateProgressionIllegal++; continue
+                }
+            }
+            # T245: fail-closed if fence/comment left unclosed INSIDE Gate Evidence
+            if ($inCodeFence -or $inHtmlComment) {
+                Write-Output 'incomplete:unterminated-fence-or-comment (unclosed code fence or HTML comment in ## Gate Evidence -- validate manually)'
+                $gateProgressionIllegal++; continue
+            }
+            # T247: no unmasked receipt but at least one was masked — targeted error
+            $unmaskedReceipt = $gateLines | Where-Object { $_ -match $receiptRe } | Select-Object -First 1
+            if ($gateEvidenceSeen -and -not $unmaskedReceipt -and $maskedReceiptInSection) {
+                Write-Output 'incomplete:receipts-in-fence (Gate Evidence has receipt-format lines but all are inside code fences or HTML comments -- move receipts out of code blocks)'
+                $gateProgressionIllegal++; continue
+            }
+            $gateList = [System.Collections.Generic.List[string]]::new()
+            $hasShipReceipt = $false  # H3: track ANY ship receipt regardless of verdict
+            $reviewNotReady = $false  # track pending re-review after NOT READY reverse edge
+            foreach ($line in $gateLines) {
+                $gm = [regex]::Match($line, '(?i)^(?:`?- )?gate:\s*(\w+)\s*\|')
+                if ($gm.Success) {
+                    $gPhase = $gm.Groups[1].Value.ToLower()
+                    # H3: record ship presence BEFORE verdict filter
+                    if ($gPhase -eq 'ship') { $hasShipReceipt = $true }
+                    # supporting workflows are out-of-band
+                    if ($gPhase -in @('retro','research','brainstorm','decide','audit')) { continue }
+                    if ($line -match '(?i)\|[^|]*Verdict:\s*PASS(\s*\||$)') {
+                        # PASS: clear pending re-review flag if this is review
+                        if ($gPhase -eq 'review') { $reviewNotReady = $false }
+                        # H4: Reclassification reset — one reset per structured drift record
+                        if ($gPhase -eq 'bootstrap' -and $gateList.Count -gt 0 -and $reclassifyCount -gt $resetsUsed) {
+                            $gateList.Clear()
+                            $resetsUsed++
+                        }
+                        $gateList.Add($gPhase)
+                    } else {
+                        # NOT READY / FAIL review: discard preceding implement (reverse-edge pop)
+                        if ($gPhase -eq 'review' -and $gateList.Count -gt 0 -and $gateList[$gateList.Count - 1] -eq 'implement') {
+                            $gateList.RemoveAt($gateList.Count - 1)
+                            $reviewNotReady = $true
+                        }
+                    }
+                }
+            }
+            $gates = @($gateList)
+            # Completeness check first — valid even with 1 gate (avoids early-return bypass)
+            $gateSet = @{}
+            foreach ($g in $gates) { $gateSet[$g] = $true }
+            # H3: completeness triggers on ANY ship receipt, not just PASS ones
+            if ($hasShipReceipt -or $gateSet.ContainsKey('ship')) {
+                if ($wlClassForGates -in @('feature','architecture-change')) {
+                    $requiredPhases = @('bootstrap','plan','implement','review','test','handoff')
+                } elseif ($wlClassForGates -eq 'hotfix') {
+                    $requiredPhases = @('bootstrap','plan','implement','review','test')
+                } elseif ($wlClassForGates -eq 'quick-win') {
+                    # H1: quick-win has real required phases — not an empty set
+                    $requiredPhases = @('bootstrap','plan','implement')
+                } elseif ($wlClassForGates -eq 'tiny-fix') {
+                    # tiny-fix is exempt from gate ceremony (AGENTS.md §tiny-fix fast path)
+                    $requiredPhases = @()
+                } else {
+                    # H1: fail-closed for unknown/misspelled classification — treat as feature
+                    $requiredPhases = @('bootstrap','plan','implement','review','test','handoff')
+                }
+                $missingPhases = $requiredPhases | Where-Object { -not $gateSet.ContainsKey($_) }
+                if ($missingPhases) {
+                    Write-Output "  incomplete gate receipts in $($wl.Name): missing $($missingPhases -join ',')"
+                    $gateProgressionIllegal++
+                }
+            }
+            # NOT READY reverse-edge check: re-review was skipped after NOT READY
+            if ($reviewNotReady -and ($gates | Where-Object { $_ -in @('test','handoff','ship') })) {
+                $badNext = ($gates | Where-Object { $_ -in @('test','handoff','ship') } | Select-Object -First 1)
+                Write-Output "  illegal gate progression in $($wl.Name): NOT_READY-review->$badNext (re-review skipped after NOT READY)"
+                $gateProgressionIllegal++
+            }
+            # Progression check requires 2+ gates; tiny-fix has no required phase sequence
+            if ($gates.Count -ge 2 -and $wlClassForGates -ne 'tiny-fix') {
                 for ($i = 1; $i -lt $gates.Count; $i++) {
                     $prev = $gates[$i - 1]
                     $curr = $gates[$i]
                     $allowed = $legalTransitions[$prev]
-                    if ($allowed -and ($curr -notin $allowed)) {
+                    if (($null -ne $allowed) -and ($curr -notin $allowed)) {
                         Write-Output "  illegal gate progression in $($wl.Name): ${prev}->${curr}"
                         $gateProgressionIllegal++
                         break
+                    }
+                }
+            }
+            # M10: stale-review — if most recent implement follows most recent review,
+            # test/handoff/ship without re-review = governance gap (test.md §reverse-edge)
+            # quick-win and tiny-fix treat review as optional — no re-review required.
+            # Unknown/H1 fail-closed classifications follow feature rules, so M10 applies.
+            if ($wlClassForGates -notin @('quick-win','tiny-fix')) {
+                $lastReviewIdx = -1
+                $lastImplIdx   = -1
+                for ($i = 0; $i -lt $gates.Count; $i++) {
+                    if ($gates[$i] -eq 'review')    { $lastReviewIdx = $i }
+                    if ($gates[$i] -eq 'implement') { $lastImplIdx   = $i }
+                }
+                if ($lastReviewIdx -ge 0 -and $lastImplIdx -gt $lastReviewIdx) {
+                    $postImpl = if ($lastImplIdx + 1 -lt $gates.Count) { $gates[($lastImplIdx + 1)..($gates.Count - 1)] } else { @() }
+                    $badNext = $postImpl | Where-Object { $_ -in @('test','handoff','ship') } | Select-Object -First 1
+                    if ($badNext) {
+                        Write-Output "  illegal gate progression in $($wl.Name): implement-after-review->$badNext (stale review — re-review required)"
+                        $gateProgressionIllegal++
                     }
                 }
             }
@@ -952,6 +1137,77 @@ if (Test-Path -Path $worklogDir -PathType Container) {
         if (($content -match '(?m)^## Phase Summary') `
             -and ($content -notmatch '(⚡\s?ACX|\sACX(\s|$))')) {
             $sentinelMarkerMissing++
+        }
+        # Test Gate Results — engineering_guardrails.md §12.2 requires evidence under
+        # "Test Gate Results" for feature/architecture-change logs that reached implement.
+        $wlClass = ''
+        if ($content -match '(?m)^- \*?\*?Classification\*?\*?:\s*(.+?)\s*$') { $wlClass = $Matches[1].Trim() -replace '`', '' }
+        if ([string]::IsNullOrEmpty($wlClass)) {
+            if ($content -match '(?m)^\|\s*(?:\*\*)?[Cc]lassification(?:\*\*)?\s*\|\s*`?([a-zA-Z][\w-]*)') { $wlClass = $Matches[1].Trim() }
+        }
+        if (($wlClass -eq 'feature' -or $wlClass -eq 'architecture-change') `
+            -and ($content -match '(?i)Gate:\s*implement') `
+            -and ($content -notmatch '(?im)^#+\s+Test Gate Results')) {
+            $testGateResultsMissing++
+        }
+        # MEDIUM-1 (review PASS with UNPROVEN rows)
+        if ($content -match '(?i)Gate:\s*review\s*\|[^|\r\n]*Verdict:\s*PASS') {
+            $unprovenLines = [regex]::Matches($content, '✗ UNPROVEN') | Where-Object { $_.Value -and ($content.Substring([Math]::Max(0,$_.Index-200), [Math]::Min(200,$_.Index)) + $content.Substring($_.Index, [Math]::Min(100,$content.Length-$_.Index))) -notmatch '\[NEEDS_HUMAN\]' }
+            # Simpler: flag if any line has UNPROVEN but not NEEDS_HUMAN
+            $unprovenUntagged = ($content -split "`n") | Where-Object { $_ -match '✗ UNPROVEN' -and $_ -notmatch '\[NEEDS_HUMAN\]' }
+            if ($unprovenUntagged) { $reviewPassWithUnproven++ }
+        }
+        # Current Phase consistency (HIGH-2): if ship PASS receipt exists, Current Phase should be 'ship'
+        if ($content -match '(?i)Gate:\s*ship\s*\|[^|\r\n]*Verdict:\s*PASS') {
+            $cpM = [regex]::Match($content, '(?m)^-\s+\*?\*?Current Phase\*?\*?:\s*`?(\w[\w-]*)')
+            if (-not $cpM.Success) { $cpM = [regex]::Match($content, '(?m)^\|\s*\*?\*?Current Phase\*?\*?\s*\|\s*`?(\w[\w-]*)') }
+            if ($cpM.Success -and $cpM.Groups[1].Value.ToLower() -ne 'ship') { $currentPhaseIncoherent++ }
+            # Archival check (Item 1): shipped log in active work/ means /ship step 3 (archival) was skipped
+            if (-not $cpM.Success -or $cpM.Groups[1].Value.ToLower() -eq 'ship') { $shippedNotArchived++ }
+            # MEDIUM-3 (M5): evidence non-empty check for shipped feature/arch-change/quick-win
+            if ($wlClass -in @('feature','architecture-change','quick-win')) {
+                $evidenceMatch = [regex]::Match($content, '(?ms)^## Evidence\r?\n(.*?)(?=^## |\z)')
+                $evidenceBody = if ($evidenceMatch.Success) { $evidenceMatch.Groups[1].Value.Trim() } else { '' }
+                if ([string]::IsNullOrWhiteSpace($evidenceBody) -or $evidenceBody -match 'Pending:\s*bootstrap only') {
+                    $evidencePlaceholderOnly++
+                }
+            }
+        }
+        # Finding 9 (HIGH): Reclassification state inconsistency — Drift Log records
+        # "Reclassification:" but Classification header was never reset to CLASSIFIED.
+        if ($content -match '(?m)^## Drift Log' -and $content -match '(?im)^\s*-\s+Reclassif') {
+            $clsHdrM = [regex]::Match($content, '(?m)^-\s*\*{0,2}Classification\*{0,2}\s*:\s*`?([A-Za-z][\w-]*)')
+            if ($clsHdrM.Success -and $clsHdrM.Groups[1].Value.ToLower() -ne 'classified') {
+                $reclassifyHeaderNotReset++
+            }
+        }
+        # Finding 5 (MEDIUM): Handoff Resume Block completeness — warn when ## Resume
+        # section exists but is missing required sub-sections (handoff.md §1a).
+        if ($content -match '(?m)^## Resume') {
+            $resumeM = [regex]::Match($content, '(?ms)^## Resume\r?\n(.*?)(?=^## |\z)')
+            $resumeBody = if ($resumeM.Success) { $resumeM.Groups[1].Value } else { '' }
+            $missingSubsections = 0
+            foreach ($subsec in @('Read Map', 'Skip List', 'Context Snapshot')) {
+                if ($resumeBody -notmatch "(?im)^###\s+$subsec") { $missingSubsections++ }
+            }
+            if ($missingSubsections -gt 0) { $handoffResumeIncomplete++ }
+        }
+        # Finding 13 (MEDIUM): hotfix fast-path evidence check — hotfix is exempt from
+        # /handoff but MUST provide evidence per handoff.md §Trigger Conditions.
+        if ($wlClass -eq 'hotfix' -and ($content -match '(?i)Gate:\s*ship\s*\|.*Verdict:\s*PASS')) {
+            $hotfixEvidM = [regex]::Match($content, '(?ms)^## Evidence\r?\n(.*?)(?=^## |\z)')
+            $hotfixEvid = if ($hotfixEvidM.Success) { $hotfixEvidM.Groups[1].Value.Trim() } else { '' }
+            if ([string]::IsNullOrWhiteSpace($hotfixEvid) -or $hotfixEvid -match 'Pending:\s*bootstrap only') {
+                $hotfixShipNoEvidence++
+            }
+        }
+        # Finding 14 (MEDIUM): ADR Coverage gap — for feature/arch-change past plan phase,
+        # bootstrap should have logged ADR Coverage Check result in ## Drift Log.
+        if (($wlClass -eq 'feature' -or $wlClass -eq 'architecture-change') -and
+            ($content -match '(?i)Gate:\s*(plan|implement)\s*\|')) {
+            if ($content -notmatch '(?i)(ADR.*[Cc]overage|[Cc]overage.*ADR|adr.*check|no.*adr.*found)') {
+                $adrCoverageUndocumented++
+            }
         }
     }
     if ($phaseFieldMissing -gt 0) {
@@ -986,6 +1242,51 @@ if (Test-Path -Path $worklogDir -PathType Container) {
         Add-Result -Level 'WARN' -Message "work logs missing sentinel marker (ACX) in Phase Summary: $sentinelMarkerMissing"
     } elseif ($worklogs.Count -gt 0 -and $phaseSummaryMissing -eq 0) {
         Add-Result -Level 'PASS' -Message 'all active work logs carry sentinel marker for audit trail'
+    }
+    if ($testGateResultsMissing -gt 0) {
+        Add-Result -Level 'WARN' -Message "feature/architecture-change work logs missing Test Gate Results section (engineering_guardrails.md §12.2): $testGateResultsMissing"
+    } elseif ($worklogs.Count -gt 0) {
+        Add-Result -Level 'PASS' -Message 'test gate results evidence present in applicable work logs'
+    }
+    if ($currentPhaseIncoherent -gt 0) {
+        Add-Result -Level 'WARN' -Message "work logs with ship PASS receipt but Current Phase != ship (header not updated): $currentPhaseIncoherent"
+    } elseif ($worklogs.Count -gt 0) {
+        Add-Result -Level 'PASS' -Message 'Current Phase field is consistent with last gate receipt in all work logs'
+    }
+    if ($shippedNotArchived -gt 0) {
+        Add-Result -Level 'WARN' -Message "shipped work logs still in active work/ directory (archival incomplete — /ship step 3 skipped?): $shippedNotArchived"
+    } elseif ($worklogs.Count -gt 0) {
+        Add-Result -Level 'PASS' -Message 'no shipped work logs found in active work/ directory'
+    }
+    if ($evidencePlaceholderOnly -gt 0) {
+        Add-Result -Level 'FAIL' -Message "feature/arch-change/quick-win shipped work logs with bootstrap-placeholder ## Evidence (NO EVIDENCE = NO SHIP per AGENTS.md §Delivery Gates): $evidencePlaceholderOnly"
+    } elseif ($worklogs.Count -gt 0) {
+        Add-Result -Level 'PASS' -Message 'shipped feature/arch-change/quick-win work logs have non-placeholder Evidence sections'
+    }
+    if ($reviewPassWithUnproven -gt 0) {
+        Add-Result -Level 'WARN' -Message "work logs with review PASS receipt but unresolved UNPROVEN rows (should be NOT READY per review.md §Burden of Proof): $reviewPassWithUnproven"
+    } elseif ($worklogs.Count -gt 0) {
+        Add-Result -Level 'PASS' -Message 'no review PASS receipts with unresolved UNPROVEN rows detected'
+    }
+    if ($reclassifyHeaderNotReset -gt 0) {
+        Add-Result -Level 'WARN' -Message "work logs with Reclassification in Drift Log but Classification header not reset to CLASSIFIED (implement.md §Mid-Execution Guard step c incomplete): $reclassifyHeaderNotReset"
+    } elseif ($worklogs.Count -gt 0) {
+        Add-Result -Level 'PASS' -Message 'no reclassification header inconsistency detected'
+    }
+    if ($handoffResumeIncomplete -gt 0) {
+        Add-Result -Level 'WARN' -Message "work logs with ## Resume section missing required sub-sections (handoff.md §1a — Read Map, Skip List, Context Snapshot required): $handoffResumeIncomplete"
+    } elseif ($worklogs.Count -gt 0) {
+        Add-Result -Level 'PASS' -Message 'handoff Resume Blocks have required sub-sections where present'
+    }
+    if ($hotfixShipNoEvidence -gt 0) {
+        Add-Result -Level 'WARN' -Message "hotfix work logs shipped without ## Evidence (hotfix fast-path still requires diff + behavior verification per handoff.md §Trigger Conditions): $hotfixShipNoEvidence"
+    } elseif ($worklogs.Count -gt 0) {
+        Add-Result -Level 'PASS' -Message 'hotfix shipped work logs carry evidence where present'
+    }
+    if ($adrCoverageUndocumented -gt 0) {
+        Add-Result -Level 'WARN' -Message "feature/architecture-change work logs past plan phase with no ADR Coverage Check record in Drift Log (bootstrap.md §ADR Coverage Check result should be logged): $adrCoverageUndocumented"
+    } elseif ($worklogs.Count -gt 0) {
+        Add-Result -Level 'PASS' -Message 'ADR Coverage Check records present in applicable work logs'
     }
 
     # Advisory lock staleness check — reads JSON fields per config.yaml §worklog_lock
@@ -1076,6 +1377,94 @@ if ($phaseSummaryViolations -gt 0) {
 }
 else {
     Add-Result -Level 'PASS' -Message 'archived Work Logs have non-empty Phase Summary (or none archived yet)'
+}
+
+# M7: Gate completeness audit for archived Work Logs (WARN — historical records).
+$archiveGateViolations = 0
+$archiveGateViolationList = New-Object System.Collections.Generic.List[string]
+if (Test-Path -Path $archiveDir -PathType Container) {
+    $archivedLogsM7 = Get-ChildItem -Path $archiveDir -Filter '*.md' -File -Recurse -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -notlike '.gitkeep*' }
+    foreach ($wl in $archivedLogsM7) {
+        $arcContent = Get-Content -Path $wl.FullName -Raw -Encoding utf8 -ErrorAction SilentlyContinue
+        if (-not $arcContent) { continue }
+        $arcClassM = [regex]::Match($arcContent, '(?m)^- \*?\*?[Cc]lassification\*?\*?:\s*`?([a-zA-Z][\w-]*)`?')
+        $arcClass = if ($arcClassM.Success) { $arcClassM.Groups[1].Value.ToLower() } else { '' }
+        if ($arcClass -eq 'tiny-fix') { continue }
+        if ($arcContent -match '(?i)Gate:\s*ship\s*\|[^|]*Verdict:\s*PASS') {
+            $arcHasPlan = [regex]::Matches($arcContent, '(?i)Gate:\s*plan\s*\|[^|]*Verdict:\s*PASS').Count
+            $arcHasImpl = [regex]::Matches($arcContent, '(?i)Gate:\s*implement\s*\|[^|]*Verdict:\s*PASS').Count
+            if ($arcHasPlan -eq 0 -or $arcHasImpl -eq 0) {
+                $archiveGateViolations++
+                $archiveGateViolationList.Add("  archived gate bypass: $($wl.FullName.Substring($root.Length).TrimStart('/','\'))")
+            }
+        }
+    }
+}
+if ($archiveGateViolations -gt 0) {
+    Add-Result -Level 'WARN' -Message "archived Work Logs with ship receipt but missing plan/implement gates (historical governance gap): $archiveGateViolations"
+    foreach ($line in $archiveGateViolationList) { Write-Output $line }
+}
+else {
+    Add-Result -Level 'PASS' -Message 'archived Work Logs gate completeness ok (or none archived yet)'
+}
+
+# M8: Relative-link depth check for archived markdown files.
+# Content copy-pasted from current_state.md (depth 2) into archive/ (depth 3)
+# keeps original relative paths which silently break one level deeper.
+if (-not $script:PythonCommand) {
+    Add-Result -Level 'SKIP' -Message 'M8 archive relative-link check -- python unavailable'
+} elseif (-not (Test-Path -Path $archiveDir -PathType Container)) {
+    Add-Result -Level 'PASS' -Message 'archived markdown files: no archive directory yet (fresh deploy)'
+} else {
+    $archiveBrokenLinks = 0
+    $archiveBrokenLinkList = New-Object System.Collections.Generic.List[string]
+    $archiveMdFiles = Get-ChildItem -Path $archiveDir -Filter '*.md' -File -Recurse -Depth 1 -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -notlike '.gitkeep*' }
+    foreach ($archMd in $archiveMdFiles) {
+        $brokenOutput = & $script:PythonCommand.Source -c @"
+import re, sys
+from pathlib import Path
+f = Path(r'$($archMd.FullName.Replace('\','/'))')
+try:
+    text = f.read_text(encoding='utf-8', errors='replace')
+except Exception:
+    print(0)
+    sys.exit(0)
+link_re = re.compile(r'\[(?:[^\]]*)\]\(([^)]+)\)')
+count = 0
+for m in link_re.finditer(text):
+    tgt = m.group(1).strip()
+    if tgt.startswith(('http://', 'https://')) or tgt.startswith('#'):
+        continue
+    path_part = tgt.split('#')[0]
+    if not path_part:
+        continue
+    resolved = (f.parent / path_part).resolve()
+    if not resolved.exists():
+        print(f'  broken relative link in {str(f)}: {tgt}')
+        count += 1
+# Print count as last line so caller reads from stdout (exit-code wraps at 256)
+print(count)
+"@ 2>$null
+        $lines = @($brokenOutput)
+        $fileCount = 0
+        if ($lines.Count -gt 0) {
+            $lastLine = $lines[-1]
+            if ($lastLine -match '^\d+$') { $fileCount = [int]$lastLine }
+        }
+        if ($fileCount -gt 0) {
+            $archiveBrokenLinks += $fileCount
+            foreach ($ln in $lines | Select-Object -SkipLast 1) { $archiveBrokenLinkList.Add($ln) }
+        }
+    }
+    if ($archiveBrokenLinks -gt 0) {
+        Add-Result -Level 'WARN' -Message "archived markdown files contain broken relative links (depth mismatch — strip or fix links when archiving from current_state.md): $archiveBrokenLinks"
+        foreach ($line in $archiveBrokenLinkList) { Write-Output $line }
+    }
+    else {
+        Add-Result -Level 'PASS' -Message 'archived markdown files: no broken relative links detected'
+    }
 }
 
 $gitignore = Join-NormalPath $root '.gitignore'
@@ -1233,8 +1622,19 @@ if (Test-Path -Path $currentStatePath -PathType Leaf) {
     }
 }
 
-# Backlog schema check: verify Kind/Labels/Priority columns present when backlog exists
+# Backlog Feature Inventory check (MEDIUM-2): spec-intake multi-feature decomposition gate
+# requires a ## Feature Inventory section per AGENTS.md §Delivery Gates.
 $backlogFile = Join-NormalPath $root 'docs/specs/_product-backlog.md'
+if (Test-Path -Path $backlogFile -PathType Leaf) {
+    $backlogRaw = Get-NormalizedContent -Path $backlogFile
+    if ($backlogRaw -notmatch '(?im)^#+\s+Feature Inventory') {
+        Add-Result -Level 'WARN' -Message "backlog missing Feature Inventory section: _product-backlog.md exists but has no '## Feature Inventory' heading -- spec-intake multi-feature decomposition gate may have been skipped"
+    } else {
+        Add-Result -Level 'PASS' -Message 'backlog Feature Inventory section present'
+    }
+}
+
+# Backlog schema check: verify Kind/Labels/Priority columns present when backlog exists
 if (Test-Path -Path $backlogFile -PathType Leaf) {
     $backlogLines = Get-Content -Path $backlogFile -Encoding utf8
     $backlogHeader = $backlogLines | Where-Object { $_ -match '\|.*Feature.*\|' } | Select-Object -First 1
@@ -1366,6 +1766,91 @@ if (Test-Path -Path $specsDir -PathType Container) {
     }
 }
 
+# Project spec template check (parity with validate.sh)
+$adrCount = 0
+foreach ($adrDir in @((Join-NormalPath $root 'docs/adr'), (Join-NormalPath $root '.agentcortex/adr'))) {
+    if (Test-Path -Path $adrDir -PathType Container) {
+        $adrCount += @(Get-ChildItem -Path $adrDir -Filter 'ADR-*.md' -File -ErrorAction SilentlyContinue).Count
+    }
+}
+if ($adrCount -gt 0) {
+    $projectTemplates = @(Get-ChildItem -Path (Join-NormalPath $root '.agentcortex/templates') -Filter 'spec-app-feature-*.md' -File -ErrorAction SilentlyContinue)
+    if ($projectTemplates.Count -eq 0) {
+        Add-Result -Level 'WARN' -Message "project spec template missing: docs/adr/ has ADR(s) but no .agentcortex/templates/spec-app-feature-<project>.md found -- run /app-init to create one, or spec-intake will use the generic template"
+    }
+    else {
+        Add-Result -Level 'PASS' -Message 'project spec template present alongside ADR(s)'
+    }
+    # Round-15 Finding 1/10: Project Name SSoT presence check
+    $csFile = Join-NormalPath $root '.agentcortex/context/current_state.md'
+    if (Test-Path -Path $csFile -PathType Leaf) {
+        $csContent15 = Get-Content -Path $csFile -Raw -Encoding UTF8
+        $projNameM = [regex]::Match($csContent15, '(?m)\*\*Project Name\*\*:\s*(.+)')
+        $projNameVal = if ($projNameM.Success) { $projNameM.Groups[1].Value.Trim() } else { '' }
+        if ([string]::IsNullOrWhiteSpace($projNameVal) -or $projNameVal -eq '(set by /app-init)') {
+            Add-Result -Level 'WARN' -Message "Project Name field absent or placeholder in current_state.md -- /app-init has run (ADRs exist) but SSoT Project Name was not set; spec-intake will fall back to glob template resolution"
+        } else {
+            Add-Result -Level 'PASS' -Message "SSoT Project Name is set: $projNameVal"
+        }
+    }
+}
+
+# Round-16 Finding 7: Domain Decisions entry cap (spec.md §8 hard cap: 10 entries)
+$domainDecisionsExceeded = 0
+if (Test-Path -Path $specsDir -PathType Container) {
+    foreach ($specFile in (Get-ChildItem -Path $specsDir -Filter '*.md' -File -ErrorAction SilentlyContinue)) {
+        if ($specFile.Name -eq '.gitkeep.md') { continue }
+        $specContent = Get-Content -Path $specFile.FullName -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
+        if ($specContent -match '(?m)^## Domain Decisions') {
+            $ddMatch = [regex]::Match($specContent, '(?ms)^## Domain Decisions\r?\n(.*?)(?=^## |\z)')
+            $ddBody = if ($ddMatch.Success) { $ddMatch.Groups[1].Value } else { '' }
+            $entryCount = ([regex]::Matches($ddBody, '\[(DECISION|TRADEOFF|CONSTRAINT)\]')).Count
+            if ($entryCount -gt 10) {
+                Write-Host "  spec Domain Decisions cap exceeded: $($specFile.Name) ($entryCount entries > 10)"
+                $domainDecisionsExceeded++
+            }
+        }
+    }
+}
+if ($domainDecisionsExceeded -gt 0) {
+    Add-Result -Level 'WARN' -Message "docs/specs/ files with Domain Decisions exceeding 10-entry cap (spec.md §8 — requires user acknowledgment): $domainDecisionsExceeded"
+} else {
+    $specDdCount = 0
+    if (Test-Path -Path $specsDir -PathType Container) {
+        foreach ($sf in (Get-ChildItem -Path $specsDir -Filter '*.md' -File -ErrorAction SilentlyContinue)) {
+            $sfContent = Get-Content -Path $sf.FullName -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
+            if ($sfContent -match '(?m)^## Domain Decisions') { $specDdCount++ }
+        }
+    }
+    if ($specDdCount -gt 0) { Add-Result -Level 'PASS' -Message 'all specs with Domain Decisions sections are within 10-entry cap' }
+}
+
+# Round-15 Finding 7: Spec frontmatter status validation
+$validStatuses = @('draft','frozen','shipped','cancelled','living')
+$specBadStatus = 0; $specMissingFrontmatter = 0; $specFileCount = 0
+$specsDir = Join-NormalPath $root 'docs/specs'
+if (Test-Path -Path $specsDir -PathType Container) {
+    foreach ($specFile in (Get-ChildItem -Path $specsDir -Filter '*.md' -File -ErrorAction SilentlyContinue)) {
+        if ($specFile.Name -eq '.gitkeep.md') { continue }  # skip placeholder
+        $specFileCount++
+        $specLines = Get-Content -Path $specFile.FullName -Encoding UTF8 -ErrorAction SilentlyContinue
+        if (-not $specLines -or $specLines[0].TrimEnd() -ne '---') {
+            $specMissingFrontmatter++; continue
+        }
+        $statusLine = $specLines | Select-Object -Skip 1 | Where-Object { $_ -match '^status:\s*' } | Select-Object -First 1
+        if (-not $statusLine) { $specMissingFrontmatter++; continue }
+        $statusVal = ($statusLine -replace '^status:\s*','').Trim()
+        if ($validStatuses -notcontains $statusVal) { $specBadStatus++ }
+    }
+}
+if ($specMissingFrontmatter -gt 0) {
+    Add-Result -Level 'WARN' -Message "docs/specs/ files missing YAML frontmatter or status field: $specMissingFrontmatter (engineering_guardrails.md §4.2 requires status: draft|frozen|shipped|cancelled)"
+} elseif ($specBadStatus -gt 0) {
+    Add-Result -Level 'WARN' -Message "docs/specs/ files with unrecognized status value: $specBadStatus (valid: draft, frozen, shipped, cancelled, living)"
+} elseif ($specFileCount -gt 0) {
+    Add-Result -Level 'PASS' -Message 'all docs/specs/ files have valid status frontmatter'
+}
+
 # ACX phase shim skill-existence check (parity with validate.sh)
 $agentsDir = Join-NormalPath $root '.claude/agents'
 if (Test-Path -Path $agentsDir -PathType Container) {
@@ -1383,7 +1868,7 @@ if (Test-Path -Path $agentsDir -PathType Container) {
                 if ($line -match '^\s+-\s+(.+)$') {
                     $skillName = $Matches[1].Trim()
                     $skillDir = Join-NormalPath $root ".agent/skills/$skillName"
-                    if (Test-Path -Path $skillDir -PathType Container) {
+                    if (Test-Path -Path $skillDir -PathType Leaf) {
                         $skillBody = Join-NormalPath $root ".agents/skills/$skillName/SKILL.md"
                         if (-not (Test-Path -Path $skillBody -PathType Leaf)) {
                             Write-Output "  shim skill missing SKILL.md: $skillName (referenced in $($shim.Name))"

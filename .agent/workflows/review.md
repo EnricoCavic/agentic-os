@@ -192,11 +192,14 @@ These classifications have no formal spec, but the burden of proof still applies
 | AC-3 | [description] | ⚠️ PARTIAL | `src/bar.dart:10` implements, but no test — [NEEDS_HUMAN] |
 ```
 
-After completing the table, convert each row into a **Gate Receipt** for the Work Log `## Gate Evidence` section using the validator-compatible format:
-```
-- Gate: review | Verdict: PASS | Classification: <classification> | Timestamp: <ISO>
-```
-The Burden of Proof table stays in the review output for human readability; the receipt line goes to Gate Evidence for CI validation.
+After completing the table, emit the Gate Receipt for Work Log `## Gate Evidence`. The verdict is **conditional** — PASS only when all AC rows are either `✅ PROVEN` or explicitly tagged `[NEEDS_HUMAN]`:
+- **If zero `✗ UNPROVEN` rows remain** (or all UNPROVEN are `[NEEDS_HUMAN]`):
+  ```
+  - Gate: review | Verdict: PASS | Classification: <classification> | Timestamp: <ISO>
+  ```
+- **If any `✗ UNPROVEN` row exists without `[NEEDS_HUMAN]` tag**: the review is incomplete. The receipt MUST be `NOT READY`, not `PASS`. Proceed through the `## Reverse Transition` block below instead of writing a PASS receipt.
+
+The Burden of Proof table stays in the review output for human readability; the receipt goes to Gate Evidence for CI validation.
 
 ## Self-Check Protocol (Auto — Before Presenting Results)
 
@@ -252,6 +255,17 @@ After review is complete, append one line to `## Phase Summary` in the Work Log:
 ```
 - review: [1-line summary — verdict, security findings count, spec compliance status]
 ```
+
+## Reverse Transition (Not Ready Verdict)
+
+If verdict = **Not Ready**, the agent MUST execute the reverse transition before closing the review session:
+
+1. Update Work Log `Current Phase: implement` (do NOT leave it as `review`).
+2. Append to `## Phase Summary`: `- review: Not Ready — [blocking issues list] — routed back to implement`.
+3. Record the reverse edge in `## Gate Evidence`: `- Gate: review | Verdict: NOT READY | Transition: REVIEWED→IMPLEMENTING | Timestamp: <ISO>`.
+4. State clearly to the user: "Route back to `/implement` to address: [list of blocking issues by severity]."
+
+This ensures the state machine correctly records the remediation loop. Leaving `Current Phase: review` on a Not Ready verdict creates a phantom REVIEWED state that blocks future phase-progression validation.
 
 ## Optional: Cloud Adversarial Review (Claude Code CLI only)
 
