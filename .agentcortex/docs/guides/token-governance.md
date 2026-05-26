@@ -2,7 +2,12 @@
 
 ## Objective
 
-To continuously reduce average task token costs without sacrificing correctness or traceability.
+**Primary goals** (in priority order):
+1. **Context quality** — precise, focused context loading; avoid polluting the context window with unnecessary content.
+2. **Output token discipline** — concise AI responses; output tokens are never cached and compound every turn.
+3. **Input token reduction** *(recommended, not mandatory)* — minimize redundant file reads and prompt bloat. In practice, prompt caching already handles 97-98% of input token cost at 0.1× price; further input reduction has diminishing returns but remains a good habit.
+
+**Constraint**: None of the above may sacrifice correctness, evidence, or traceability.
 
 ## 0. Spirit of Architecture (No Token-Saving at the Expense of Correctness)
 
@@ -55,7 +60,7 @@ If any check fails, it is considered "breaking governance for efficiency" and mu
 
 ## 6. Context Caching (Provider-Level Optimization)
 
-Modern LLM providers support **context caching** — reusing attention computation for stable parts of the prompt (system instructions, AGENTS.md, guardrails) across calls. This can reduce token costs by 40–70% for repeated reads.
+Modern LLM providers support **context caching** — reusing attention computation for stable parts of the prompt (system instructions, AGENTS.md, guardrails) across calls. In practice this project achieves a **97-98% cache hit rate** (measured 2026-05-13 ~ 05-26), meaning ~97% of input tokens are served at 0.1× price.
 
 ### AI Behavior
 
