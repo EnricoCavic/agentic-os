@@ -3,7 +3,7 @@ status: living
 title: Product Backlog
 source: governance-bloat-review-2026-04-12 + optimization-round-2026-05-04
 created: 2026-04-12
-last_updated: 2026-05-11
+last_updated: 2026-05-26
 ---
 
 # Product Backlog
@@ -30,7 +30,7 @@ Governance file bloat review (2026-04-12) identified 10 findings across P0–P2:
 | 12 | validate.{sh,ps1}: archive size WARN check (Global Lessons cap already PASS) | — | — | — | — | quick-win | Shipped | — |
 | 13 | Warm→Cold LLM summarization pass in /ship | framework | lifecycle | P2 | — | feature | Pending | #1, #3 |
 | 14 | External Skill Research & Integration (Phase A: 3 core skills) | framework | skills | P2 | docs/specs/skill-research-integration.md | feature | Pending | — |
-| 15 | Anti-Rationalization Pattern (framework-wide enhancement) | governance | skills | P2 | docs/specs/skill-research-integration.md | quick-win | Pending | #14 |
+| 15 | Anti-Rationalization Pattern (framework-wide enhancement) | governance | skills | P2 | docs/specs/skill-research-integration.md | quick-win | Shipped | #14 |
 | 16 | Skill Validation Pipeline (meta-governance) | framework | skills | P2 | docs/specs/skill-research-integration.md | feature | Pending | #14 |
 | 17 | Hard Work Log lock (advisory → blocking) | framework | concurrency | P1 | — | feature | Pending | — |
 | 18 | Lightweight routing heuristics (decision tree in config.yaml, not a DSL) | framework | routing | P2 | — | quick-win | Pending | — |
@@ -53,7 +53,7 @@ Governance file bloat review (2026-04-12) identified 10 findings across P0–P2:
 | 35 | /spec-intake Clarification Pass (≤3 questions before emitting spec, recorded in spec ## Clarifications Resolved) | — | — | — | — | quick-win | Shipped | — |
 | 36 | /app-init onboard mode (read-only stdout summary for existing repo, no file writes; absorbs #39 /recap pointer) | — | — | — | — | quick-win | Shipped | — |
 | 37 | /plan template `[P]` parallel-task marker | — | — | — | — | quick-win | Shipped | — |
-| 38 | AGENTS.md token-budget pass (~150 → ≤100 lines, link out detail to guides) | governance | docs | P2 | — | quick-win | Pending | — |
+| 38 | AGENTS.md token-budget pass (~150 → ≤100 lines, link out detail to guides) | governance | docs | P2 | — | quick-win | Shipped | — |
 | 39 | /recap workflow pointer to Work Log Phase Summary (no new doc) | — | — | — | — | tiny-fix | Shipped | — |
 | 40 | review.md /ultrareview callout + hotfix.md /autofix-pr callout (Claude-CLI-only doc hook-in) | — | — | — | — | tiny-fix | Shipped | — |
 

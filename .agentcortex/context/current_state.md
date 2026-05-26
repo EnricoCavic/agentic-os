@@ -12,9 +12,9 @@
   - Active Work Log Path: derive <worklog-key> from the raw branch name using filesystem-safe normalization before any gate checks.
   - Workflows & Policies: `.agent/workflows/*.md`, `.agent/rules/*.md`
 - **Project Name**: (set by /app-init)
-- **Last Updated**: 2026-05-22
-- **Last Verified**: 2026-05-22
-- **Update Sequence**: 20
+- **Last Updated**: 2026-05-26
+- **Last Verified**: 2026-05-26
+- **Update Sequence**: 21
 - **ADR Index**:
   - docs/adr/ADR-001-governance-friction-tuning.md — ADR-001: Governance Friction Tuning, accepted 2026-04-23
   - docs/adr/ADR-002-guarded-governance-writes.md — ADR-002: Guarded Governance Writes (lock unification + CI lint + lifecycle frontmatter), accepted 2026-04-25
@@ -69,6 +69,30 @@
 - [Category: spec-factual-claims][Severity: MEDIUM][Trigger: domain-decision-tool-behavior-claim][prev: eea362e5] Domain Decisions that make factual claims about tool behavior (e.g., 'no external API call', 'language-agnostic') MUST be verified against tool documentation before the spec is frozen. Factual errors in Domain Decisions survive implementation and review phases because reviewers check AC compliance, not rationale accuracy. Self-check at spec-write: for each [DECISION] that asserts tool behavior, find one authoritative source confirming the claim.
 - [Category: scope-expansion][Severity: HIGH][Trigger: procedure-header-scope-change][prev: 95082304] When expanding a procedure's tier scope (e.g., "quick-win only" → "all tiers"), MUST audit every step inside the procedure body for correctness under the new scope BEFORE committing. Changing only the header/trigger misses procedure-body invariants — e.g., a receipt-writing step that was safe for quick-win becomes a governance hole for feature/hotfix. Self-check: for each step N in the procedure, ask "does this step still hold correctly for every new tier I just added?"
 ## Ship History
+
+### Ship-brain-quality-sprint-2026-05-26
+- **PR #112** (squash `f3b3b81`) — Brain quality batch: set -e hardening, Anti-Rationalization §4.5, AGENTS.md -43% tokens.
+  - `validate.sh`: added `-e` flag (`set -euo pipefail`); hardened `run_python_check` for set-e abort; added `|| true` guards to all grep/wc/du/cat pipeline assignments.
+  - `engineering_guardrails.md §4.5`: Anti-Rationalization Rule — structural tripwire requiring evidence citation written to Work Log before verdict appears in same response (backlog #15).
+  - `AGENTS.md`: 191→98 lines (-43% tokens, backlog #38) — extracted 3 Shared Phase Contracts sub-sections to `.agent/workflows/shared-contracts.md`; Skill Safety items 5-9 clarified.
+  - `.agent/workflows/shared-contracts.md`: NEW file; contains Phase-Entry Skill Loading, 5-Gate Verification Before Completion, Phase Output Compression.
+  - 10 workflow files bulk-updated: anchors from `AGENTS.md §...` → `shared-contracts.md §...`.
+  - `trigger-registry.yaml`, skill stubs (2 files): runtime_anchor updated from AGENTS.md to shared-contracts.md.
+  - Tests: CI 11/11 green. validate.sh PASS.
+- **PR #113** (squash `9868896`) — Expert review follow-up: validate.sh safety, shared-contracts unconditional, §4.5 tripwire.
+  - `validate.sh`: hardened wc/du/cat assignments; `current_state.md` read guarded with `|| { record_result WARN ... }`.
+  - `AGENTS.md §Shared Phase Contracts`: strengthened to unconditional load directive (Gate FAIL if skipped); added Read-Once exemption for shared-contracts.md.
+  - `engineering_guardrails.md §4.5`: structural tripwire version (write-before-verdict); cross-reference added to `review.md`.
+  - `guard_context_write.py`: B2 dangling anchors — regenerated trigger-compact-index.json.
+  - Tests: CI 11/11 green.
+- **PR #114** (squash `334907c`) — Consensus batch: #43 fix, --list-checks, B19 atomic writes, gate receipt schema.
+  - `validate.sh`: FAIL if deprecated workflow files present (new-feature/medium-feature/small-fix); `--list-checks`/`-l` flag; gate receipt schema WARN checks for active+archived work logs.
+  - `validate.ps1`: mirrored deprecated-files FAIL check; removed same 3 files from `$requiredFiles`.
+  - `guard_context_write.py`: rename-CAS atomic write (`os.replace(tmp, target)`); `cleanup_stale_tmps()` at startup (backlog #19).
+  - `.agent/workflows/new-feature.md`, `medium-feature.md`, `small-fix.md`: deleted (closes #43).
+  - `_product-backlog.md`: B19 → Shipped 2026-05-26.
+  - Tests: CI 11/11 green (including Framework Validation Windows).
+- Backlog closed: #15 (Anti-Rationalization), #19 (SSoT atomic writes), #38 (AGENTS.md token-budget pass), #43 (deprecated workflow files).
 
 ### Ship-fix-downstream-path-consistency-2026-05-22
 - **PR #106** (squash `40d3462`) — Cross-session doc write/read path alignment for zero-Python downstream (quick-win).
@@ -148,15 +172,5 @@
   - zh-TW §3–§6 renumbered to close the §4 hole created when "從零開始" + "帶入素材" were merged into §3.
 - Tests: validate 66 PASS / 0 WARN / 0 FAIL / 10 SKIP.
 - Commits: `867e37c`; merged via `cf9b622` (PR #92).
-
-### Ship-claude-modest-antonelli-da2aec-2026-05-07
-- Feature shipped: Zero-Python downstream + AGENTS.md trim + deploy-gap fix + skill cleanup (PR #91, quick-win, 4 commits).
-  - aec35d6: delete `.claude/hooks/check-{sentinel,precompact}.py`, strip hook wiring from `.claude/settings.json`, replace runtime hook intent with bash/PowerShell-native Work Log Phase Summary audit in `validate.{sh,ps1}`. AGENTS.md 229 → 181 lines (-993 tokens). Deploy `.claude/agents/acx-*.md` (5 shims) + `.claude/settings.json` as scaffold tier in `deploy.sh`.
-  - d3d6e67: repair 3 cross-file anchor refs broken by AGENTS.md heading rename (`.agent/config.yaml`, `engineering_guardrails.md` §11 redirect, add `### Skill Activation Triggers` heading).
-  - 9c23982: post-review cleanup — move `### Skill Activation Triggers` out of indented numbered list to top-level placement; fix pre-existing `validate.sh:1329` bash quirk (`grep -c` + `|| echo 0` → `0\n0` syntax error); remove `.claude/hooks/__pycache__/` residue.
-  - f3d97fc: delete 5 redundant process skills (`executing-plans`, `writing-plans`, `requesting-code-review`, `receiving-code-review`, `finishing-a-development-branch`); inline content into `implement.md` / `plan.md` / `handoff.md` / `review.md` / `ship.md` workflows as always-on rules. Demote Skill Notes MUST → SHOULD per Lesson L4. Skills 19 → 14, all remaining have at least one of (inlined-content / acx-shim native injection / workflow `IF active` block) — zero pure-honor-system.
-- Tests: validate 74 PASS / 0 WARN / 0 FAIL / 2 SKIP (consistent across all 4 commits) + CI 7/7 green (Markdown Links, Deploy Smoke Test, Deploy Smoke Test (No Python), Framework Validation, Framework Validation Python 3.9, Framework Validation Windows, ShellCheck — run 25484303443).
-- Commits: `aec35d6`, `d3d6e67`, `9c23982`, `f3d97fc`.
-- PR: https://github.com/KbWen/agentic-os/pull/91
 
 *(Older entries archived to `.agentcortex/context/archive/ship-history-2026.md`)*

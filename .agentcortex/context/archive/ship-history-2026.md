@@ -72,3 +72,11 @@ Archived from `current_state.md ## Ship History` to stay within the 10-entry cap
 - **v1.1.2** (2026-04-17): Polish batch 2 — Python advisory in deploy.sh (1.1), guardrails Loaded-Sections Receipt (3.2), bootstrap Reading Mode Table + §0 decision table (3.3 + 2.1), Confidence Gate harmonized with structured receipts + step-level in /implement (2.3), Read-Once Drift Log audit receipt in AGENTS.md (4.3). Commit `4976a92`. Closes remaining 6 of 12 post-v1.1.0 audit findings.
 - **v1.1.1-batch1** (2026-04-17): Polish pass — installer UX (Git-bash detection, clone progress), governance wiring (Confidence Gate receipt in /plan + /ship, No-Bypass scope clarified in AGENTS.md), token discipline (CLAUDE.md 51→27 lines), skill index signpointed in routing.md §3. Commit `95ceafb`. Addresses 6 of 12 audit findings; remaining 6 deferred to batch 2 on same branch.
 - **v1.1.0** (2026-04-16): Token optimization & governance hardening. SKILL.md heading-scope (#57), phase output compression (#54), expert review quick-wins (#56), deploy fixes (#52, #53, #55).
+
+### Ship-claude-modest-antonelli-da2aec-2026-05-07
+- Feature shipped: Zero-Python downstream + AGENTS.md trim + deploy-gap fix + skill cleanup (PR #91, quick-win, 4 commits).
+  - aec35d6: delete `.claude/hooks/check-{sentinel,precompact}.py`, strip hook wiring from `.claude/settings.json`, replace runtime hook intent with bash/PowerShell-native Work Log Phase Summary audit in `validate.{sh,ps1}`. AGENTS.md 229 → 181 lines (-993 tokens). Deploy `.claude/agents/acx-*.md` (5 shims) + `.claude/settings.json` as scaffold tier in `deploy.sh`.
+  - d3d6e67: repair 3 cross-file anchor refs broken by AGENTS.md heading rename (`.agent/config.yaml`, `engineering_guardrails.md` §11 redirect, add `### Skill Activation Triggers` heading).
+  - 9c23982: post-review cleanup — move `### Skill Activation Triggers` out of indented numbered list to top-level placement; fix pre-existing `validate.sh:1329` bash quirk; remove `.claude/hooks/__pycache__/` residue.
+  - f3d97fc: delete 5 redundant process skills; inline content into implement.md/plan.md/handoff.md/review.md/ship.md. Skills 19 → 14.
+- Tests: validate 74/0/0/2 + CI 7/7 green. PR: https://github.com/KbWen/agentic-os/pull/91
