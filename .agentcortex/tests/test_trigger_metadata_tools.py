@@ -103,13 +103,21 @@ lifecycle:
 
 
 class TriggerMetadataToolTests(unittest.TestCase):
+    # writing-plans was retired as a real skill in PR #114/#115 (inlined into plan.md),
+    # but the skill-package-manifest system (load_skill_package_manifest, build_skill_registry_snapshot,
+    # resolve_skill_lockfile, resolve_skill_execution_policy) remains under active strategic
+    # direction per docs/architecture/skill-ecosystem.md (Near Term roadmap). No production skill
+    # currently ships a manifest.yaml, so these tests stage a writing-plans fixture in a tempdir
+    # to exercise the manifest system without polluting the real repo.
+
     def setUp(self) -> None:
-        self.temp_skill_dir = ROOT / ".agents" / "skills" / "writing-plans"
-        self.temp_summary_file = ROOT / ".agent" / "skills" / "writing-plans"
-        
-        # Create summary file
-        self.temp_summary_file.parent.mkdir(parents=True, exist_ok=True)
-        self.temp_summary_file.write_text("""---
+        self._tmpdir_ctx = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmpdir_ctx.cleanup)
+        self.fixture_root = Path(self._tmpdir_ctx.name)
+
+        summary_path = self.fixture_root / ".agent" / "skills" / "writing-plans"
+        summary_path.parent.mkdir(parents=True, exist_ok=True)
+        summary_path.write_text("""---
 name: writing-plans
 phases: [plan]
 trigger_priority: hard
@@ -121,8 +129,8 @@ description: temp package
 ---
 """, encoding="utf-8")
 
-        # Create mirror file
-        mirror_dir = self.temp_skill_dir / "agents"
+        skill_dir = self.fixture_root / ".agents" / "skills" / "writing-plans"
+        mirror_dir = skill_dir / "agents"
         mirror_dir.mkdir(parents=True, exist_ok=True)
         (mirror_dir / "openai.yaml").write_text("""display_name: writing-plans
 description: temp package
@@ -138,20 +146,12 @@ agentcortex:
   runtime_anchor: ["AGENTS.md"]
 """, encoding="utf-8")
 
-        # Create skill package with manifest
         write_temp_skill_package(
-            ROOT,
+            self.fixture_root,
             "writing-plans",
             capabilities=["read_repo"],
             trust_tier_hint="official",
         )
-
-    def tearDown(self) -> None:
-        import shutil
-        if self.temp_skill_dir.is_dir():
-            shutil.rmtree(self.temp_skill_dir)
-        if self.temp_summary_file.is_file():
-            self.temp_summary_file.unlink()
 
     def test_validator_passes_on_repo_state(self) -> None:
         result = run_tool(".agentcortex/tools/validate_trigger_metadata.py", "--root", ".")
@@ -303,7 +303,7 @@ agentcortex:
         )
 
     def test_writing_plans_manifest_validates(self) -> None:
-        skill_dir = ROOT / ".agents" / "skills" / "writing-plans"
+        skill_dir = self.fixture_root / ".agents" / "skills" / "writing-plans"
         manifest = load_skill_package_manifest(skill_dir)
         self.assertIsNotNone(manifest)
         errors = validate_skill_package_manifest(skill_dir, manifest or {})
@@ -311,9 +311,9 @@ agentcortex:
 
     def test_writing_plans_manifest_authority_matches_repo_state(self) -> None:
         entry = load_registry_entry("writing-plans")
-        summary = parse_frontmatter(ROOT / entry["canonical_ref"])
-        mirror = parse_simple_yaml((ROOT / entry["mirror_ref"]).read_text(encoding="utf-8"))
-        detail_path = ROOT / entry["detail_ref"]
+        summary = parse_frontmatter(self.fixture_root / entry["canonical_ref"])
+        mirror = parse_simple_yaml((self.fixture_root / entry["mirror_ref"]).read_text(encoding="utf-8"))
+        detail_path = self.fixture_root / entry["detail_ref"]
         manifest = load_skill_package_manifest(detail_path.parent)
 
         self.assertIsNotNone(manifest)
@@ -328,9 +328,9 @@ agentcortex:
 
     def test_manifest_authority_reports_summary_and_mirror_drift(self) -> None:
         entry = load_registry_entry("writing-plans")
-        summary = parse_frontmatter(ROOT / entry["canonical_ref"])
-        mirror = parse_simple_yaml((ROOT / entry["mirror_ref"]).read_text(encoding="utf-8"))
-        detail_path = ROOT / entry["detail_ref"]
+        summary = parse_frontmatter(self.fixture_root / entry["canonical_ref"])
+        mirror = parse_simple_yaml((self.fixture_root / entry["mirror_ref"]).read_text(encoding="utf-8"))
+        detail_path = self.fixture_root / entry["detail_ref"]
         manifest = load_skill_package_manifest(detail_path.parent)
 
         self.assertIsNotNone(manifest)
@@ -351,7 +351,7 @@ agentcortex:
         self.assertTrue(any("mirror display_name must derive from manifest name" in error for error in errors), errors)
 
     def test_manifest_digest_mismatch_is_reported(self) -> None:
-        skill_dir = ROOT / ".agents" / "skills" / "writing-plans"
+        skill_dir = self.fixture_root / ".agents" / "skills" / "writing-plans"
         manifest = load_skill_package_manifest(skill_dir)
         self.assertIsNotNone(manifest)
         mutated_manifest = dict(manifest or {})
@@ -360,7 +360,7 @@ agentcortex:
         self.assertTrue(any("content_digest does not match" in error for error in errors), errors)
 
     def test_registry_snapshot_includes_manifest_backed_packages(self) -> None:
-        snapshot = build_skill_registry_snapshot(ROOT)
+        snapshot = build_skill_registry_snapshot(self.fixture_root)
         self.assertEqual(snapshot["version"], 1)
         self.assertEqual(snapshot["generated_from"], ".agents/skills")
         self.assertTrue(snapshot["snapshot_digest"].startswith("sha256:"))
@@ -371,7 +371,7 @@ agentcortex:
         self.assertEqual(package["lifecycle_status"], "active")
 
     def test_lockfile_resolution_pins_requested_package(self) -> None:
-        snapshot = build_skill_registry_snapshot(ROOT)
+        snapshot = build_skill_registry_snapshot(self.fixture_root)
         lockfile = resolve_skill_lockfile(snapshot, ["writing-plans"])
         package = next(entry for entry in snapshot["packages"] if entry["id"] == "writing-plans")
 
@@ -430,7 +430,7 @@ agentcortex:
         result = run_tool(
             ".agentcortex/tools/resolve_skill_lockfile.py",
             "--root",
-            ".",
+            str(self.fixture_root),
             "--requested",
             "writing-plans",
         )
@@ -443,7 +443,7 @@ agentcortex:
         result = run_tool(
             ".agentcortex/tools/resolve_skill_lockfile.py",
             "--root",
-            ".",
+            str(self.fixture_root),
             "--requested",
             "writing-plans",
             "--runtime",
