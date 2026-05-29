@@ -12,9 +12,9 @@
   - Active Work Log Path: derive <worklog-key> from the raw branch name using filesystem-safe normalization before any gate checks.
   - Workflows & Policies: `.agent/workflows/*.md`, `.agent/rules/*.md`
 - **Project Name**: (set by /app-init)
-- **Last Updated**: 2026-05-26
-- **Last Verified**: 2026-05-26
-- **Update Sequence**: 21
+- **Last Updated**: 2026-05-29
+- **Last Verified**: 2026-05-29
+- **Update Sequence**: 22
 - **ADR Index**:
   - docs/adr/ADR-001-governance-friction-tuning.md — ADR-001: Governance Friction Tuning, accepted 2026-04-23
   - docs/adr/ADR-002-guarded-governance-writes.md — ADR-002: Guarded Governance Writes (lock unification + CI lint + lifecycle frontmatter), accepted 2026-04-25
@@ -69,6 +69,14 @@
 - [Category: spec-factual-claims][Severity: MEDIUM][Trigger: domain-decision-tool-behavior-claim][prev: eea362e5] Domain Decisions that make factual claims about tool behavior (e.g., 'no external API call', 'language-agnostic') MUST be verified against tool documentation before the spec is frozen. Factual errors in Domain Decisions survive implementation and review phases because reviewers check AC compliance, not rationale accuracy. Self-check at spec-write: for each [DECISION] that asserts tool behavior, find one authoritative source confirming the claim.
 - [Category: scope-expansion][Severity: HIGH][Trigger: procedure-header-scope-change][prev: 95082304] When expanding a procedure's tier scope (e.g., "quick-win only" → "all tiers"), MUST audit every step inside the procedure body for correctness under the new scope BEFORE committing. Changing only the header/trigger misses procedure-body invariants — e.g., a receipt-writing step that was safe for quick-win becomes a governance hole for feature/hotfix. Self-check: for each step N in the procedure, ask "does this step still hold correctly for every new tier I just added?"
 ## Ship History
+
+### Ship-fix-guard-test-ci-coverage-2026-05-29
+- **Commit `8001ef5`** (quick-win) — Framework self-test integrity: restored `tests/guard/` collection + gated it in CI (audit items A+B, 2026-05-29 self-audit).
+  - Root cause A: `tests/guard/test_sentinel_hook.py` + `test_precompact_hook.py` `exec_module()` the hook sources `.claude/hooks/check-sentinel.py` / `check-precompact.py`, intentionally removed in `aec35d6` (zero-python-downstream design, documented in `.claude/settings.json`). Missing files raised `FileNotFoundError` at pytest **collection** → aborted the ENTIRE `tests/guard/` collection → all 82 valid governance-tool tests silently never ran.
+  - Root cause B: CI (`.github/workflows/validate.yml`) ran only `pytest tests/ci/`, never `tests/guard/` — so the 82 tests (guard_context_write, audit-chain, lint, lifecycle, adr-coverage) were ungated regardless.
+  - Fix: deleted the 2 orphaned test files (355 lines; feature deliberately removed) + extended `test-ci-structural` job to `pytest tests/ci/ tests/guard/ -v`.
+  - Evidence: pre-fix `pytest tests/guard/` = 2 collection errors / 0 run; post-fix `pytest tests/ci/ tests/guard/` = 114 passed, 0 errors.
+- **Follow-ups queued (same self-audit, NOT shipped here)**: C1 audit-chain tail-truncation undetectable (reproduced — `check_chain` has no head/length anchor); C2 `migrate` re-blesses forged history; C3 guard replace/append take disjoint locks → lost-update risk on `current_state.md`; D validate.sh↔validate.ps1 parity gaps (unverified). See backlog #41–#44.
 
 ### Ship-brain-quality-sprint-2026-05-26
 - **PR #112** (squash `f3b3b81`) — Brain quality batch: set -e hardening, Anti-Rationalization §4.5, AGENTS.md -43% tokens.

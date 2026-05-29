@@ -157,8 +157,8 @@ jobs:
       - name: Install test dependencies
         run: pip install pyyaml pytest
 
-      - name: Run CI structural tests
-        run: python -m pytest tests/ci/ -v
+      - name: Run CI structural + guard tests
+        run: python -m pytest tests/ci/ tests/guard/ -v
 
   deploy-no-python:
     name: Deploy Smoke Test (No Python)
