@@ -75,12 +75,13 @@
 ## Ship History
 
 ### Ship-fix-win-cmd-dispatch-readme-counts-2026-05-31
-- **Branch `fix/win-cmd-dispatch-readme-counts`** (quick-win) - Fixed a dead Windows `.cmd` install/update path + corrected stale README skill/workflow counts.
+- **Commit `554377e`** (squash, PR #120, quick-win) - Fixed a dead Windows `.cmd` install/update path + corrected stale README skill/workflow counts.
   - **Install bug**: `installers/deploy_brain.cmd` dispatched to canonical `.agentcortex/bin/deploy.*` whenever present (always, post-install), bypassing the wrapper's NVM-style install-vs-update routing. `deploy_brain.cmd .` from an installed root -> canonical `deploy.sh .` with REPO_ROOT==TARGET -> self-deploy guard error. Fix: cmd now ALWAYS delegates to the sibling wrapper (deploy_brain.ps1 preferred -> deploy_brain.sh), never canonical; added cmd->PS1 typed-arg mapping. Caught + fixed a `%0`/`shift` clobber the expert design missed (capture `%~dp0` into `SCRIPT_DIR` before shift). Rewrote ASCII+CRLF per `.gitattributes`.
   - **Docs**: README "17 Professional Skills" -> 14 (removed 5 phantom rows that are workflows, added real karpathy-principles + production-readiness with verified metadata); workflow count 35->33; added Windows `--dry-run` parity line. zh-TW: 17->14 + removed inaccurate versioned model string.
   - Verified offline via real `cmd.exe`: first-install dry-run (exit 0) + update-from-installed-root (Cloning -> .agentcortex-src -> "182 updated", exit 0, no self-deploy error). validate.sh & validate.ps1 fail=0 both.
   - Note: `deploy_brain.cmd` is wrapper-tier -> deployed as an update it sidecars (.acx-incoming) over locally-modified downstream copies; downstream must merge to receive the fix.
   - Closes issue #32 (skill-subdir deploy - verified already fixed by c7d9ade; nested agents/openai.yaml all deploy).
+  - Multi-round adversarial review (3-lens workflow) caught 5 follow-ups, each empirically re-tested: README Windows preview `--dry-run`->`-DryRun` (PS1 `[switch]$DryRun` binding; the original line did a real deploy, not a preview); removed dead `--no-python`/`-NoPython` from cmd+ps1 (validate-only flag, never forwarded); `--source` empty-value fail-fast guard; and re-pointed the validate `deploy_brain.cmd` gate from the now-inverted canonical reference to the sibling-wrapper delegation.
 
 ### Ship-fix-validator-parity-and-audit-closure-2026-05-29
 - **Commit `55ed8ea`** (quick-win, backlog #44 Shipped / #43 Cancelled) — Closed the final two 2026-05-29 self-audit items after INDEPENDENT verification.
