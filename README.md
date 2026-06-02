@@ -223,6 +223,7 @@ powershell -ExecutionPolicy Bypass -File .\agentic-os\installers\deploy_brain.ps
 ```
 
 Use the PowerShell entrypoint when possible. It resolves Git Bash directly and does not require a WSL distro.
+Git Bash is still required on Windows for shell-based deploy and validation scripts; the PowerShell entrypoint simply locates and invokes it for you.
 
 ```powershell
 # Already installed? Run from your project root to update:
