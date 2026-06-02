@@ -398,6 +398,17 @@ Agentic OS is built on [10 non-negotiable principles](.agentcortex/docs/AGENT_PH
 
 ## Documentation
 
+Start with the document that matches what you are trying to do:
+
+| Goal | Start Here | Why |
+|:---|:---|:---|
+| Install or upgrade Agentic OS | [Quick Start](#quick-start), [Migration Guide](.agentcortex/docs/guides/migration.md) | Deployment commands, update flow, and existing-project guidance |
+| Choose the right AI model | [Model Selection Guide](docs/AGENT_MODEL_GUIDE.md), [Lifecycle Benchmark](docs/LIFECYCLE_BENCHMARK.md) | Practical model tradeoffs and measured token costs |
+| Run disciplined agent workflows | [Agent Philosophy](.agentcortex/docs/AGENT_PHILOSOPHY.md), [Testing Protocol](.agentcortex/docs/TESTING_PROTOCOL.md) | Core rules, evidence expectations, and verification standards |
+| Use a specific platform | [Codex Platform Guide](.agentcortex/docs/CODEX_PLATFORM_GUIDE.md), [Claude Platform Guide](.agentcortex/docs/CLAUDE_PLATFORM_GUIDE.md) | Platform-specific loading, handoff, and compatibility notes |
+| Understand governance internals | [Document Governance](.agentcortex/docs/guides/doc-governance.md), [Nonlinear Scenarios](.agentcortex/docs/NONLINEAR_SCENARIOS.md) | State, handoff, recovery, and documentation lifecycle rules |
+| Extend skills safely | [Skill Ecosystem](docs/architecture/skill-ecosystem.md), [Token Governance](.agentcortex/docs/guides/token-governance.md) | Skill packaging, trigger policy, and context budget control |
+
 | Document | Description |
 |:---|:---|
 | [Agent Philosophy](.agentcortex/docs/AGENT_PHILOSOPHY.md) | 10 core principles |

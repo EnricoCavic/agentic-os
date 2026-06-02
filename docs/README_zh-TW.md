@@ -250,6 +250,17 @@ flowchart LR
 - 先用 `/plan` 收斂檔案範圍，再進入 `/implement`，降低來回修正。
 - 小型任務沿用 Fast Lane；若變更開始影響狀態/策略，立即升級流程，避免返工。
 
+## 🗺️ 文件導覽
+
+| 目標 | 先讀這裡 | 用途 |
+|:---|:---|:---|
+| 安裝或升級 Agentic OS | [快速開始](#-快速開始)、[遷移與整合指南](../.agentcortex/docs/guides/migration_zh-TW.md) | 部署指令、更新流程、既有專案導入 |
+| 選擇合適模型 | [模型選擇指南](AGENT_MODEL_GUIDE_zh-TW.md)、[生命週期基準測試](LIFECYCLE_BENCHMARK_zh-TW.md) | 模型取捨與實測 token 成本 |
+| 跑穩定的 agent 工作流 | [設計哲學](../.agentcortex/docs/AGENT_PHILOSOPHY_zh-TW.md)、[測試協議](../.agentcortex/docs/TESTING_PROTOCOL_zh-TW.md) | 核心規則、證據要求、驗證標準 |
+| 使用特定平台 | [Codex 平台指南](../.agentcortex/docs/CODEX_PLATFORM_GUIDE_zh-TW.md)、[Antigravity v5 Runtime](../.agentcortex/docs/guides/antigravity-v5-runtime.md) | 平台載入、交接、相容性注意事項 |
+| 理解治理內部機制 | [文件治理](../.agentcortex/docs/guides/doc-governance.md)、[非線性情境](../.agentcortex/docs/NONLINEAR_SCENARIOS_zh-TW.md) | 狀態、交接、復原與文件生命週期 |
+| 安全擴充技能 | [Skill Ecosystem](architecture/skill-ecosystem.md)、[Token 治理指南](../.agentcortex/docs/guides/token-governance_zh-TW.md) | skill 封裝、觸發策略、context 預算控制 |
+
 ## ✅ 自我驗證
 
 ```bash
