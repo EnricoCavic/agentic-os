@@ -6,7 +6,7 @@ If you discover a security vulnerability in Agentic OS, **please do not open a p
 
 Instead, report it privately:
 
-1. **Email**: Send details to the maintainer via GitHub's private vulnerability reporting (Settings > Security > Advisories > New draft advisory)
+1. **Private advisory**: Use GitHub's private vulnerability reporting flow (Settings > Security > Advisories > New draft advisory).
 2. **Include**: Description of the vulnerability, steps to reproduce, affected files/workflows, and potential impact
 
 ## Response Timeline
@@ -34,5 +34,5 @@ Security issues in Agentic OS may include:
 
 | Version | Supported |
 |---------|-----------|
-| 1.0.x   | Yes       |
-| < 1.0   | No        |
+| 1.2.x   | Yes       |
+| < 1.2   | No        |

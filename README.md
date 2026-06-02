@@ -6,8 +6,8 @@
 
 <p align="center">
   <strong>The governance-first operating system for AI coding agents.</strong><br/>
-  Structured workflows, delivery gates, engineering guardrails, and 14 professional skills<br/>
-  that work across Claude Code, Cursor, GitHub Copilot, Google Antigravity, and Codex.
+  Portable workflows, delivery gates, engineering guardrails, and 14 professional skills<br/>
+  for Claude Code, OpenAI Codex, Google Antigravity, Cursor, GitHub Copilot, and other coding agents.
 </p>
 
 <p align="center">
@@ -30,7 +30,7 @@
 
 ## The Problem
 
-AI coding agents are powerful but undisciplined. Without structure, they:
+AI coding agents are powerful, but they need shared operating rules. Without structure, they can:
 
 - **Skip steps** — jump straight to code without planning or reviewing
 - **Hallucinate completion** — claim "done" without verifiable evidence
@@ -40,7 +40,7 @@ AI coding agents are powerful but undisciplined. Without structure, they:
 
 ## The Solution
 
-**Agentic OS** is a drop-in governance framework that makes any AI agent follow professional engineering workflows. Install it into your project, and your AI agents gain:
+**Agentic OS** is a portable governance framework that gives AI agents a repeatable engineering workflow. Install it into your project, and your AI agents gain:
 
 ```
    Intent          Gate           Workflow         Evidence        Ship
@@ -368,12 +368,12 @@ your-project/
 
 | Platform | Status | Integration |
 |:---|:---|:---|
-| **Claude Code** | Full support | `CLAUDE.md` auto-loads governance |
-| **Google Antigravity** | Full support | Intent router + Antigravity runtime |
-| **OpenAI Codex** | Full support | Platform guide + CLI delegation |
-| **Cursor** | Compatible | Reads `AGENTS.md` as project rules |
-| **GitHub Copilot** | Compatible | Follows guardrails via `AGENTS.md` |
-| **Any LLM Agent** | Compatible | Model-agnostic governance language |
+| **Claude Code** | Native support | `CLAUDE.md` entrypoint + Claude platform guide |
+| **OpenAI Codex** | Native support | `AGENTS.md`, Codex platform guide, and CLI delegation workflow |
+| **Google Antigravity** | Native support | Intent router + Antigravity runtime guidance |
+| **Cursor** | Compatible | Uses `AGENTS.md` / project-rule style guidance |
+| **GitHub Copilot** | Compatible | Uses repository instructions and guardrail docs |
+| **Any LLM Agent** | Compatible | Model-agnostic Markdown workflows and evidence rules |
 
 ---
 
