@@ -15,8 +15,9 @@ not just following gates.
 
 ## 2. Governance Gap Analysis
 
-Current inventory: 19 skills. Coverage is strong on **gates & workflows** but weak
-on **behavioral discipline** and **quality depth**.
+Current inventory: 14 active skills. Coverage is strong on **gates & workflows** but still needs
+periodic review for **behavioral discipline** and **quality depth** as retired process skills are
+folded into workflows.
 
 | Gap | Severity | Description |
 |---|---|---|
@@ -83,7 +84,7 @@ All candidates are integrated into existing skills — zero new skills added.
 |---|---|---|
 | `doc-lookup` | Anti-rationalization table + Conflict Detection Template | addyosmani/source-driven-development |
 | `karpathy-principles` | Anti-rationalization table + Code Simplification Checklist | addyosmani/code-simplification |
-| `receiving-code-review` | 5-Axis Quality Standard + Anti-rationalization table | addyosmani/code-review-and-quality |
+| `/review` workflow | 5-Axis Quality Standard | addyosmani/code-review-and-quality |
 
 ### Phase B: Future Candidates (P2, not yet started)
 
@@ -111,9 +112,9 @@ evaluating.
 
 ## 7. Success Metrics
 
-- [x] 3 existing skills enhanced with anti-rationalization tables (Phase A)
+- [x] Phase A guidance integrated into current skills/workflows
 - [x] Code simplification checklist integrated into karpathy-principles
-- [x] 5-axis quality standard integrated into receiving-code-review
+- [x] 5-axis quality standard integrated into the `/review` workflow
 - [x] Conflict detection template integrated into doc-lookup
 - [ ] `validate.sh` passes with all changes
 - [ ] Zero governance gaps rated HIGH remaining
