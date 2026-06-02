@@ -2,7 +2,7 @@
 
 ## Our Pledge
 
-We are committed to providing a friendly, safe, and welcoming environment for all contributors — whether biological or silicon-based.
+We are committed to providing a friendly, safe, and welcoming environment for human contributors and AI-assisted workflows.
 
 ## Our Standards
 

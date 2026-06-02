@@ -1,6 +1,6 @@
 # Contributing to Agentic OS
 
-Thank you for your interest in **Agentic OS**! This project is designed as an "Agentic-First" ecosystem. Whether you are a human developer or an AI Agent, please follow these guidelines to maintain project integrity and token efficiency.
+Thank you for your interest in **Agentic OS**. This repository is designed for human maintainers working alongside AI coding agents. These guidelines keep changes reviewable, evidence-backed, and consistent across supported agent platforms.
 
 ## 🤖 For AI Agents & Subagents
 
@@ -18,6 +18,16 @@ If you are an AI assisting in this repository:
 2. **Feature Branches**: Use descriptive `codex/<task-name>` branch names for framework work in this repo.
 3. **PR Standards**: Every Pull Request should include a clear "Problem/Solution" summary and verification evidence.
 4. **Language**: All internal documentation, rules, and commit messages must be in **English** for maximum cross-model compatibility.
+
+## 📚 Root Document Roles
+
+| File | Role |
+|:---|:---|
+| `README.md` | Public overview, install path, platform compatibility, and documentation map |
+| `CONTRIBUTING.md` | Contributor workflow, validation expectations, and PR standards |
+| `SECURITY.md` | Vulnerability reporting scope, private disclosure path, and support policy |
+| `CODE_OF_CONDUCT.md` | Conduct expectations for human contributors and AI-assisted workflows |
+| `CITATION.cff` | Citation metadata for papers, talks, and downstream references |
 
 ## 🔧 Local Development
 
@@ -86,7 +96,7 @@ Quick reference:
 
 ## ⚖️ Code of Conduct
 
-We are committed to providing a friendly, safe, and welcoming environment for all contributors, regardless of whether they are biological or silicon-based.
+We are committed to a respectful environment for human contributors and AI-assisted workflows. See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 ---
 *Questions? Open an issue or refer to [README.md](README.md).*
