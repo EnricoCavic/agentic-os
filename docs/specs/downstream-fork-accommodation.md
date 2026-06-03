@@ -31,7 +31,7 @@ governance/security files always staying current.
 - **AC-3 (A, carve-out warn)**: An override directive citing `> Overrides: AGENTS.md §Delivery Gates` (or `§Core Directives`/No-Bypass Rule) causes bootstrap to emit a WARN, record `rejected` in `## Drift Log`, and NOT apply that directive; other (narrowing) directives in the same file still apply. Bootstrap does not hard-block.
 - **AC-4 (A, doc status)**: `doc-governance.md` §49 reads "**MUST** read … when present" (was "SHOULD"); §51 `Status` reads `active` (was `soft-launch`) with an Implementation Contract subsection pointing at the bootstrap load step; the §47 carve-out text is unchanged.
 - **AC-5 (B, force-update)**: After a local edit to any framework-authoritative file (`.agent/rules/*`, `.agent/workflows/*`, `.agent/config.yaml`, `.agentcortex/bin/validate.*`, `.agentcortex/bin/deploy.*`, `.antigravity/rules.md`, `codex/rules/*`, `.agentcortex/tools/**`, `.agentcortex/metadata/**`), a re-deploy overwrites it and produces **no** `.acx-incoming`.
-- **AC-6 (B+D, skill sidecar)**: After a local edit to any skill under `.agent/skills/**` or `.agents/skills/**` (framework or `custom-*`), a re-deploy produces a `.acx-incoming`, leaves the original file unchanged, increments `COUNT_SKIPPED`, and the SKIP message offers manual/AI merge. Unmodified skills still force-update.
+- **AC-6 (B+D, skill sidecar)**: After a local edit to any framework-shipped skill under `.agent/skills/**` or `.agents/skills/**`, a re-deploy produces a `.acx-incoming`, leaves the original file unchanged, increments `COUNT_SKIPPED`, and the SKIP message offers manual/AI merge. Net-new `custom-*` skills are never touched by deploy.
 - **AC-7 (parity)**: `deploy.ps1` exhibits AC-5 + AC-6 behavior identically to `deploy.sh` (verified by running the relevant entry point, per Global Lesson `[cross-platform-cli]` — not by reading). `validate.sh` and `validate.ps1` both gain the same new structural check(s) if any are added.
 - **AC-8 (A enforcement, structural)**: `validate.sh` and `validate.ps1` each assert that `bootstrap.md` contains the override-load step (structural presence check — the framework ships the instruction). No fake per-agent MUST is added.
 - **AC-9 (C, README)**: `README.md` gains an "Additive Fork" section (override layer + skill sidecar + `custom-*` namespace + "never edit framework files in place; copy-then-customize"); `docs/README_zh-TW.md` mirrors it with equivalent 繁體中文 content.
@@ -69,7 +69,7 @@ INDEPENDENT — new spec. No existing `docs/specs/*.md` covers downstream fork/c
 ## 7. Test Plan (seeds)
 
 - `tests/deploy/test_core_authoritative_no_sidecar.*` — AC-5.
-- `tests/deploy/test_skill_sidecar.*` — AC-6 (framework skill + `custom-*` skill).
+- `tests/deploy/test_skill_sidecar.*` — AC-6 (framework skill sidecar + `custom-*` untouched).
 - `tests/bootstrap/test_override_load.*` — AC-1/AC-2/AC-3 (present→recorded; absent→none; gate-relax→warn+rejected).
 - `validate.sh`/`validate.ps1` structural check — AC-8.
 - Parity: run each `deploy.ps1` path for AC-5/AC-6 (AC-7), not read-only inspection.

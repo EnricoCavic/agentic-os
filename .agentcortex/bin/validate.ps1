@@ -423,8 +423,9 @@ if (Test-Path -Path $archiveIndexJsonl -PathType Leaf) {
 # chain cannot detect TAIL-TRUNCATION; git's merge-base with origin/main is used
 # as an EXTERNAL append-only witness (committed baseline must be a line-prefix of
 # the working copy). Tamper-EVIDENCE, not prevention. Degrades to WARN (never
-# silent PASS) when git / origin/main / baseline is unavailable. PowerShell reads
-# `git show` / Get-Content as string arrays, so CRLF is stripped naturally.
+# silent PASS) when git / origin/main / baseline is unavailable. Use cmd.exe
+# redirection for the git blob so Windows PowerShell 5.1 cannot mis-decode UTF-8
+# JSONL through its native pipeline.
 $indexRel = '.agentcortex/context/archive/INDEX.jsonl'
 if (Test-Path -Path $archiveIndexJsonl -PathType Leaf) {
     $gitPresent = [bool](Get-Command git -ErrorAction SilentlyContinue)
@@ -443,20 +444,31 @@ if (Test-Path -Path $archiveIndexJsonl -PathType Leaf) {
             if ($LASTEXITCODE -ne 0) {
                 Add-Result -Level 'WARN' -Message 'INDEX.jsonl append-only witness -- not present at merge-base (new log surface)'
             } else {
-                $baseLines = @(git -C $root show "${witnessBase}:$indexRel" 2>$null | Where-Object { $_ -ne '' })
-                $localLines = @(Get-Content -LiteralPath $archiveIndexJsonl | Where-Object { $_ -ne '' })
-                if ($localLines.Count -lt $baseLines.Count) {
-                    Add-Result -Level 'FAIL' -Message "INDEX.jsonl append-only witness -- local has $($localLines.Count) entries, fewer than baseline $($baseLines.Count) at merge-base (tail-truncation?)"
-                } else {
-                    $prefixOk = $true
-                    for ($i = 0; $i -lt $baseLines.Count; $i++) {
-                        if ($localLines[$i] -ne $baseLines[$i]) { $prefixOk = $false; break }
-                    }
-                    if (-not $prefixOk) {
-                        Add-Result -Level 'FAIL' -Message 'INDEX.jsonl append-only witness -- committed baseline is not a prefix of local (a previously-published audit entry was edited or deleted)'
+                $baseTmp = New-TemporaryFile
+                try {
+                    $objectName = "${witnessBase}:$indexRel"
+                    & cmd.exe /c "git -C `"$root`" show `"$objectName`" > `"$($baseTmp.FullName)`""
+                    if ($LASTEXITCODE -ne 0) {
+                        Add-Result -Level 'WARN' -Message 'INDEX.jsonl append-only witness -- unable to read baseline blob'
                     } else {
-                        Add-Result -Level 'PASS' -Message 'INDEX.jsonl append-only witness -- baseline is a prefix of local (append-only invariant holds)'
+                        $baseLines = @(Get-Content -LiteralPath $baseTmp.FullName -Encoding UTF8 | Where-Object { $_ -ne '' })
+                        $localLines = @(Get-Content -LiteralPath $archiveIndexJsonl -Encoding UTF8 | Where-Object { $_ -ne '' })
+                        if ($localLines.Count -lt $baseLines.Count) {
+                            Add-Result -Level 'FAIL' -Message "INDEX.jsonl append-only witness -- local has $($localLines.Count) entries, fewer than baseline $($baseLines.Count) at merge-base (tail-truncation?)"
+                        } else {
+                            $prefixOk = $true
+                            for ($i = 0; $i -lt $baseLines.Count; $i++) {
+                                if ($localLines[$i] -ne $baseLines[$i]) { $prefixOk = $false; break }
+                            }
+                            if (-not $prefixOk) {
+                                Add-Result -Level 'FAIL' -Message 'INDEX.jsonl append-only witness -- committed baseline is not a prefix of local (a previously-published audit entry was edited or deleted)'
+                            } else {
+                                Add-Result -Level 'PASS' -Message 'INDEX.jsonl append-only witness -- baseline is a prefix of local (append-only invariant holds)'
+                            }
+                        }
                     }
+                } finally {
+                    Remove-Item -LiteralPath $baseTmp.FullName -Force -ErrorAction SilentlyContinue
                 }
             }
         }

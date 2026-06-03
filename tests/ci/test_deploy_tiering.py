@@ -30,13 +30,47 @@ VALIDATE_PS1 = ROOT / ".agentcortex" / "bin" / "validate.ps1"
 README = ROOT / "README.md"
 README_ZH = ROOT / "docs" / "README_zh-TW.md"
 
-bash = shutil.which("bash")
+
+git_path = shutil.which("git")
+git_root = Path(git_path).parent.parent if git_path else None
+bash_candidates = [
+    str(git_root / "bin" / "bash.exe") if git_root else None,
+    str(git_root / "usr" / "bin" / "bash.exe") if git_root else None,
+    r"C:\Program Files\Git\bin\bash.exe",
+    r"C:\Program Files\Git\usr\bin\bash.exe",
+    r"C:\Program Files (x86)\Git\bin\bash.exe",
+    shutil.which("bash"),
+]
+bash = next(
+    (
+        candidate for candidate in bash_candidates
+        if candidate and "WindowsApps" not in candidate and Path(candidate).exists()
+    ),
+    None,
+)
 requires_bash = pytest.mark.skipif(bash is None, reason="bash not available")
+powershell = shutil.which("powershell") or shutil.which("pwsh")
+requires_powershell = pytest.mark.skipif(powershell is None, reason="PowerShell not available")
 
 
 def _deploy(target: Path) -> subprocess.CompletedProcess:
     return subprocess.run(
         [bash, str(DEPLOY_SH), str(target)],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        cwd=str(ROOT),
+    )
+
+
+def _deploy_ps1(target: Path) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [
+            powershell,
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(ROOT / ".agentcortex" / "bin" / "deploy.ps1"),
+            str(target),
+        ],
         capture_output=True, text=True, encoding="utf-8", errors="replace",
         cwd=str(ROOT),
     )
@@ -88,6 +122,19 @@ def test_skill_edit_sidecars_and_core_rule_force_updates() -> None:
             "core rule must NOT produce a sidecar (governance must force-update)"
         assert "<!-- downstream edit -->" not in rule.read_text(encoding="utf-8"), \
             "core rule edit must be overwritten by the framework version"
+
+
+@requires_powershell
+def test_deploy_ps1_entrypoint_resolves_real_bash() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "proj"
+        target.mkdir()
+
+        result = _deploy_ps1(target)
+        assert result.returncode == 0, (
+            f"deploy.ps1 failed:\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+        )
+        assert (target / ".agentcortex-manifest").exists(), "deploy.ps1 should create manifest"
 
 
 # ---------------------------------------------------------------------------

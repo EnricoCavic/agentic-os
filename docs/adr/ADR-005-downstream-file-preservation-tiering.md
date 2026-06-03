@@ -55,7 +55,7 @@ The core-branch code is **unchanged**; only the tier *classification* of skill
 paths moves. This reuses the existing scaffold sidecar machinery (`deploy.sh:154-216`)
 — minimal change, no new code path (DELETE-bias).
 
-**Compliance check**: after a local edit to `.agent/rules/engineering_guardrails.md`, a re-deploy overwrites it with **no** `.acx-incoming`; after a local edit to any skill (framework or `custom-*`), a re-deploy produces a `.acx-incoming`, leaves the original untouched, and increments `COUNT_SKIPPED`.
+**Compliance check**: after a local edit to `.agent/rules/engineering_guardrails.md`, a re-deploy overwrites it with **no** `.acx-incoming`; after a local edit to a framework-shipped skill, a re-deploy produces a `.acx-incoming`, leaves the original untouched, and increments `COUNT_SKIPPED`; a net-new `custom-*` skill remains untouched because the framework never ships that namespace.
 
 > **🚩 DEVIATION FROM USER'S LITERAL DIRECTIVE (surface for confirmation).** The
 > user chose "extend sidecar to **all** core tier". This ADR narrows that to
