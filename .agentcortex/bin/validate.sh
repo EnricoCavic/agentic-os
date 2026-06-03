@@ -1656,9 +1656,10 @@ if [[ -d "$ARCHIVE_DIR" ]]; then
       phase_summary_violations=$((phase_summary_violations + 1))
       phase_summary_violation_list="${phase_summary_violation_list}  empty Phase Summary: ${wl#$ROOT/}\n"
     fi
-    # Exclude ship-history-*.md: compacted ship-history archives are not Work
-    # Logs and have no `## Phase Summary` contract (#171).
-  done < <(find "$ARCHIVE_DIR" -name '*.md' -not -name '.gitkeep*' -not -name 'ship-history-*' -print0 2>/dev/null || true)
+  # Exclude ship-history-*.md (case-insensitive `-iname` for parity with the PS
+  # `-notlike` filter): compacted ship-history archives are not Work Logs and
+  # carry no `## Phase Summary` contract (#171).
+  done < <(find "$ARCHIVE_DIR" -name '*.md' -not -name '.gitkeep*' -not -iname 'ship-history-*' -print0 2>/dev/null || true)
 fi
 if [[ "$phase_summary_violations" -gt 0 ]]; then
   record_result WARN "archived Work Logs with empty Phase Summary: ${phase_summary_violations}"
@@ -2154,23 +2155,21 @@ if [[ -d "$ROOT/docs/specs" ]]; then
   fi
 fi
 
-# Project spec template check: if /app-init has run (at least one docs/adr/ADR-*.md
-# exists) but no project-customized spec template was created, WARN so the user
-# knows spec-intake will fall back to the generic template instead of the
-# project-specific one.
-adr_count=0
+# Project spec template check (#172): detect a genuine downstream app that has
+# run /app-init by the presence of its project-architecture ADR
+# (docs/adr/ADR-00N-project-architecture.md, created by app-init.md §4). The
+# framework's own governance ADRs (ADR-001-governance-friction-tuning, ..) do
+# NOT match this pattern, so these app-init-derived checks never false-fire on
+# the framework repo itself. This signal is deploy-independent, so it also
+# covers fork/clone adopters (README §Additive Fork) that never run deploy.sh.
+# If app-init ran but the template / Project Name is missing, WARN.
+app_init_adr_count=0
 for adr_dir in "$ROOT/docs/adr" "$ROOT/.agentcortex/adr"; do
   if [[ -d "$adr_dir" ]]; then
-    for f in "$adr_dir"/ADR-*.md; do [[ -f "$f" ]] && adr_count=$((adr_count + 1)); done
+    for f in "$adr_dir"/*-project-architecture.md; do [[ -f "$f" ]] && app_init_adr_count=$((app_init_adr_count + 1)); done
   fi
 done
-# Framework-self guard (#172): a deployed downstream app always has a
-# .agentcortex-manifest (deploy.sh writes one into every target); the framework
-# source repo never does (self-deploy is blocked, and the file is untracked).
-# These app-init-derived checks apply only to genuine downstream apps, so skip
-# them on the framework repo, whose governance ADRs (ADR-001..) are not an
-# app-init signal.
-if [[ "$adr_count" -gt 0 && -f "$ROOT/.agentcortex-manifest" ]]; then
+if [[ "$app_init_adr_count" -gt 0 ]]; then
   has_project_template=0
   for tmpl in "$ROOT"/.agentcortex/templates/spec-app-feature-*.md; do
     [[ -f "$tmpl" ]] && has_project_template=1 && break
@@ -2221,9 +2220,7 @@ fi
 
 # Round-15 Finding 7: Spec frontmatter status validation — each docs/specs/*.md
 # must have YAML frontmatter with a recognized 'status:' value.
-# archive = archive-index files (_product-backlog-archive.md); research =
-# transient _research-*.md notes per .agent/workflows/research.md (#170).
-VALID_SPEC_STATUSES="draft|frozen|shipped|cancelled|living|archive|research"
+VALID_SPEC_STATUSES="draft|frozen|shipped|cancelled|living"
 spec_bad_status=0
 spec_missing_frontmatter=0
 if [[ -d "$ROOT/docs/specs" ]]; then
@@ -2232,6 +2229,11 @@ if [[ -d "$ROOT/docs/specs" ]]; then
     [[ -f "$spec" ]] || continue
     # Skip .gitkeep.md placeholder files
     [[ "$(basename "$spec")" == ".gitkeep.md" ]] && continue
+    # Skip underscore-prefixed meta/index files (_product-backlog*, _research-*):
+    # not governed specs; they use their own lifecycle states (archive/research)
+    # and are exempt from the spec-status enum, matching the `_*` skip convention
+    # already used for the Spec Index completeness check above (#170).
+    [[ "$(basename "$spec")" == _* ]] && continue
     # Check YAML frontmatter presence (first line must be ---)
     first_line="$(head -n1 "$spec" 2>/dev/null | tr -d '\r')"
     if [[ "$first_line" != "---" ]]; then
@@ -2251,7 +2253,7 @@ fi
 if [[ "$spec_missing_frontmatter" -gt 0 ]]; then
   record_result WARN "docs/specs/ files missing YAML frontmatter or status field: ${spec_missing_frontmatter} (engineering_guardrails.md §4.2 requires status: draft|frozen|shipped|cancelled)"
 elif [[ "$spec_bad_status" -gt 0 ]]; then
-  record_result WARN "docs/specs/ files with unrecognized status value: ${spec_bad_status} (valid: draft, frozen, shipped, cancelled, living, archive, research)"
+  record_result WARN "docs/specs/ files with unrecognized status value: ${spec_bad_status} (valid: draft, frozen, shipped, cancelled, living)"
 else
   # Only emit PASS when specs directory has files to check
   spec_file_count=0

@@ -1990,18 +1990,18 @@ if (Test-Path -Path $specsDir -PathType Container) {
     }
 }
 
-# Project spec template check (parity with validate.sh)
-$adrCount = 0
+# Project spec template check (#172) (parity with validate.sh): detect a genuine
+# downstream app that ran /app-init by its project-architecture ADR
+# (ADR-00N-project-architecture.md). The framework's own governance ADRs do not
+# match this pattern, so these checks never false-fire on the framework repo;
+# the signal is deploy-independent so it also covers fork/clone adopters.
+$appInitAdrCount = 0
 foreach ($adrDir in @((Join-NormalPath $root 'docs/adr'), (Join-NormalPath $root '.agentcortex/adr'))) {
     if (Test-Path -Path $adrDir -PathType Container) {
-        $adrCount += @(Get-ChildItem -Path $adrDir -Filter 'ADR-*.md' -File -ErrorAction SilentlyContinue).Count
+        $appInitAdrCount += @(Get-ChildItem -Path $adrDir -Filter '*-project-architecture.md' -File -ErrorAction SilentlyContinue).Count
     }
 }
-# Framework-self guard (#172): only deployed downstream apps carry a
-# .agentcortex-manifest (deploy.sh writes one into every target); the framework
-# source repo never does. Skip these app-init-derived checks on the framework
-# repo, whose governance ADRs are not an app-init signal. Parity with validate.sh.
-if ($adrCount -gt 0 -and (Test-Path -Path (Join-NormalPath $root '.agentcortex-manifest') -PathType Leaf)) {
+if ($appInitAdrCount -gt 0) {
     $projectTemplates = @(Get-ChildItem -Path (Join-NormalPath $root '.agentcortex/templates') -Filter 'spec-app-feature-*.md' -File -ErrorAction SilentlyContinue)
     if ($projectTemplates.Count -eq 0) {
         Add-Result -Level 'WARN' -Message "project spec template missing: docs/adr/ has ADR(s) but no .agentcortex/templates/spec-app-feature-<project>.md found -- run /app-init to create one, or spec-intake will use the generic template"
@@ -2054,14 +2054,15 @@ if ($domainDecisionsExceeded -gt 0) {
 }
 
 # Round-15 Finding 7: Spec frontmatter status validation
-# archive = archive-index files; research = transient _research-*.md notes
-# per .agent/workflows/research.md (#170). Parity with validate.sh.
-$validStatuses = @('draft','frozen','shipped','cancelled','living','archive','research')
+$validStatuses = @('draft','frozen','shipped','cancelled','living')
 $specBadStatus = 0; $specMissingFrontmatter = 0; $specFileCount = 0
 $specsDir = Join-NormalPath $root 'docs/specs'
 if (Test-Path -Path $specsDir -PathType Container) {
     foreach ($specFile in (Get-ChildItem -Path $specsDir -Filter '*.md' -File -ErrorAction SilentlyContinue)) {
         if ($specFile.Name -eq '.gitkeep.md') { continue }  # skip placeholder
+        # Skip _-prefixed meta/index files (_product-backlog*, _research-*): not
+        # governed specs; exempt from the status enum, parity with validate.sh (#170).
+        if ($specFile.Name -like '_*') { continue }
         $specFileCount++
         $specLines = Get-Content -Path $specFile.FullName -Encoding UTF8 -ErrorAction SilentlyContinue
         if (-not $specLines -or $specLines[0].TrimEnd() -ne '---') {
@@ -2076,7 +2077,7 @@ if (Test-Path -Path $specsDir -PathType Container) {
 if ($specMissingFrontmatter -gt 0) {
     Add-Result -Level 'WARN' -Message "docs/specs/ files missing YAML frontmatter or status field: $specMissingFrontmatter (engineering_guardrails.md §4.2 requires status: draft|frozen|shipped|cancelled)"
 } elseif ($specBadStatus -gt 0) {
-    Add-Result -Level 'WARN' -Message "docs/specs/ files with unrecognized status value: $specBadStatus (valid: draft, frozen, shipped, cancelled, living, archive, research)"
+    Add-Result -Level 'WARN' -Message "docs/specs/ files with unrecognized status value: $specBadStatus (valid: draft, frozen, shipped, cancelled, living)"
 } elseif ($specFileCount -gt 0) {
     Add-Result -Level 'PASS' -Message 'all docs/specs/ files have valid status frontmatter'
 }
