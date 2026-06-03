@@ -132,6 +132,18 @@ It does NOT contain governance rules — those remain in `AGENTS.md`.
 | "查文件", "check docs", "查官方文檔", "read the docs", "看文件再做" | `doc-lookup` |
 | "執行計畫" / "execute the plan" / "完成分支" / "merge 準備" / "請求 review" / "接收 review" / "寫計畫" | inlined into `/plan`, `/implement`, `/handoff`, `/ship`, `/review` workflows — no skill load needed |
 
+### 3a. Framework Skill Namespace & Downstream `custom-*` Reservation (Ref: ADR-005)
+
+The framework owns exactly these **14** skill names (do not reuse them for downstream-custom skills):
+
+`api-design`, `auth-security`, `database-design`, `dispatching-parallel-agents`, `doc-lookup`, `frontend-patterns`, `karpathy-principles`, `production-readiness`, `red-team-adversarial`, `subagent-driven-development`, `systematic-debugging`, `test-driven-development`, `using-git-worktrees`, `verification-before-completion`.
+
+**Reserved downstream namespace** — the framework guarantees it will **never** ship a skill whose name begins with `custom-`. Downstream projects (fork or clone) SHOULD name their own skills `custom-<name>` under `.agents/skills/custom-<name>/` (full body) + `.agent/skills/custom-<name>` (metadata). This guarantees:
+
+- **No collision on upgrade**: an upstream skill can never later claim a `custom-*` name.
+- **Preservation on deploy**: `custom-*` skills are net-new to the framework source, so `deploy.sh` never touches them; even a same-named framework skill edit is sidecar-protected, not silently overwritten (Ref: ADR-005, `deploy.sh get_tier` → scaffold for `.agent/skills/*`,`.agents/skills/*`).
+- **Additive-fork cleanliness**: because `custom-*` files are disjoint from the framework's file set, `git pull upstream` stays conflict-free for forks that only *add* skills (never edit framework skills in place).
+
 ---
 
 ## 4. Ambiguity Rules

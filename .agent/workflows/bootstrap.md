@@ -104,6 +104,12 @@ Tool exit codes:
    - **Staleness Check**: After reading SSoT, check `Last Verified` field. If today's date minus `Last Verified` > 14 days, output advisory: `"⚠️ SSoT last verified <N> days ago. Consider running /govern-docs to refresh."` Do NOT block — advisory only.
    - **Last Verified Update**: After successfully reading SSoT, update the `Last Verified` field to today's ISO date via `guard_context_write.py` (or direct write if Python unavailable).
    - **ADR Auto-Discovery** (capability-by-presence): If `docs/adr/` exists AND classification is `feature` or `architecture-change`, scan filenames only (no body reads). If any ADR files are found, output advisory: `"📋 Found [N] ADR(s) in docs/adr/. Review relevant ones before planning."` Advisory only — does not block.
+
+1a. **Load Override Layer** (capability-by-presence — Ref: ADR-004, `.agentcortex/docs/guides/doc-governance.md §Override Layer`). MUST read override files at session start **when present**; absence is not an error and costs zero reads.
+   - Check, in precedence order (later overrides earlier): (1) project-root `AGENTS.override.md`, (2) `~/.agentcortex/AGENTS.override.md`. Skip silently any that do not exist.
+   - For each present override, apply its `> Overrides: AGENTS.md §<section>` directives, EXCEPT: a directive citing `§Delivery Gates`, `§Core Directives`, or the No-Bypass Rule MUST NOT be applied — these are framework invariants. On such a directive, emit `"⚠️ Override [<file>] cites framework-invariant [<section>]; cannot relax gates — ignored."`, record `"Override rejected: <file> §<section> (framework-invariant)"` in the Work Log `## Drift Log`, and continue. Do NOT hard-block.
+   - Record the result in the Work Log `## Session Info`: `Override: <filename(s) + source>` or `Override: none`.
+   - **Read-Once**: load overrides once here at session start; later phases trust the recorded result and MUST NOT re-read. This step is lazy (present-only) — it never eager-imports an override into the context prefix.
 2. READ/CREATE `.agentcortex/context/work/<worklog-key>.md` (Work Log).
    - **Work Log Resolution**: Resolve a filesystem-safe `<worklog-key>` from the current branch before any path check. Store the raw git branch string in `Branch:`.
      **Normalization algorithm** (canonical — all agents/platforms MUST use this exact rule):
@@ -217,6 +223,7 @@ Write `## Session Info` and `## Drift Log` blocks immediately after header:
 - Session: [timestamp]
 - Platform: [Antigravity / Codex Web / Codex App]
 - Guardrails loaded: [§ list — e.g., "§1, §2, §4, §7, §8.1, §10 (core)" | "skipped (quick-win)" | "skipped (tiny-fix)"]
+- Override: [loaded override filename(s) + source per §1a | none]
 
 ## Drift Log
 - Skip Attempt: NO
