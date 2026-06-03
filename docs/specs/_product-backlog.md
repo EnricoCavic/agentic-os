@@ -3,7 +3,7 @@ status: living
 title: Product Backlog
 source: governance-bloat-review-2026-04-12 + optimization-round-2026-05-04 + optimization-research-2026-06-02
 created: 2026-04-12
-last_updated: 2026-06-02
+last_updated: 2026-06-03
 ---
 
 # Product Backlog
@@ -53,6 +53,7 @@ Governance file bloat review (2026-04-12) identified 10 findings across P0–P2:
 | 66 | Recommended-workflows advisory layer | framework | routing | P2 | — | feature | Pending | [#167](https://github.com/KbWen/agentic-os/issues/167) | — |
 | 67 | Canonical-doc-path gate + research-wiki sidecar | framework | governance | P2 | — | quick-win | Pending | [#168](https://github.com/KbWen/agentic-os/issues/168) | — |
 | 68 | Authority-map metadata (read-this-not-that resolver) | framework | governance | P2 | — | quick-win | Pending | [#169](https://github.com/KbWen/agentic-os/issues/169) | — |
+| 69 | Phase-entry instruction-budget audit + subtractive prune (honor-system MUST removal; ~90 dirs/~9.4k tok at threshold) | framework | governance | P1 | docs/specs/_research-rpi-qrspi-corroboration.md | feature | Pending | [#176](https://github.com/KbWen/agentic-os/issues/176) | #45, #65 |
 
 > Completed entries (#2, 4–6, 8–10, 12, 15, 19–20, 22–32, 34–44) are in [`_product-backlog-archive.md`](./_product-backlog-archive.md).
 
