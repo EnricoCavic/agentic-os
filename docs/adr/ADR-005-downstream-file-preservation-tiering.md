@@ -7,6 +7,8 @@ deciders: "@kbwen + Claude Opus 4.8 + multi-expert workflow (3 rounds, 20+ agent
 applies_to:
   - ".agentcortex/bin/deploy.sh"
   - ".agentcortex/bin/deploy.ps1"
+  - ".agent/workflows/routing.md"
+  - "tests/ci/**"
   - "tests/deploy/**"
 lifecycle:
   owner: "/adr"
@@ -62,8 +64,8 @@ paths moves. This reuses the existing scaffold sidecar machinery (`deploy.sh:154
 > "skills sidecar; framework-authoritative core stays force-update" on the
 > governance-drift safety argument above (which also honours the user's own
 > "don't break the flow" constraint — all-core *would* break the update flow for
-> governance files). ADR remains `proposed`; reversible before `/implement` if
-> the user insists on literal all-core.
+> governance files). User confirmed this narrower scope before implementation;
+> the decision is now accepted and shipped in the PR.
 
 ## Alternatives Considered
 
