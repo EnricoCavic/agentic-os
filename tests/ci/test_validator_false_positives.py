@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -215,12 +216,23 @@ def test_f4_deprecated_files_pass_branch_parity() -> None:
     assert msg in VALIDATE_PS1.read_text(encoding="utf-8")
 
 
+requires_windows = pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="validate.ps1 is the native Windows validator; running it under Linux "
+    "pwsh mis-resolves $root. Behavioral sh↔ps1 parity is a Windows concern — the "
+    "cross-platform regression guard is the structural test above. (The Linux CI "
+    "'CI Structural Tests' job must NOT execute the native PS validator.)",
+)
+
+
+@requires_windows
 @requires_bash
 @requires_powershell
 def test_validator_count_parity_on_framework() -> None:
     """F4/F2 hardening: validate.sh and validate.ps1 must report identical
     pass/warn/fail counts on the framework repo (they previously differed by one
-    PASS due to the missing deprecated-files PASS branch)."""
+    PASS due to the missing deprecated-files PASS branch). Windows-only — see
+    requires_windows rationale."""
     sh = _summary_counts(_run_validate(ROOT))
     ps = _summary_counts(_run_validate_ps1(ROOT))
     assert sh == ps, f"validator count parity broken: sh={sh} ps1={ps}"
