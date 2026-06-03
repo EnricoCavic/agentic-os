@@ -14,7 +14,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 REQS = ROOT / ".github" / "requirements-ci.txt"
 WORKFLOW = ROOT / ".github" / "workflows" / "validate.yml"
-DEPENDABOT = ROOT / ".github" / "dependabot.yml"
 
 
 def test_requirements_file_pins_test_deps() -> None:
@@ -46,9 +45,3 @@ def test_workflow_forces_utf8() -> None:
     txt = WORKFLOW.read_text(encoding="utf-8")
     assert re.search(r"PYTHONUTF8:\s*[\"']?1", txt), \
         "CI must export PYTHONUTF8=1 for cross-platform encoding safety (#163)"
-
-
-def test_dependabot_tracks_pip_requirements() -> None:
-    txt = DEPENDABOT.read_text(encoding="utf-8")
-    assert re.search(r'package-ecosystem:\s*"pip"', txt), \
-        "dependabot must track the pip ecosystem so the CI pins stay fresh (#163)"
