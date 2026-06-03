@@ -1656,7 +1656,9 @@ if [[ -d "$ARCHIVE_DIR" ]]; then
       phase_summary_violations=$((phase_summary_violations + 1))
       phase_summary_violation_list="${phase_summary_violation_list}  empty Phase Summary: ${wl#$ROOT/}\n"
     fi
-  done < <(find "$ARCHIVE_DIR" -name '*.md' -not -name '.gitkeep*' -print0 2>/dev/null || true)
+    # Exclude ship-history-*.md: compacted ship-history archives are not Work
+    # Logs and have no `## Phase Summary` contract (#171).
+  done < <(find "$ARCHIVE_DIR" -name '*.md' -not -name '.gitkeep*' -not -name 'ship-history-*' -print0 2>/dev/null || true)
 fi
 if [[ "$phase_summary_violations" -gt 0 ]]; then
   record_result WARN "archived Work Logs with empty Phase Summary: ${phase_summary_violations}"
@@ -2162,7 +2164,13 @@ for adr_dir in "$ROOT/docs/adr" "$ROOT/.agentcortex/adr"; do
     for f in "$adr_dir"/ADR-*.md; do [[ -f "$f" ]] && adr_count=$((adr_count + 1)); done
   fi
 done
-if [[ "$adr_count" -gt 0 ]]; then
+# Framework-self guard (#172): a deployed downstream app always has a
+# .agentcortex-manifest (deploy.sh writes one into every target); the framework
+# source repo never does (self-deploy is blocked, and the file is untracked).
+# These app-init-derived checks apply only to genuine downstream apps, so skip
+# them on the framework repo, whose governance ADRs (ADR-001..) are not an
+# app-init signal.
+if [[ "$adr_count" -gt 0 && -f "$ROOT/.agentcortex-manifest" ]]; then
   has_project_template=0
   for tmpl in "$ROOT"/.agentcortex/templates/spec-app-feature-*.md; do
     [[ -f "$tmpl" ]] && has_project_template=1 && break
@@ -2213,7 +2221,9 @@ fi
 
 # Round-15 Finding 7: Spec frontmatter status validation — each docs/specs/*.md
 # must have YAML frontmatter with a recognized 'status:' value.
-VALID_SPEC_STATUSES="draft|frozen|shipped|cancelled|living"
+# archive = archive-index files (_product-backlog-archive.md); research =
+# transient _research-*.md notes per .agent/workflows/research.md (#170).
+VALID_SPEC_STATUSES="draft|frozen|shipped|cancelled|living|archive|research"
 spec_bad_status=0
 spec_missing_frontmatter=0
 if [[ -d "$ROOT/docs/specs" ]]; then
@@ -2241,7 +2251,7 @@ fi
 if [[ "$spec_missing_frontmatter" -gt 0 ]]; then
   record_result WARN "docs/specs/ files missing YAML frontmatter or status field: ${spec_missing_frontmatter} (engineering_guardrails.md §4.2 requires status: draft|frozen|shipped|cancelled)"
 elif [[ "$spec_bad_status" -gt 0 ]]; then
-  record_result WARN "docs/specs/ files with unrecognized status value: ${spec_bad_status} (valid: draft, frozen, shipped, cancelled, living)"
+  record_result WARN "docs/specs/ files with unrecognized status value: ${spec_bad_status} (valid: draft, frozen, shipped, cancelled, living, archive, research)"
 else
   # Only emit PASS when specs directory has files to check
   spec_file_count=0
