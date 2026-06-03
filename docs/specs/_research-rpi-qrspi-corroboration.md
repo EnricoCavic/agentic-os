@@ -8,8 +8,14 @@ date: 2026-06-03
 
 External trigger: Dexter Horthy (HumanLayer) keynote *"Everything We Got Wrong About
 Research-Plan-Implement"* (Coding Agents Conf, 2026-03) + the QRSPI write-ups. Goal:
-decide whether any QRSPI lesson is a real, un-covered gap in THIS repo — or whether we
-have already converged. DELETE-bias; "they have it" ≠ evidence.
+map how each QRSPI lesson lands against THIS repo. DELETE-bias; "they have it" ≠ evidence.
+
+> **Scope discipline (do NOT prematurely converge).** Every detail below is a potential
+> direction. "We already have a mechanism for X" is NOT proof the deeper failure mode X
+> points at is solved — a skill/rule that *names* a concern ≠ the concern handled. Items
+> are framed `signal → our current mechanism → deeper question still open`, with **no
+> closing verdict**. Convergence to a concrete scope happens only when the work is
+> actually picked up — re-research then, fresh. (Memory: `feedback-dont-narrow-research-scope`.)
 
 ## Key Facts
 
@@ -43,25 +49,39 @@ have already converged. DELETE-bias; "they have it" ≠ evidence.
 - **No new honor-system MUST** (Lesson #70 + #72): a new phase/gate without a validator is anti-help. Adding stages *increases* the instruction budget we just measured as near-threshold — the opposite of QRSPI's actual fix.
 - The thing QRSPI optimizes FOR (fewer directives/phase) is in tension with our reflex (add a gate). The measurement above is the binding constraint.
 
-## Genuinely-new deltas (honest triage — most already covered)
-| QRSPI idea | Status in our repo | Verdict |
-|---|---|---|
-| Reduce per-phase instruction count | partially (−43% done; still ~90 dirs) | **REAL, highest value** — continue trimming, not adding |
-| Questioning phase before research | `brainstorm` exists but is *optional/un-gated* | candidate: make brainstorm the default-on entry for feature, not a separate new gate |
-| Structure outline (vertical slice) separate from Plan | mentioned in implement/review, not its own step | LOW — fold a 1-line "vertical-slice + checkpoint" requirement into existing `/plan`, do NOT add a phase |
-| Research with ticket hidden (objective map) | not explicit | candidate: 1-line note in `research.md` |
-| Subagent context-firewall | covered (2 skills) | **no-op** |
-| After-action reports | covered (`/retro`) | **no-op** |
+## Direction space (open — do NOT prematurely converge)
+Each row is a live direction. "Our current mechanism" is what *exists*, not proof the
+deeper question is closed. Re-interrogate every row when the work is picked up.
 
-## Suggested Scope (recommendation)
-Primary, evidence-backed action is **subtractive, not additive**:
-1. **Instruction-budget audit** of the ~90 phase-entry directives → identify honor-system MUSTs with no validator (per Lesson #70) and DELETE/merge them. This is the QRSPI lesson that actually applies and the one our own lessons already mandate. Target: drop phase-entry directive count below the ~85 threshold with enforcement-backed survivors only.
-2. Only IF (1) frees budget: fold two ≤1-line refinements into existing workflows (default-on brainstorm for feature; vertical-slice + ticket-hidden research notes). No new phases, no new MUSTs.
+| QRSPI signal | Our current mechanism | Deeper question still open |
+|---|---|---|
+| Reduce per-phase instruction count | −43% done (PR #112); still ~90 dirs at entry | Which of the ~90 are honor-system w/o validator? Is the threshold even the right metric, or is *ordering / burial depth* the real failure? |
+| Questioning **before** research | `brainstorm` workflow exists, but optional/un-gated | Do agents actually run it? Is "optional questioning" functionally skipped? Should questioning be structured/multi-agent rather than freeform? |
+| Structure outline (vertical slice) separate from Plan | mentioned in implement/review/guardrails | Is "mentioned" enough, or does the *plan-reading illusion* survive because structure is never a distinct, checkable artifact? |
+| Research with ticket **hidden** (objective map, no persuasion) | not explicit | Does our `/research` produce a factual map or a solution-biased narrative? Worth testing on a real task. |
+| Subagent **context-firewall** | 2 skills (`dispatching-parallel-agents`, `subagent-driven-development`) | Skills *exist* — but is `/research` actually wired to use them by default, or do they sit unused? Coverage-in-form ≠ coverage-in-practice. |
+| Per-phase **after-action** reports | `/retro` + Drift/Evidence + Lessons registry | `/retro` is coarse/session-level; QRSPI's is per-phase. Is the finer granularity a real gain we're missing? |
+| Magic-words / honor-system critique | Lesson #70 `[enforcement]` (same conclusion) | We *named* it — but is it *applied*? How many live MUSTs still violate it (incl. `⚡ ACX`)? |
+
+> None of the above is closed as "no-op." Where we have a mechanism, the open question is
+> whether it addresses QRSPI's *deeper* failure mode or merely shares its vocabulary.
+
+## Candidate strands (NOT a converged scope)
+These are ways in, not a ranked plan. Backlog #69 currently parks ONE strand (the
+instruction-budget audit) because it is the most measurable entry point — that choice is
+a starting handle, **not** a decision that the other strands are out of scope.
+
+- **Strand A — instruction-budget audit** (most measurable): enumerate the ~90 phase-entry directives; mark which have a hook/validator/test (Lesson #70). Subtractive where un-enforced. *Open even here:* is directive *count* the right metric, or is burial-depth/ordering the real driver of silent skips?
+- **Strand B — questioning/research quality**: test whether `/research` produces a factual map vs. a persuasive narrative, and whether optional brainstorm is de-facto skipped. May reveal a deeper gap than "add a step."
+- **Strand C — structure-as-artifact**: whether the plan-reading illusion survives because vertical-slice structure is never a distinct checkable output.
+- **Strand D — mechanism-in-practice audit**: do the context-firewall subagent skills actually get used, or do they sit unused? (coverage-in-form vs in-practice).
+- **Strand E — Lesson #70 application audit**: how many live MUSTs still violate our own enforcement rule.
 
 ## Next Actions
-- **Decision needed (`/decide` or ADR-006)**: subtractive instruction-budget pass vs. status-quo. This is an architecture-level tradeoff (governance surface vs. cross-platform parity) → ADR is the right home.
-- If approved → `/spec-intake` can consume this file for the budget-audit spec; the two micro-refinements ride as small `quick-win` doc edits, not a feature.
-- Do NOT add Questioning/Structure as new gated phases — fails the measured-budget constraint and Lesson #70.
+- **When picked up: re-research the full direction space first** (per `feedback-dont-narrow-research-scope`) — do not start from this file's framing as settled. Treat every row of the Direction-space table as a question to re-open with fresh eyes.
+- A decision (`/decide` or **ADR-006**) is likely needed for any strand that touches `AGENTS.md` / `engineering_guardrails.md` (architecture-level: governance surface vs. cross-platform parity).
+- Hard constraint that survives across strands: **no new honor-system MUST** (a new phase/gate without a validator both raises the measured budget and violates Lesson #70). Cross-platform parity required.
+- `/spec-intake` can consume this file once a strand is chosen — but choosing a strand ≠ closing the others.
 
 ## Official References
 - [Horthy keynote](https://www.youtube.com/watch?v=YwZR6tc7qYg) · [QRSPI breakdown](https://alexlavaee.me/blog/from-rpi-to-qrspi/) · [2026 evolution](https://betterquestions.ai/the-necessary-evolution-of-research-plan-implement-as-an-agentic-practice-in-2026/)
