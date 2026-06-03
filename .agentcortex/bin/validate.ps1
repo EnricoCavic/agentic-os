@@ -340,10 +340,17 @@ $deprecatedWorkflowFiles = @(
     (Join-NormalPath $workflowsDir 'medium-feature.md'),
     (Join-NormalPath $workflowsDir 'small-fix.md')
 )
+# Emit FAIL-on-present / PASS-on-absent to match validate.sh exactly (F4 parity:
+# the bash side records a PASS when none are present, so without this else the
+# two validators differed by one PASS).
+$deprecatedFound = @()
 foreach ($df in $deprecatedWorkflowFiles) {
-    if (Test-Path -Path $df -PathType Leaf) {
-        Add-Result -Level 'FAIL' -Message "deprecated workflow file still present: $df -- remove with git rm"
-    }
+    if (Test-Path -Path $df -PathType Leaf) { $deprecatedFound += (Split-Path -Leaf $df) }
+}
+if ($deprecatedFound.Count -gt 0) {
+    Add-Result -Level 'FAIL' -Message "deprecated workflow files still present (remove them): $($deprecatedFound -join ', ')"
+} else {
+    Add-Result -Level 'PASS' -Message 'deprecated workflow files absent (new-feature, medium-feature, small-fix)'
 }
 
 if ($isSourceRepo) {
@@ -2068,7 +2075,15 @@ if (Test-Path -Path $specsDir -PathType Container) {
         if (-not $specLines -or $specLines[0].TrimEnd() -ne '---') {
             $specMissingFrontmatter++; continue
         }
-        $statusLine = $specLines | Select-Object -Skip 1 | Where-Object { $_ -match '^status:\s*' } | Select-Object -First 1
+        # Scan for status: ONLY within the frontmatter block — from line 1 until
+        # the closing `---` (or EOF if unclosed) — mirroring validate.sh's awk
+        # `/^---/{if(n++) exit}` scoping so a body line `status: x` cannot be
+        # misread as frontmatter (F2 parity).
+        $statusLine = $null
+        for ($i = 1; $i -lt $specLines.Count; $i++) {
+            if ($specLines[$i].TrimEnd() -eq '---') { break }
+            if ($specLines[$i] -match '^status:\s*') { $statusLine = $specLines[$i]; break }
+        }
         if (-not $statusLine) { $specMissingFrontmatter++; continue }
         $statusVal = ($statusLine -replace '^status:\s*','').Trim()
         if ($validStatuses -notcontains $statusVal) { $specBadStatus++ }

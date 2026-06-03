@@ -45,6 +45,26 @@ bash = next(
 )
 requires_bash = pytest.mark.skipif(bash is None, reason="bash not available")
 
+powershell = shutil.which("pwsh") or shutil.which("powershell")
+requires_powershell = pytest.mark.skipif(powershell is None, reason="PowerShell not available")
+
+
+def _run_validate_ps1(cwd: Path) -> str:
+    proc = subprocess.run(
+        [powershell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+         str(cwd / ".agentcortex" / "bin" / "validate.ps1")],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        cwd=str(cwd),
+    )
+    return proc.stdout + proc.stderr
+
+
+def _summary_counts(output: str) -> dict:
+    import re
+    m = re.search(r"Summary:\s*pass=(\d+)\s+warn=(\d+)\s+fail=(\d+)", output)
+    assert m, f"no Summary line in output:\n{output[-400:]}"
+    return {"pass": int(m.group(1)), "warn": int(m.group(2)), "fail": int(m.group(3))}
+
 # The four WARN substrings this change eliminates on the framework repo.
 STATUS_WARN = "unrecognized status value"          # #170
 PHASE_SUMMARY_WARN = "with empty Phase Summary"     # #171 (WARN-specific; avoids
@@ -185,3 +205,22 @@ def test_172_pattern_parity() -> None:
 def test_171_ship_history_exclusion_parity() -> None:
     assert "ship-history-*" in VALIDATE_SH.read_text(encoding="utf-8")
     assert "ship-history-*" in VALIDATE_PS1.read_text(encoding="utf-8")
+
+
+def test_f4_deprecated_files_pass_branch_parity() -> None:
+    """F4: both validators must emit a PASS when no deprecated workflow files are
+    present (previously validate.ps1 only emitted FAIL-on-present → 1-PASS skew)."""
+    msg = "deprecated workflow files absent (new-feature, medium-feature, small-fix)"
+    assert msg in VALIDATE_SH.read_text(encoding="utf-8")
+    assert msg in VALIDATE_PS1.read_text(encoding="utf-8")
+
+
+@requires_bash
+@requires_powershell
+def test_validator_count_parity_on_framework() -> None:
+    """F4/F2 hardening: validate.sh and validate.ps1 must report identical
+    pass/warn/fail counts on the framework repo (they previously differed by one
+    PASS due to the missing deprecated-files PASS branch)."""
+    sh = _summary_counts(_run_validate(ROOT))
+    ps = _summary_counts(_run_validate_ps1(ROOT))
+    assert sh == ps, f"validator count parity broken: sh={sh} ps1={ps}"
