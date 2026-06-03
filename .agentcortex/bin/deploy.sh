@@ -90,6 +90,18 @@ get_tier() {
         # scaffold — user may customize advisory hook samples before activating
         .githooks/*) echo "scaffold" ;;
 
+        # scaffold — skill bodies/metadata (ADR-005): skills are advisory
+        # instruction extensions (they CANNOT bypass gates), so a user-edited
+        # skill is preserved via .acx-incoming instead of being silently
+        # overwritten (closes R1). Unmodified skills still force-update (scaffold
+        # updates when the manifest hash matches). The reserved custom-* namespace
+        # is never shipped by the framework, so it only ever hits the SKIP branch.
+        # NOTE: framework-authoritative paths (.agent/rules/*, .agent/workflows/*,
+        # .agent/config.yaml, validate.*, deploy.*, platform entries, tools/**,
+        # metadata/**) deliberately fall through to core below — they MUST keep
+        # force-updating so governance/security fixes always land (no drift).
+        .agent/skills/*|.agents/skills/*) echo "scaffold" ;;
+
         # core — everything else is framework, always overwrite
         *) echo "core" ;;
     esac

@@ -137,6 +137,18 @@ flowchart LR
 > [!TIP]
 > 部署腳本會自動將 Agent 相關暫存檔（如 `work/`, `skills/` 等）加入 `.gitignore`，防止其被上傳到遠端倉庫。
 
+### 1a) 客製化而不衝突（Fork 或 Clone）
+
+無論你用 **fork**（再 `git pull upstream`）或 **clone + `deploy_brain.sh`** 導入，同一條規則讓升級無痛：**只「加」你自己的檔，絕不原地編輯框架檔。** 把客製放在框架保證永不觸碰的地方，它就能同時撐過 `git pull upstream`（fork）與下次 `deploy`（clone）：
+
+| 你想要… | 放這裡 | 為何升級不會壞 |
+|---|---|---|
+| 加專案治理（narrow/停用某指令） | `AGENTS.override.md`（專案根）或 `~/.agentcortex/AGENTS.override.md`（個人） | session 起始 present-only 載入；框架永不 ship 這些檔。MAY narrow/disable，但**不得**放寬 delivery gates。 |
+| 加你自己的 skill | `.agents/skills/custom-<name>/SKILL.md`（+ `.agent/skills/custom-<name>` metadata） | `custom-*` 是框架永不 ship 的保留 namespace → 零碰撞、不被覆寫。 |
+| 調整 skill 啟用（pin/排除） | `.agentcortex/context/private/user-preferences.yaml` | gitignored、個人、bootstrap 載入。 |
+
+**不要做的事**：原地編輯框架檔（`AGENTS.md`、`.agent/rules/*`、`.agent/workflows/*`、已 ship 的 skill body）會在 `git pull upstream`（fork）造成 merge 衝突、在下次 `deploy`（clone）被強制更新。框架 **skill** 是唯一寬容的例外——你若改了，`deploy` 會把你的版本保留成可見的 `<file>.acx-incoming` sidecar，而非靜默覆寫——但更乾淨的做法永遠是複製成 `custom-<name>` skill 再改。治理、安全、workflow 檔一律強制更新，確保你持續收到修補。
+
 ### 2) Codex / Antigravity 開場
 
 ```text

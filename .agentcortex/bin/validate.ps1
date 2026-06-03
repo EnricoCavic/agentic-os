@@ -618,6 +618,8 @@ else {
 }
 
 Test-ContainsLiteral -Path (Join-NormalPath $workflowsDir 'bootstrap.md') -Pattern 'Recommended Skills' -SuccessMessage 'bootstrap includes Recommended Skills contract' -FailureMessage 'bootstrap missing Recommended Skills contract'
+# ADR-004: bootstrap MUST ship the override-layer load step (structural enforcement only; per-agent compliance is honor-system, not falsely test-enforced).
+Test-ContainsLiteral -Path (Join-NormalPath $workflowsDir 'bootstrap.md') -Pattern 'Load Override Layer' -SuccessMessage 'bootstrap ships override-layer load step (ADR-004 §1a)' -FailureMessage 'bootstrap missing override-layer load step (ADR-004 §1a)'
 $phaseSkillFiles = @(
     (Join-NormalPath $workflowsDir 'plan.md'),
     (Join-NormalPath $workflowsDir 'implement.md'),

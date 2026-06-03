@@ -44,3 +44,17 @@ source_sha: 9c035887c83dad2e8095c1b2ae8cb49828642960
 [CONSTRAINT] Future INDEX rotation (backlog #3) MUST re-anchor the witness baseline as a deliberate reviewed operation; until then origin/main's merge-base is a valid monotonic lower bound and the strict-prefix invariant holds.
 
 [CONSTRAINT] The witness MUST degrade to WARN (never silent PASS) when git/origin/baseline is unavailable; and MUST CR-normalize + drop blank lines identically in bash (`tr -d '\r'` + `grep '.'`) and PowerShell (string-array read + `-ne ''`) so the two validators cannot disagree (Windows CRLF parity).
+
+### [document-governance][2026-06-03][arch-downstream-fork-accommodation]
+source_spec: docs/specs/downstream-fork-accommodation.md
+source_sha: (ship commit on arch/downstream-fork-accommodation)
+
+[DECISION] Activate the already-shipped-but-inert `AGENTS.override.md` layer (lazy, present-only via bootstrap §1a) rather than invent a new `AGENTS.local.md` eager-`@import` twin — avoids one-topic-two-files and warm-cache prefix bloat. The "no consumer" basis that justified parking it in quick-win #34 flipped once downstream users began arriving. (ADR-004)
+
+[DECISION] Reclassify skills (`.agent/skills/**`, `.agents/skills/**`) to the deploy sidecar class while keeping rules/workflows/validate/deploy/platform/tools/metadata force-update — skills are advisory (non-gate), so a frozen skill is a visible, low-cost loss; a frozen workflow/rule is invisible governance drift. (ADR-005)
+
+[TRADEOFF] Narrowed the user's literal "sidecar all core" to "skills only" — accepts that editing a framework skill freezes it (visible via `.acx-incoming`) in exchange for guaranteeing governance/security files always update. Worse-than-R1 invisible drift is the avoided failure. (ADR-005, user-confirmed)
+
+[CONSTRAINT] Override carve-out (no gate relaxation) and citation requirement are warn-only advisory, not hard-block — a pure-text override cannot be machine-proven to relax vs legitimately narrow a gate; only the machine-verifiable deploy behaviors become hard-tested. Enforcement of the override-load step is structural (validate.sh/ps1 assert bootstrap ships §1a); per-agent compliance is honor-system, stated honestly (no fake MUST). (ADR-004, Lesson [enforcement])
+
+[CONSTRAINT] The framework MUST NEVER ship a skill under the reserved `custom-*` prefix — a downstream namespace contract, regression-guarded by `tests/ci/test_deploy_tiering.py::test_framework_ships_no_custom_namespace_skill`. (ADR-005)

@@ -521,6 +521,16 @@ else
     "antigravity rules missing rollback reminder"
 fi
 
+# ADR-004: bootstrap MUST ship the override-layer load step. Structural
+# enforcement only — the framework ships the instruction; per-agent compliance
+# ("did this agent actually read the override") is honor-system like the
+# Sentinel and is NOT falsely claimed as test-enforced.
+check_contains_literal \
+  "$WORKFLOWS_DIR/bootstrap.md" \
+  'Load Override Layer' \
+  "bootstrap ships override-layer load step (ADR-004 §1a)" \
+  "bootstrap missing override-layer load step (ADR-004 §1a)"
+
 ACTIVE_CODEX_RULES="$ROOT/codex/rules/default.rules"
 [[ -f "$ACTIVE_CODEX_RULES" ]] || ACTIVE_CODEX_RULES="$CODEX_RULES"
 if [[ -f "$ACTIVE_CODEX_RULES" ]]; then
