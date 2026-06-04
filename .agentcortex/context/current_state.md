@@ -14,7 +14,7 @@
 - **Project Name**: (set by /app-init)
 - **Last Updated**: 2026-06-04T14:45:00+08:00
 - **Last Verified**: 2026-06-04
-- **Update Sequence**: 32
+- **Update Sequence**: 34
 - **ADR Index**:
   - docs/adr/ADR-001-governance-friction-tuning.md — ADR-001: Governance Friction Tuning, accepted 2026-04-23
   - docs/adr/ADR-002-guarded-governance-writes.md — ADR-002: Guarded Governance Writes (lock unification + CI lint + lifecycle frontmatter), accepted 2026-04-25
@@ -28,6 +28,7 @@
   - docs/specs/audit-chain-tamper-evidence.md — Audit-Chain Tamper-Evidence Hardening (C1 truncation + C2 migrate), [Shipped 2026-05-29] (ADR-003 amendment, backlog #42)
   - docs/specs/handoff-trigger-policy.md — Handoff-Trigger Policy: turn-count → context-occupancy + phase-boundary (cross-platform, advisory), [Shipped 2026-05-31] (ADR-001 domain)
   - docs/specs/downstream-fork-accommodation.md — Downstream Fork/Clone Accommodation (override layer activation + deploy skill-sidecar tiering + README fork stance + custom/* namespace), [Shipped 2026-06-03] (ADR-004 + ADR-005)
+  - docs/specs/spec-drift-linter.md — Spec Drift Linter (advisory AC coverage vs git diff), [Shipped 2026-06-04] (backlog #50, issue #156)
   - docs/specs/multi-agent-review-guidelines.md — Multi-Agent Review Guidelines and Contributor Adapters, [Shipped 2026-06-04] (backlog #56, issue #162)
 - **Canonical Commands**:
   - `/spec-intake`: Import external specs (from other LLMs, documents, or natural language). Handles large product specs via decomposition. Runs before `/bootstrap`.
@@ -88,6 +89,13 @@
   - **Adapters**: `GEMINI.md`, `.github/copilot-instructions.md`, and `.github/instructions/governance-review.instructions.md` point back to shared governance while keeping tool-specific context short.
   - **Human guide**: `docs/ai-contributors.md` documents PR/local interaction patterns for `@codex review`, `@claude`, `@copilot`, and Gemini CLI.
   - **Evidence**: new guard tests 5 passed; final `pytest tests/ci tests/guard` 185 passed after ship metadata; validate.ps1 and Git Bash validate.sh both fail=0; implementation commit `fe0f306`.
+
+### Ship-codex-issue-156-spec-drift-linter-2026-06-04
+- **Branch `codex/issue-156-spec-drift-linter`** (feature, spec `docs/specs/spec-drift-linter.md`, issue #156) — Added an advisory spec-vs-diff linter for `/review` so reviewers can spot changed files not mentioned by AC path references and AC-referenced paths not touched by the branch, without changing review verdict rules.
+  - **Tooling**: `.agentcortex/tools/lint_spec_drift.py` resolves specs from `--spec` or Work Log `--worklog`, extracts path-like references from `## Acceptance Criteria`, compares against `git diff --name-only`, includes untracked files for local review, prints concise advisory warnings, and exits 0 for drift warnings.
+  - **Safety**: git revisions passed to `--base` / `--head` reject option-like values; subprocess calls use fixed argv lists; no dependencies added.
+  - **Workflow**: `.agent/workflows/review.md` now instructs reviewers to run the linter before Burden of Proof and explicitly labels it advisory/non-blocking.
+  - **Evidence**: focused linter tests 8 passed; `pytest tests/ci tests/guard` 188 passed; validate.ps1 and Git Bash validate.sh both fail=0 after sync with `origin/main`. Implementation commit `c76812d`.
 
 ### Ship-arch-downstream-fork-accommodation-2026-06-03
 - **Branch `arch/downstream-fork-accommodation`** (architecture-change, ADR-004 + ADR-005, spec `docs/specs/downstream-fork-accommodation.md`) — Strengthened downstream fork/clone compatibility so downstream users keep their own skills + governance across upgrades without editing framework files in place. Decided via 3-round multi-expert analysis (20+ agents, 48-scenario catalog, external prior-art on Copier/Cookiecutter/git-subtree/Nix/Kustomize).
