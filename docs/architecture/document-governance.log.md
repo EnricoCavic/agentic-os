@@ -68,3 +68,13 @@ source_sha: c76812d6b1a71ee7e857543789ca88ab7934d2d0
 [DECISION] Extract only path-like references from Acceptance Criteria because that is deterministic and easy to test across platforms.
 
 [CONSTRAINT] `/review` integration must describe the linter as non-blocking and must not change review verdict rules.
+
+### [document-governance][2026-06-04][codex/multi-agent-review-guidelines]
+source_spec: docs/specs/multi-agent-review-guidelines.md
+source_sha: fe0f306ef529c5b30b099b5e1b7a8bac8b561f15
+
+[DECISION] Keep `AGENTS.md` as the short cross-agent source of truth and keep tool-specific files as adapters rather than duplicated governance manuals.
+
+[DECISION] Use `.github/copilot-instructions.md` for Copilot's always-on short entry point because Copilot code review has a documented custom-instruction length boundary.
+
+[CONSTRAINT] Do not add new durable governance claims unless a guard test or validator verifies the structural presence or size constraint.

@@ -51,6 +51,18 @@ Match the user's input language (English → English; 繁體中文 → 繁體中
 - A `/review` phase that ends with `Verdict: NOT READY` does NOT satisfy the review gate. Ship requires a `Verdict: PASS` review receipt — NOT READY receipts are reverse edges and are excluded from gate progression by the validator.
 - **Spec Intake Gate**: When external spec input is detected (user-provided spec, document, or raw material containing multiple features), AI MUST decompose into a Feature Inventory and obtain user selection BEFORE generating any individual feature spec. Skipping decomposition for multi-feature input = Gate FAIL. Single-feature input may proceed directly. Full workflow: `.agent/workflows/spec-intake.md`.
 
+## Review guidelines
+
+When reviewing PRs or changed files, prioritize actionable defects over style commentary:
+
+- Flag correctness, security, data-loss, governance-bypass, and test-coverage risks before maintainability notes.
+- Treat skipped gates, missing Work Log evidence, stale SSoT/backlog/spec metadata, or unverified ship claims as high-priority findings.
+- Verify that changed behavior has focused tests or a written no-test rationale with reproducible evidence.
+- Check scope discipline: changed files should match the issue/spec/PR description, with unrelated refactors called out.
+- Prefer file/line-specific comments that describe the failure mode and a concrete fix.
+- Do not request broad rewrites, formatting churn, or speculative abstractions unless they prevent a real defect.
+- For governance/docs changes, check that canonical paths are used and tool-specific adapters point back to shared rules instead of duplicating them.
+
 ## Agentic OS Runtime v1 (Antigravity Contract)
 
 1. **Intent-Driven Routing**: Map user intent to the correct workflow phase BEFORE any action. Routing lookup: `.agent/workflows/routing.md` (NOT on every turn). Precedence: `AGENTS.md` > workflows > skills. Optional modules (`/ask-openrouter`, `/codex-cli`, `/claude-cli`) require explicit user request. Full command registry: `routing.md §5`. Skill activation: see `### Skill Activation Triggers` below.
