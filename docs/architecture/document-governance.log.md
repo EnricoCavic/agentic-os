@@ -58,3 +58,13 @@ source_sha: (ship commit on arch/downstream-fork-accommodation)
 [CONSTRAINT] Override carve-out (no gate relaxation) and citation requirement are warn-only advisory, not hard-block — a pure-text override cannot be machine-proven to relax vs legitimately narrow a gate; only the machine-verifiable deploy behaviors become hard-tested. Enforcement of the override-load step is structural (validate.sh/ps1 assert bootstrap ships §1a); per-agent compliance is honor-system, stated honestly (no fake MUST). (ADR-004, Lesson [enforcement])
 
 [CONSTRAINT] The framework MUST NEVER ship a skill under the reserved `custom-*` prefix — a downstream namespace contract, regression-guarded by `tests/ci/test_deploy_tiering.py::test_framework_ships_no_custom_namespace_skill`. (ADR-005)
+
+### [document-governance][2026-06-04][codex/issue-156-spec-drift-linter]
+source_spec: docs/specs/spec-drift-linter.md
+source_sha: c76812d6b1a71ee7e857543789ca88ab7934d2d0
+
+[DECISION] Keep the linter advisory so it can surface likely scope drift without creating a brittle hard gate around prose parsing.
+
+[DECISION] Extract only path-like references from Acceptance Criteria because that is deterministic and easy to test across platforms.
+
+[CONSTRAINT] `/review` integration must describe the linter as non-blocking and must not change review verdict rules.
