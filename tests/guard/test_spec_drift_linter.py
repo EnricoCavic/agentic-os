@@ -165,6 +165,7 @@ class TestReviewWorkflowIntegration(unittest.TestCase):
 
         self.assertIn("lint_spec_drift.py", review_text)
         self.assertIn("advisory", review_text.lower())
+        self.assertIn("--base <Checkpoint SHA> --head HEAD", review_text)
         self.assertIn("non-blocking", review_text.lower())
 
 
