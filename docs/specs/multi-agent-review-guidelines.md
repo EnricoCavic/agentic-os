@@ -1,5 +1,5 @@
 ---
-status: frozen
+status: shipped
 title: Multi-Agent Review Guidelines and Contributor Adapters
 source: user-request-2026-06-04
 created: 2026-06-04
