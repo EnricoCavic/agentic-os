@@ -13,6 +13,16 @@ Conduct strict review of current changes.
 
 Before review, check the active Work Log size. If it exceeds compaction thresholds (see `.agent/config.yaml` §worklog), compact per `/handoff` §6 BEFORE proceeding. This prevents bloated logs from inflating token costs during the review phase.
 
+## Spec Drift Advisory
+
+If the active Work Log references a `docs/specs/<feature>.md` file, run the advisory spec drift linter before the Burden of Proof table:
+
+```sh
+python .agentcortex/tools/lint_spec_drift.py --worklog .agentcortex/context/work/<worklog-key>.md
+```
+
+This check is advisory and non-blocking. Warnings can inform review questions, but they do NOT change the review verdict rules; AC proof still comes from the Burden of Proof Protocol below.
+
 ## Skill-Aware Review (Pre-Check)
 
 Apply the Phase-Entry Skill-Loading Protocol (shared-contracts.md §Phase-Entry Skill Loading) for all skills listing `/review` in their phases. Read `Recommended Skills` from the active Work Log before selecting which skill guidance to apply in this phase. Then apply each skill's **"During /review:"** checklist items as additional review criteria. Explicitly state: "Reviewing with [skill-name] checklist applied."

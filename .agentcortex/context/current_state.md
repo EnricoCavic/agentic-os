@@ -12,9 +12,9 @@
   - Active Work Log Path: derive <worklog-key> from the raw branch name using filesystem-safe normalization before any gate checks.
   - Workflows & Policies: `.agent/workflows/*.md`, `.agent/rules/*.md`
 - **Project Name**: (set by /app-init)
-- **Last Updated**: 2026-06-03
-- **Last Verified**: 2026-06-03
-- **Update Sequence**: 31
+- **Last Updated**: 2026-06-04
+- **Last Verified**: 2026-06-04
+- **Update Sequence**: 32
 - **ADR Index**:
   - docs/adr/ADR-001-governance-friction-tuning.md — ADR-001: Governance Friction Tuning, accepted 2026-04-23
   - docs/adr/ADR-002-guarded-governance-writes.md — ADR-002: Guarded Governance Writes (lock unification + CI lint + lifecycle frontmatter), accepted 2026-04-25
@@ -28,6 +28,7 @@
   - docs/specs/audit-chain-tamper-evidence.md — Audit-Chain Tamper-Evidence Hardening (C1 truncation + C2 migrate), [Shipped 2026-05-29] (ADR-003 amendment, backlog #42)
   - docs/specs/handoff-trigger-policy.md — Handoff-Trigger Policy: turn-count → context-occupancy + phase-boundary (cross-platform, advisory), [Shipped 2026-05-31] (ADR-001 domain)
   - docs/specs/downstream-fork-accommodation.md — Downstream Fork/Clone Accommodation (override layer activation + deploy skill-sidecar tiering + README fork stance + custom/* namespace), [Shipped 2026-06-03] (ADR-004 + ADR-005)
+  - docs/specs/spec-drift-linter.md — Spec Drift Linter (advisory AC coverage vs git diff), [Frozen 2026-06-04] (backlog #50, issue #156)
 - **Canonical Commands**:
   - `/spec-intake`: Import external specs (from other LLMs, documents, or natural language). Handles large product specs via decomposition. Runs before `/bootstrap`.
   - `/bootstrap`: Task initialization & classification freeze.
