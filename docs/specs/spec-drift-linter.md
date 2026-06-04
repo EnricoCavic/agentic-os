@@ -1,9 +1,9 @@
 ---
-status: frozen
+status: shipped
 title: Spec Drift Linter
 source: GitHub issue #156
 created: 2026-06-04
-primary_domain: governance-tooling
+primary_domain: document-governance
 secondary_domains: [review-workflow]
 ---
 
