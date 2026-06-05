@@ -152,7 +152,7 @@ The framework owns exactly these **14** skill names (do not reuse them for downs
 
 2. **Optional module ambiguity**: A phrase like "用 claude" requires clear delegation intent. Ambiguous phrasing (e.g., "can Claude do this?") does NOT trigger `/claude-cli`. Require explicit delegation request before routing to any optional module.
 
-3. **tiny-fix vs quick-win escalation**: Modifying `docs/specs/`, `docs/architecture/`, any file with `status: frozen`, `AGENTS.md`, `.agent/rules/*.md`, `.agent/config.yaml`, `.agentcortex/templates/*`, or `.agentcortex/bin/validate.*` always escalates to quick-win minimum — even if fewer than 3 files are touched. (Authoritative rule in AGENTS.md §Agentic OS Runtime v1 rule 2.)
+3. **tiny-fix vs quick-win escalation**: Modifying `docs/specs/`, `docs/architecture/`, any file with `status: frozen`, `AGENTS.md`, `.agent/rules/*.md`, `.agent/config.yaml`, `.agentcortex/templates/*`, `.agentcortex/bin/validate.*`, or platform adapter entry files (`CLAUDE.md`, `GEMINI.md`) always escalates to quick-win minimum — even if fewer than 3 files are touched. (Authoritative rule in AGENTS.md §Agentic OS Runtime v1 rule 2.)
 
 4. **Skill vs workflow**: If a user's request matches both a skill phrase (§3) and a workflow route (§1), route to the workflow phase first and activate the skill within that phase. Skills do not replace phase routing.
 

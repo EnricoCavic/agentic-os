@@ -12,9 +12,9 @@
   - Active Work Log Path: derive <worklog-key> from the raw branch name using filesystem-safe normalization before any gate checks.
   - Workflows & Policies: `.agent/workflows/*.md`, `.agent/rules/*.md`
 - **Project Name**: (set by /app-init)
-- **Last Updated**: 2026-06-04T14:45:00+08:00
+- **Last Updated**: 2026-06-05T13:17:46+08:00
 - **Last Verified**: 2026-06-04
-- **Update Sequence**: 34
+- **Update Sequence**: 35
 - **ADR Index**:
   - docs/adr/ADR-001-governance-friction-tuning.md — ADR-001: Governance Friction Tuning, accepted 2026-04-23
   - docs/adr/ADR-002-guarded-governance-writes.md — ADR-002: Guarded Governance Writes (lock unification + CI lint + lifecycle frontmatter), accepted 2026-04-25
@@ -283,3 +283,11 @@
 - Commits: `867e37c`; merged via `cf9b622` (PR #92).
 
 *(Older entries archived to `.agentcortex/context/archive/ship-history-2026.md`)*
+
+### Ship-fix-tiny-fix-exclusion-adapter-parity-2026-06-05
+- **Branch `fix/tiny-fix-exclusion-adapter-parity`** (quick-win) — Closed a parity gap that let platform adapter entry files (`CLAUDE.md`, `GEMINI.md`) take the silent tiny-fix path despite carrying governance dispatch — the root cause of PR #195 shipping a semantic governance edit with no Work Log or gate evidence.
+  - **Exclusion list**: added `CLAUDE.md`/`GEMINI.md` to all four mirrored tiny-fix exclusion sites — `engineering_guardrails.md §10.3`, `AGENTS.md` Runtime v1 rule 2, `routing.md §4`, `bootstrap.md §0`.
+  - **Drift guard**: `tests/guard/test_classification_escalation.py` adds the two adapter tokens to `GOVERNANCE_EXCLUSION_TOKENS` and two new tests, so all 4 mirror sites (not just §10.3 + AGENTS.md) are now drift-guarded against the full token set.
+  - **Scope decision**: adapters only; rejected an `*.override.md` glob as speculative (override loader reads only `AGENTS.override.md`; ADR-004 overrides cannot relax gates). Plan-consulted.
+  - **Evidence**: escalation test 10/10, guard suite 132/132; `validate.ps1` + `validate.sh` both `pass=98 warn=9 fail=0`; regenerated `trigger-compact-index.json` (AGENTS.md is a registry `detail_ref`). Implementation commit `160566b`.
+  - **Rollback** = revert PR.

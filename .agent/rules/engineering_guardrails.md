@@ -339,6 +339,7 @@ If a section is not applicable, write `none` instead of omitting it. This keeps 
   - `docs/specs/_product-backlog.md` — route to `/spec-intake` instead of tiny-fix
   - Any file with `status: frozen` frontmatter — frozen files require unfreeze approval (§4.2)
   - `AGENTS.md`, `.agent/rules/*.md`, `.agent/config.yaml` — framework governance files affect all agents globally
+  - `CLAUDE.md`, `GEMINI.md` — platform adapter entry files; they `@import AGENTS.md` and carry governance dispatch, so adapter edits are governance-semantic and must escalate
   - `.agentcortex/templates/*` — template changes propagate to all downstream projects via `deploy.sh`
   - `.agentcortex/bin/validate.*` — validator changes are governance-critical (affect CI gate verdicts)
 

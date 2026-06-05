@@ -21,6 +21,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 GUARDRAILS = ROOT / ".agent" / "rules" / "engineering_guardrails.md"
 AGENTS = ROOT / "AGENTS.md"
+ROUTING = ROOT / ".agent" / "workflows" / "routing.md"
+BOOTSTRAP = ROOT / ".agent" / "workflows" / "bootstrap.md"
 
 # Governance files that MUST always escalate above tiny-fix. These appear in
 # BOTH engineering_guardrails §10.3 and AGENTS.md's tiny-fix exclusions — the
@@ -33,6 +35,8 @@ GOVERNANCE_EXCLUSION_TOKENS = [
     ".agentcortex/bin/validate.",
     "specs/",
     "architecture/",
+    "CLAUDE.md",
+    "GEMINI.md",
 ]
 
 CLASSIFICATION_TIERS = ["tiny-fix", "quick-win", "feature", "architecture-change", "hotfix"]
@@ -53,6 +57,8 @@ class ClassificationEscalationContractTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.text = GUARDRAILS.read_text(encoding="utf-8")
         cls.agents = AGENTS.read_text(encoding="utf-8")
+        cls.routing = ROUTING.read_text(encoding="utf-8")
+        cls.bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
         cls.escalation = _subsection(cls.text, "10.1")
         cls.gate_standards = _subsection(cls.text, "10.2")
         cls.tiny_fix = _subsection(cls.text, "10.3")
@@ -139,6 +145,39 @@ class ClassificationEscalationContractTests(unittest.TestCase):
             self.assertIn(
                 token, clause,
                 f"AGENTS.md tiny-fix exclusion clause drifted from §10.3: missing '{token}'",
+            )
+
+    def test_routing_escalation_rule_matches_guardrails(self) -> None:
+        """routing.md §4's tiny-fix↔quick-win escalation rule MUST enumerate the
+        same governance files as §10.3 — site 3 of the 4-way mirror. Scope to the
+        rule clause, not the whole file, so a dropped token cannot hide elsewhere."""
+        m = re.search(
+            r"tiny-fix vs quick-win escalation.*?always escalates to quick-win minimum",
+            self.routing, re.DOTALL,
+        )
+        self.assertIsNotNone(
+            m, "routing.md is missing the 'tiny-fix vs quick-win escalation … always escalates' rule",
+        )
+        clause = m.group(0)
+        for token in GOVERNANCE_EXCLUSION_TOKENS:
+            self.assertIn(
+                token, clause,
+                f"routing.md escalation rule drifted from §10.3: missing '{token}'",
+            )
+
+    def test_bootstrap_fastcheck_table_matches_guardrails(self) -> None:
+        """bootstrap.md §0 fast-check decision table MUST enumerate the same
+        governance files as §10.3 — site 4 of the 4-way mirror. Scope to the table
+        block (tokens are spread across multiple rows, so match the whole table)."""
+        m = re.search(r"\| IF the task.*?(?=\n\n|\n##)", self.bootstrap, re.DOTALL)
+        self.assertIsNotNone(
+            m, "bootstrap.md is missing the §0 '| IF the task...' fast-check decision table",
+        )
+        table = m.group(0)
+        for token in GOVERNANCE_EXCLUSION_TOKENS:
+            self.assertIn(
+                token, table,
+                f"bootstrap.md fast-check table drifted from §10.3: missing '{token}'",
             )
 
 
