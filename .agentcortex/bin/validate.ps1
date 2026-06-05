@@ -1979,7 +1979,7 @@ if (Test-Path -Path $githubWorkflowsDir -PathType Container) {
 # Document lifecycle bloat checks
 $globalLessonsMax = if ($env:GLOBAL_LESSONS_MAX) { [int]$env:GLOBAL_LESSONS_MAX } else { 20 }
 if (Test-Path -Path $currentStatePath -PathType Leaf) {
-    $lessonsCount = @([regex]::Matches($csContent, '(?m)^- \[Category:') | Measure-Object).Count
+    $lessonsCount = ([regex]::Matches($csContent, '(?m)^- \[Category:')).Count
     if ($lessonsCount -gt $globalLessonsMax) {
         Add-Result -Level 'WARN' -Message "Global Lessons exceeds cap ($lessonsCount > $globalLessonsMax); run /retro to archive LOW-severity entries"
     }
