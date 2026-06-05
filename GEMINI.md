@@ -6,7 +6,7 @@
 
 ## Startup
 
-1. Load the shared instructions from `AGENTS.md`.
+1. **At the start of a task, enter the governed flow in `AGENTS.md` before any file edit or completion claim — decide up front, not at the edit moment. No silent direct edits.**
 2. Use `/memory show` when you need to inspect the active Gemini context.
 3. Use `/memory refresh` after this file or `AGENTS.md` changes during an active session.
 
