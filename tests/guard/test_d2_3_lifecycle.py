@@ -5,6 +5,7 @@ Spec: docs/specs/lock-unification.md (AC-15..AC-20)
 
 from __future__ import annotations
 
+import concurrent.futures
 import sys
 import tempfile
 import unittest
@@ -91,6 +92,26 @@ class TestFrontmatterParsing(unittest.TestCase):
             f.write_text(VALID_FM)
             finding = lc.check_file(f, "docs/audit/doc.md")
             self.assertEqual(finding.severity, "PASS")
+
+    def test_parser_uses_unique_tempfile_not_source_sidecar(self) -> None:
+        source = (ROOT / ".agentcortex" / "tools" / "check_lifecycle_frontmatter.py").read_text(encoding="utf-8")
+
+        self.assertIn("mkstemp", source)
+        self.assertNotIn(".__fm_probe__", source)
+
+    def test_parallel_frontmatter_parse_does_not_race_on_sidecar(self) -> None:
+        with tempfile.TemporaryDirectory() as base_dir:
+            f = Path(base_dir) / "doc.md"
+            f.write_text(VALID_FM)
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+                results = list(executor.map(lambda _i: lc.parse_frontmatter(f), range(24)))
+
+            for raw, parsed in results:
+                self.assertIsNotNone(raw)
+                self.assertIsInstance(parsed, dict)
+                self.assertIn("lifecycle", parsed)
+            self.assertFalse(list(Path(base_dir).glob("*.__fm_probe__.yaml")))
 
     def test_missing_lifecycle_fails_when_recent(self) -> None:
         with tempfile.TemporaryDirectory() as base_dir:

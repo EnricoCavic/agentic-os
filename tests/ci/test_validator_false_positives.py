@@ -216,6 +216,14 @@ def test_f4_deprecated_files_pass_branch_parity() -> None:
     assert msg in VALIDATE_PS1.read_text(encoding="utf-8")
 
 
+def test_global_lessons_count_uses_match_count_in_ps1() -> None:
+    """PowerShell must count regex matches, not the single Measure-Object result."""
+    ps1 = VALIDATE_PS1.read_text(encoding="utf-8")
+
+    assert "Measure-Object).Count" not in ps1
+    assert "([regex]::Matches($csContent, '(?m)^- \\[Category:')).Count" in ps1
+
+
 requires_windows = pytest.mark.skipif(
     sys.platform != "win32",
     reason="validate.ps1 is the native Windows validator; running it under Linux "

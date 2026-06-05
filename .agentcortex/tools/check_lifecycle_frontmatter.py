@@ -19,9 +19,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
+import tempfile
 from datetime import date
 from pathlib import Path
 from typing import Iterable, NamedTuple
@@ -72,8 +74,12 @@ def parse_frontmatter(path: Path) -> tuple[str | None, dict | None]:
     if not m:
         return None, None
     raw = m.group(1)
-    # Build a temporary file-like for the YAML loader (.yaml extension required)
-    tmp = Path(str(path) + ".__fm_probe__.yaml")
+    # Build a unique temp file for the YAML loader (.yaml extension required).
+    # Keep it outside the repo so parallel validators cannot race on a fixed
+    # sidecar path next to the source document.
+    fd, tmp_name = tempfile.mkstemp(suffix=".yaml")
+    os.close(fd)
+    tmp = Path(tmp_name)
     try:
         # Write the frontmatter as a standalone YAML doc and parse via loader.
         # We avoid touching the source file; this just reuses the parser.
