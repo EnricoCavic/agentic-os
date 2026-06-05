@@ -21,7 +21,7 @@ Before loading any context, walk the decision table below top-to-bottom — **fi
 |---|---|
 | modifies `docs/specs/_product-backlog.md` | route to `/spec-intake` (not bootstrap) |
 | modifies any file in `docs/specs/` or `docs/architecture/` | minimum `quick-win` — continue to Step 1 |
-| modifies `AGENTS.md`, `.agent/rules/*`, or `.agent/config.yaml` | minimum `quick-win` — continue to Step 1 |
+| modifies `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.agent/rules/*`, or `.agent/config.yaml` | minimum `quick-win` — continue to Step 1 |
 | modifies `.agentcortex/templates/*` or `.agentcortex/bin/validate.*` | minimum `quick-win` — continue to Step 1 |
 | modifies any file with `status: frozen` frontmatter | minimum `quick-win` — continue to Step 1 |
 | modifies <3 files (PR-scope, NOT per-logical-change) AND is non-semantic (typo, docs, non-functional config) AND scope is unambiguous AND target paths do NOT match any ADR's `applies_to:` glob | **tiny-fix** — skip Steps 1–6, inline plan + execute + evidence (Work Log skipped per §5). **Misclassification checkpoint**: if during the inline edit the change proves semantic, crosses a module boundary, or exceeds 3 files — STOP immediately, escalate to `quick-win`, create a Work Log, and re-enter from §1. |
