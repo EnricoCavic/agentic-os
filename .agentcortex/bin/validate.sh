@@ -780,7 +780,7 @@ domain_doc_frontmatter_warn=0
 shopt -s nullglob
 for spec in "$ROOT"/docs/specs/*.md; do
   [[ -f "$spec" ]] || continue
-  if grep -Eq '^primary_domain:\s*[^[:space:]]+' "$spec"; then
+  if grep -Eq '^primary_domain:[[:space:]]*[^[:space:]]+' "$spec"; then
     if ! grep -F -q '## Domain Decisions' "$spec"; then
       printf '  spec with primary_domain missing Domain Decisions: %s\n' "$spec"
       document_governance_spec_errors=$((document_governance_spec_errors + 1))
@@ -804,7 +804,7 @@ if [[ -d "$ROOT/docs/architecture" ]]; then
   for domain_doc in "$ROOT"/docs/architecture/*.md; do
     [[ -f "$domain_doc" ]] || continue
     [[ "$domain_doc" == *.log.md ]] && continue
-    if ! grep -Eq '^status:\s*living$' "$domain_doc" || ! grep -Eq '^domain:\s*[^[:space:]]+' "$domain_doc"; then
+    if ! grep -Eq '^status:[[:space:]]*living$' "$domain_doc" || ! grep -Eq '^domain:[[:space:]]*[^[:space:]]+' "$domain_doc"; then
       printf '  domain doc candidate missing full L1 contract (status: living + domain:): %s\n' "$domain_doc"
       domain_doc_frontmatter_warn=$((domain_doc_frontmatter_warn + 1))
     fi
@@ -1409,7 +1409,7 @@ PYEOF
     # "Reclassification:" but Classification header was never reset to CLASSIFIED,
     # leaving downstream agents with a stale classification tier.
     if printf '%s' "$wl_content" | grep -q '## Drift Log' \
-       && printf '%s' "$wl_content" | grep -qiE '^\s*-\s+Reclassif'; then
+       && printf '%s' "$wl_content" | grep -qiE '^[[:space:]]*-[[:space:]]+Reclassif'; then
       cls_hdr="$(printf '%s' "$wl_content" | grep -m1 -iE '^-[[:space:]]*\*?\*?Classification\*?\*?:' \
         | sed 's/.*Classification[^:]*:[[:space:]]*//' | tr -d '`\r' | tr '[:upper:]' '[:lower:]' | xargs)" || true
       if [[ -n "$cls_hdr" && "$cls_hdr" != "classified" ]]; then
@@ -1649,7 +1649,7 @@ phase_summary_violations=0
 phase_summary_violation_list=""
 if [[ -d "$ARCHIVE_DIR" ]]; then
   while IFS= read -r -d '' wl; do
-    classification="$(grep -m1 -E '^- \*?\*?Classification\*?\*?:' "$wl" 2>/dev/null | sed -E 's/.*Classification[^:]*:\s*`?//; s/`.*//; s/\s*$//')" || true
+    classification="$(grep -m1 -E '^- \*?\*?Classification\*?\*?:' "$wl" 2>/dev/null | sed -E 's/.*Classification[^:]*:[[:space:]]*`?//; s/`.*//; s/[[:space:]]*$//')" || true
     [[ "$classification" == "tiny-fix" ]] && continue
     summary_body="$(awk '/^## Phase Summary/{found=1; next} found && /^## /{exit} found{print}' "$wl" 2>/dev/null | tr -d '[:space:]')"
     if [[ -z "$summary_body" || "$summary_body" == "none" ]]; then
@@ -1677,7 +1677,7 @@ if [[ -d "$ARCHIVE_DIR" ]]; then
   while IFS= read -r -d '' wl; do
     wl_content="$(cat "$wl" 2>/dev/null)"
     [[ -z "$wl_content" ]] && continue
-    arc_class="$(printf '%s' "$wl_content" | grep -m1 -E '^- \*?\*?[Cc]lassification\*?\*?:' | sed -E 's/.*[Cc]lassification[^:]*:\s*`?//; s/`.*//; s/\s*$//' | tr '[:upper:]' '[:lower:]')" || true
+    arc_class="$(printf '%s' "$wl_content" | grep -m1 -E '^- \*?\*?[Cc]lassification\*?\*?:' | sed -E 's/.*[Cc]lassification[^:]*:[[:space:]]*`?//; s/`.*//; s/[[:space:]]*$//' | tr '[:upper:]' '[:lower:]')" || true
     [[ "$arc_class" == "tiny-fix" ]] && continue
     if printf '%s' "$wl_content" | grep -qiE 'Gate:[[:space:]]*ship[[:space:]]*\|[^|]*Verdict:[[:space:]]*PASS'; then
       arc_has_plan=$(printf '%s' "$wl_content" | grep -ciE 'Gate:[[:space:]]*plan[[:space:]]*\|[^|]*Verdict:[[:space:]]*PASS') || true
@@ -1977,7 +1977,7 @@ if [[ -f "$BACKLOG_FILE" ]]; then
 
     # L-3: Kind distribution sanity — warn if all non-— rows have Kind=feature (no review-finding/hotfix-spawn ever written)
     if [[ "$total_pending" -gt 9 ]]; then
-      kind_variety=$(grep '| Pending' "$BACKLOG_FILE" 2>/dev/null | awk -F'|' '{gsub(/^[[:space:]]+|[[:space:]]+$/, "", $4); print $4}' | grep -vE '^\s*(—)?\s*$' | sort -u | wc -l | tr -d '[:space:]')
+      kind_variety=$(grep '| Pending' "$BACKLOG_FILE" 2>/dev/null | awk -F'|' '{gsub(/^[[:space:]]+|[[:space:]]+$/, "", $4); print $4}' | grep -vE '^[[:space:]]*(—)?[[:space:]]*$' | sort -u | wc -l | tr -d '[:space:]')
       kind_variety=${kind_variety:-0}
       if [[ "$kind_variety" -eq 1 ]]; then
         record_result WARN "backlog Kind diversity: all assigned pending items share the same Kind value — review-finding and hotfix-spawn entries may not be reaching the backlog"
