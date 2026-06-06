@@ -183,6 +183,12 @@ deploy_file() {
                 [ "$dst_hash" != "$src_hash" ] && locally_modified=true
             fi
             if $locally_modified && [ "$dst_hash" != "$src_hash" ]; then
+                # A backup MUST always overwrite a stale .acx-local. Unlike
+                # .acx-incoming (cleaned each run by clean_acx_incoming), the
+                # .acx-local backup persists, so a pre-existing one + a user-set
+                # CP_FLAG=-n/-i would make `cp` silently skip — losing the newest
+                # local edits. Remove first so the backup always lands.
+                rm -f "$dst.acx-local"
                 cp ${CP_FLAG:+"$CP_FLAG"} "$dst" "$dst.acx-local"
                 echo "  [OVERWRITE] $rel (core force-updated; your local edits backed up to $rel.acx-local)"
                 COUNT_CORE_OVERWRITTEN=$((COUNT_CORE_OVERWRITTEN + 1))
@@ -749,6 +755,7 @@ write_downstream_ignore_block() {
 # Deploy Artifacts
 .agentcortex-src/
 *.acx-incoming
+*.acx-local
 
 # Third-party AI Tool Local State
 .openrouter/
@@ -776,6 +783,7 @@ strip_managed_ignore_blocks() {
         managed[".agent/private/"] = 1
         managed[".agentcortex-src/"] = 1
         managed["*.acx-incoming"] = 1
+        managed["*.acx-local"] = 1
         managed[".openrouter/"] = 1
         managed[".claude-chat/"] = 1
         managed[".cursor/"] = 1
