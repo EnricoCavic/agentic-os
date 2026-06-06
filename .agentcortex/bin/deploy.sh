@@ -44,14 +44,21 @@ COUNT_UPDATED=0
 COUNT_SKIPPED=0
 COUNT_NEW=0
 COUNT_REMOVED=0
+COUNT_CORE_OVERWRITTEN=0
 
 # --- SHA256 utility (cross-platform) ---
 compute_sha256() {
     local file="$1"
+    # NOTE: GNU sha256sum / BSD shasum escape filenames containing a backslash
+    # or newline by prefixing the output line with a literal '\' (and escaping
+    # the name). On Windows/Git Bash a backslash TARGET path (e.g. C:\proj)
+    # therefore yields "\<hash>", which silently breaks every dst-hash
+    # comparison (a clean repo path hashes without the prefix). Strip a leading
+    # backslash so the hash is comparable regardless of path style.
     if command -v sha256sum >/dev/null 2>&1; then
-        sha256sum "$file" | cut -d' ' -f1
+        sha256sum "$file" | cut -d' ' -f1 | sed 's/^\\//'
     elif command -v shasum >/dev/null 2>&1; then
-        shasum -a 256 "$file" | cut -d' ' -f1
+        shasum -a 256 "$file" | cut -d' ' -f1 | sed 's/^\\//'
     elif command -v openssl >/dev/null 2>&1; then
         openssl dgst -sha256 "$file" | awk '{print $NF}'
     else
@@ -159,7 +166,33 @@ deploy_file() {
         old_manifest_hash="$(manifest_lookup_hash "$rel")"
 
         if [ "$tier" = "core" ]; then
-            # Core: always overwrite
+            # Core: force-update (ADR-005 — governance/security fixes always land,
+            # no drift). But if the downstream locally modified this core file,
+            # back up their version to a .acx-local sidecar + warn before
+            # overwriting, so edits are recoverable instead of silently lost
+            # (#173). The force-update invariant is preserved — the new framework
+            # version still lands; only the silent-data-loss footgun is closed.
+            local dst_hash
+            dst_hash="$(compute_sha256 "$dst")"
+            local locally_modified=false
+            if [ -n "$old_manifest_hash" ]; then
+                [ "$dst_hash" != "$old_manifest_hash" ] && locally_modified=true
+            else
+                # Pre-manifest/legacy: no baseline to compare against; treat
+                # content that differs from the framework version as user content.
+                [ "$dst_hash" != "$src_hash" ] && locally_modified=true
+            fi
+            if $locally_modified && [ "$dst_hash" != "$src_hash" ]; then
+                # A backup MUST always overwrite a stale .acx-local. Unlike
+                # .acx-incoming (cleaned each run by clean_acx_incoming), the
+                # .acx-local backup persists, so a pre-existing one + a user-set
+                # CP_FLAG=-n/-i would make `cp` silently skip — losing the newest
+                # local edits. Remove first so the backup always lands.
+                rm -f "$dst.acx-local"
+                cp ${CP_FLAG:+"$CP_FLAG"} "$dst" "$dst.acx-local"
+                echo "  [OVERWRITE] $rel (core force-updated; your local edits backed up to $rel.acx-local)"
+                COUNT_CORE_OVERWRITTEN=$((COUNT_CORE_OVERWRITTEN + 1))
+            fi
             cp ${CP_FLAG:+"$CP_FLAG"} "$src" "$dst"
             [ -n "$do_chmod" ] && chmod +x "$dst"
             COUNT_UPDATED=$((COUNT_UPDATED + 1))
@@ -722,6 +755,7 @@ write_downstream_ignore_block() {
 # Deploy Artifacts
 .agentcortex-src/
 *.acx-incoming
+*.acx-local
 
 # Third-party AI Tool Local State
 .openrouter/
@@ -749,6 +783,7 @@ strip_managed_ignore_blocks() {
         managed[".agent/private/"] = 1
         managed[".agentcortex-src/"] = 1
         managed["*.acx-incoming"] = 1
+        managed["*.acx-local"] = 1
         managed[".openrouter/"] = 1
         managed[".claude-chat/"] = 1
         managed[".cursor/"] = 1
@@ -919,7 +954,11 @@ echo ""
 echo "Agentic OS v${ACX_VERSION} (${SOURCE_COMMIT}) deployed successfully!"
 echo ""
 if $IS_UPDATE; then
-    echo "Summary: ${COUNT_UPDATED} updated / ${COUNT_SKIPPED} skipped / ${COUNT_NEW} new / ${COUNT_REMOVED} removed"
+    if [ "$COUNT_CORE_OVERWRITTEN" -gt 0 ]; then
+        echo "Summary: ${COUNT_UPDATED} updated (${COUNT_CORE_OVERWRITTEN} locally-modified core force-updated) / ${COUNT_SKIPPED} skipped / ${COUNT_NEW} new / ${COUNT_REMOVED} removed"
+    else
+        echo "Summary: ${COUNT_UPDATED} updated / ${COUNT_SKIPPED} skipped / ${COUNT_NEW} new / ${COUNT_REMOVED} removed"
+    fi
 else
     echo "Installed ${TOTAL_DEPLOYED} files."
 fi
@@ -930,6 +969,13 @@ if [ "$COUNT_SKIPPED" -gt 0 ]; then
     echo ""
     echo "  → Manual merge:  diff each pair, keep your content + adopt framework updates, then re-run deploy."
     echo "  → AI-assisted:   ask your AI agent — \"merge each *.acx-incoming into its target, preserving project-specific content and adopting framework updates, then delete the sidecars\""
+fi
+if [ "$COUNT_CORE_OVERWRITTEN" -gt 0 ]; then
+    echo ""
+    echo "⚠ ${COUNT_CORE_OVERWRITTEN} locally-modified core file(s) were force-updated (ADR-005)."
+    echo "  Your previous versions were backed up as *.acx-local sidecars."
+    echo "  Core files are framework-authoritative — re-apply needed tweaks via"
+    echo "  AGENTS.override.md (governance) or custom-* skills, not by editing core in place."
 fi
 echo ""
 echo "Platform Entry Points Ready:"

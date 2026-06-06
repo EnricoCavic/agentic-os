@@ -13,6 +13,7 @@ Structural tests guard the wiring/parity against silent deletion.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import tempfile
@@ -53,11 +54,12 @@ powershell = shutil.which("powershell") or shutil.which("pwsh")
 requires_powershell = pytest.mark.skipif(powershell is None, reason="PowerShell not available")
 
 
-def _deploy(target: Path) -> subprocess.CompletedProcess:
+def _deploy(target: Path, env: dict | None = None) -> subprocess.CompletedProcess:
+    run_env = {**os.environ, **env} if env else None
     return subprocess.run(
         [bash, str(DEPLOY_SH), str(target)],
         capture_output=True, text=True, encoding="utf-8", errors="replace",
-        cwd=str(ROOT),
+        cwd=str(ROOT), env=run_env,
     )
 
 
@@ -122,6 +124,85 @@ def test_skill_edit_sidecars_and_core_rule_force_updates() -> None:
             "core rule must NOT produce a sidecar (governance must force-update)"
         assert "<!-- downstream edit -->" not in rule.read_text(encoding="utf-8"), \
             "core rule edit must be overwritten by the framework version"
+
+
+@requires_bash
+def test_modified_core_rule_backs_up_to_acx_local_and_is_not_silent() -> None:
+    """#173: a locally-modified core file is force-updated (ADR-005 invariant),
+    but its previous version is backed up to a .acx-local sidecar and the
+    overwrite is surfaced in deploy output — never silently lost."""
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "proj"
+        target.mkdir()
+
+        assert _deploy(target).returncode == 0
+        rule = target / ".agent" / "rules" / "engineering_guardrails.md"
+        assert rule.exists()
+
+        marker = "<!-- downstream core tweak 173 -->"
+        rule.write_text(rule.read_text(encoding="utf-8") + f"\n{marker}\n", encoding="utf-8")
+
+        second = _deploy(target)
+        assert second.returncode == 0, f"update failed:\n{second.stderr}"
+
+        backup = rule.with_name("engineering_guardrails.md.acx-local")
+        # The user's edit is recoverable from the .acx-local backup ...
+        assert backup.exists(), "modified core file must back up to .acx-local"
+        assert marker in backup.read_text(encoding="utf-8"), \
+            "the .acx-local backup must contain the user's edit"
+        # ... while the live file is force-updated (ADR-005 invariant preserved) ...
+        assert marker not in rule.read_text(encoding="utf-8"), \
+            "core rule must still be force-updated to the framework version"
+        # ... using .acx-local, NOT .acx-incoming (parity with the AC-5 contract).
+        assert not rule.with_name("engineering_guardrails.md.acx-incoming").exists()
+        # ... and the overwrite is NOT silent.
+        assert "acx-local" in second.stdout, \
+            "deploy must surface the core overwrite (non-silent)"
+
+        # Idempotency: a second update (file now matches framework) must NOT
+        # re-flag or create another backup.
+        backup.unlink()
+        third = _deploy(target)
+        assert third.returncode == 0
+        assert not backup.exists(), \
+            "unmodified core file must not be flagged as locally-modified"
+        assert "acx-local" not in third.stdout
+
+
+@requires_bash
+def test_core_backup_not_skipped_under_cp_flag_n() -> None:
+    """#173 regression: the .acx-local backup must ALWAYS land, even with
+    CP_FLAG=-n. .acx-local is never auto-cleaned, so a stale one + `cp -n`
+    would silently skip the backup and lose the newest local edits — exactly
+    the data loss this fix closes."""
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "proj"
+        target.mkdir()
+        assert _deploy(target).returncode == 0
+        rule = target / ".agent" / "rules" / "engineering_guardrails.md"
+        backup = rule.with_name("engineering_guardrails.md.acx-local")
+        base = rule.read_text(encoding="utf-8")
+
+        # First local edit, then a no-clobber (CP_FLAG=-n) update creates .acx-local(A).
+        rule.write_text(base + "\n<!-- edit A -->\n", encoding="utf-8")
+        assert _deploy(target, env={"CP_FLAG": "-n"}).returncode == 0
+        assert backup.exists() and "edit A" in backup.read_text(encoding="utf-8")
+
+        # Second local edit, then another -n update. The stale backup must be
+        # replaced with edit B — NOT skipped by `cp -n`.
+        rule.write_text(base + "\n<!-- edit B -->\n", encoding="utf-8")
+        assert _deploy(target, env={"CP_FLAG": "-n"}).returncode == 0
+        bk = backup.read_text(encoding="utf-8")
+        assert "edit B" in bk, "newest local edits must be backed up, not skipped under CP_FLAG=-n"
+        assert "edit A" not in bk, "stale backup must be replaced, not retained"
+
+
+def test_deploy_gitignores_acx_local_sidecar() -> None:
+    """#173: the .acx-local backup is deploy-generated; it must be in the
+    managed downstream .gitignore block (parity with *.acx-incoming) so it
+    does not pollute the downstream working tree."""
+    s = DEPLOY_SH.read_text(encoding="utf-8")
+    assert "*.acx-local" in s, "deploy.sh must add *.acx-local to the managed .gitignore block"
 
 
 @requires_powershell
