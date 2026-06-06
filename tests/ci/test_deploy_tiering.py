@@ -124,6 +124,49 @@ def test_skill_edit_sidecars_and_core_rule_force_updates() -> None:
             "core rule edit must be overwritten by the framework version"
 
 
+@requires_bash
+def test_modified_core_rule_backs_up_to_acx_local_and_is_not_silent() -> None:
+    """#173: a locally-modified core file is force-updated (ADR-005 invariant),
+    but its previous version is backed up to a .acx-local sidecar and the
+    overwrite is surfaced in deploy output — never silently lost."""
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "proj"
+        target.mkdir()
+
+        assert _deploy(target).returncode == 0
+        rule = target / ".agent" / "rules" / "engineering_guardrails.md"
+        assert rule.exists()
+
+        marker = "<!-- downstream core tweak 173 -->"
+        rule.write_text(rule.read_text(encoding="utf-8") + f"\n{marker}\n", encoding="utf-8")
+
+        second = _deploy(target)
+        assert second.returncode == 0, f"update failed:\n{second.stderr}"
+
+        backup = rule.with_name("engineering_guardrails.md.acx-local")
+        # The user's edit is recoverable from the .acx-local backup ...
+        assert backup.exists(), "modified core file must back up to .acx-local"
+        assert marker in backup.read_text(encoding="utf-8"), \
+            "the .acx-local backup must contain the user's edit"
+        # ... while the live file is force-updated (ADR-005 invariant preserved) ...
+        assert marker not in rule.read_text(encoding="utf-8"), \
+            "core rule must still be force-updated to the framework version"
+        # ... using .acx-local, NOT .acx-incoming (parity with the AC-5 contract).
+        assert not rule.with_name("engineering_guardrails.md.acx-incoming").exists()
+        # ... and the overwrite is NOT silent.
+        assert "acx-local" in second.stdout, \
+            "deploy must surface the core overwrite (non-silent)"
+
+        # Idempotency: a second update (file now matches framework) must NOT
+        # re-flag or create another backup.
+        backup.unlink()
+        third = _deploy(target)
+        assert third.returncode == 0
+        assert not backup.exists(), \
+            "unmodified core file must not be flagged as locally-modified"
+        assert "acx-local" not in third.stdout
+
+
 @requires_powershell
 def test_deploy_ps1_entrypoint_resolves_real_bash() -> None:
     with tempfile.TemporaryDirectory() as td:
