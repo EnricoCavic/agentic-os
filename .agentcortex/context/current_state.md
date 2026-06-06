@@ -12,9 +12,9 @@
   - Active Work Log Path: derive <worklog-key> from the raw branch name using filesystem-safe normalization before any gate checks.
   - Workflows & Policies: `.agent/workflows/*.md`, `.agent/rules/*.md`
 - **Project Name**: (set by /app-init)
-- **Last Updated**: 2026-06-05T13:17:46+08:00
-- **Last Verified**: 2026-06-04
-- **Update Sequence**: 35
+- **Last Updated**: 2026-06-06T15:05:00+08:00
+- **Last Verified**: 2026-06-06
+- **Update Sequence**: 36
 - **ADR Index**:
   - docs/adr/ADR-001-governance-friction-tuning.md — ADR-001: Governance Friction Tuning, accepted 2026-04-23
   - docs/adr/ADR-002-guarded-governance-writes.md — ADR-002: Guarded Governance Writes (lock unification + CI lint + lifecycle frontmatter), accepted 2026-04-25
@@ -291,3 +291,16 @@
   - **Scope decision**: adapters only; rejected an `*.override.md` glob as speculative (override loader reads only `AGENTS.override.md`; ADR-004 overrides cannot relax gates). Plan-consulted.
   - **Evidence**: escalation test 10/10, guard suite 132/132; `validate.ps1` + `validate.sh` both `pass=98 warn=9 fail=0`; regenerated `trigger-compact-index.json` (AGENTS.md is a registry `detail_ref`). Implementation commit `160566b`.
   - **Rollback** = revert PR.
+
+### Ship-fix-issue-190-sed-grep-posix-portability-2026-06-06
+- **PR #197** (quick-win, issue #190) — `validate.sh` used GNU-only `\s` in 6 shell-context regexes (`grep -E`/`sed -E`); BSD grep/sed (macOS default) treat `\s` as a literal `s`, breaking whitespace handling in `primary_domain`/`status`/`domain` frontmatter checks, the Reclassif drift guard, two archived-worklog Classification `sed` extractions, and the backlog Kind-diversity filter. Replaced with POSIX `[[:space:]]` (valid in ERE on both GNU and BSD).
+  - Python-`re` `\s` left untouched (cross-platform); `validate.ps1` (.NET regex) and `deploy.sh` unaffected (verified 0 `\s`/`\w`).
+  - **Evidence**: GNU grep 3.0 / sed 4.9 byte-identical output before/after (no CI regression); `validate.sh` integrity check passed; `pytest tests/ci tests/guard` 198 passed; PR CI 11/11 green. Rollback = revert PR.
+  - **Triage by-product**: same 2026-06-05 batch issues #186 (BOM)/#187 (override merge)/#191 (subdir path) verified false-premise with empirical evidence and **closed**; feature #154 closed as already-implemented by `trigger-registry.yaml`+`trigger-compact-index.json`+`validate_trigger_metadata.py`; #189 closed (slash-commands are agent-dispatched, not shell binaries); #169 kept, recommended narrowing.
+
+### Ship-fix-issue-173-core-overwrite-backup-2026-06-06
+- **PR #198** (quick-win, issue #173) — On the deploy UPDATE path a downstream-locally-modified **core** file was silently overwritten (no warning/backup, hidden in "N updated"), unlike scaffold-tier `.acx-incoming` sidecaring. Reproduced. Fix preserves the **ADR-005 force-update invariant** (new framework version still lands) but backs up the user's prior version to `.acx-local` + prints `[OVERWRITE]` + summary/footer notice.
+  - **Root-cause defect found while testing**: `compute_sha256` used `sha256sum "$file"`; GNU sha256sum / BSD shasum escape backslash filenames with a leading `\` line-prefix, so a Windows/Git-Bash `C:\` TARGET made every `dst` hash `\<hash>` while repo-side `src` hashed clean → unmodified core AND scaffold files mis-flagged as modified (124 spurious → 0 after fix). Stripped leading `\`. Manual `/tmp` (forward-slash) testing did NOT reproduce — only `C:\` paths (as `deploy.ps1`/CI pass). See [[reference_sha256sum_backslash_escaping]].
+  - **Adversarial review (subagent, code-verified) caught a real HIGH defect**: backup `cp ${CP_FLAG}` could be silently skipped under user-set `CP_FLAG=-n`/`-i` (stale `.acx-local` never auto-cleaned) → reintroduced the silent data loss. Fixed with `rm -f` before backup; added `*.acx-local` to managed `.gitignore`; added a `CP_FLAG=-n` regression test.
+  - **Scope correction**: `deploy.ps1` is a thin bash launcher → single logic file (issue's "both deploy.sh + deploy.ps1" was a misread).
+  - **Evidence**: behavioral repro (backup holds edit, force-updated live, scaffold preserved, idempotent, 0 false-positives over 180+ files); `pytest tests/ci tests/guard` **201 passed**; `validate.sh` passed; PR CI 11/11 green. Rollback = revert PR.
