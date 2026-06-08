@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.4.1] - 2026-06-08
+
+Patch release: chat-language adherence fix plus a CI time-bomb test fix.
+
+**Governance**
+- **Chat-language policy hardening (#206)**: agents now reliably reply in the user's input language instead of defaulting to English (worst on Claude) or drifting to Korean/Japanese. Root cause was output-layer enforcement asymmetry — the every-turn English `⚡ ACX` sentinel and gate/phase templates drowned a single un-reinforced two-language line — compounded by an Antigravity-only "default Traditional Chinese" rule that contradicted `AGENTS.md`. The `AGENTS.md` policy is now universal-language (arrows are examples, not an allowlist) with explicit anti-drift (including "never collapse a non-English input into English"), a live-chat-vs-artifact carve-out, and a deterministic English fallback; the language requirement now rides the always-reinforced sentinel rule; `.antigravity/rules.md` inherits the canonical policy instead of overriding it.
+
+**Tests**
+- Fixed a time-bomb in `tests/guard/test_worklog_lock_recovery.py::test_active_lock_preserved_by_api_and_cli`: it anchored a lock's `updated_at` to a frozen timestamp while the CLI subprocess evaluates staleness against the real clock, so the test went red ~60 minutes past its hardcoded time on any later run. The lock is now anchored to the real current time, isolating the test to live-owner preservation.
+
 ## [1.4.0] - 2026-06-08
 
 Release covering work merged since the v1.3.0 tag. Adds local validation tooling, work-log lock resilience, advisory governance linters, and multi-agent review guidance; hardens cross-platform deploy/validation; and polishes the public README.

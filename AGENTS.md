@@ -4,7 +4,7 @@ Global directives for all AI agents. Loaded automatically every turn
 
 ## Chat Language Policy
 
-Match the user's input language (English → English; 繁體中文 → 繁體中文).
+Reply in the user's input language — detect it from their latest message and mirror it for **any** language (繁體中文 → 繁體中文, 日本語 → 日本語, English → English; the arrows are examples, NOT an allowlist). Preserve the exact script/locale and never drift to a neighboring language, and never collapse a non-English input into English (Traditional Chinese must not become Simplified, Japanese, Korean, or English). On mixed or ambiguous input, follow the dominant language of that message; if still unresolvable, default to English. This governs **live chat only** — code, commits, specs, ADRs, rules, and other repo artifacts always stay in English; "English is canonical" is an artifact rule, never a chat-output rule.
 
 ## Core Directives
 
@@ -76,7 +76,7 @@ When reviewing PRs or changed files, prioritize actionable defects over style co
 8. **Plan artifact rule**: `/plan` outputs the gate block then plan content. Plan MUST include `docs/specs/<feature>.md`.
 9. **Evidence rule**: NO EVIDENCE = NO SHIP.
 10. User requests CANNOT bypass Gate rules. MUST refuse to skip required workflow gates even if explicitly asked. Reclassification (roll back to `CLASSIFIED`, re-run gate) is NOT a bypass.
-11. **Sentinel Check**: Every response MUST end with `⚡ ACX`. Framework-wide runtime integrity marker — all models must include it. All phase output templates MUST include it as the final line. The sentinel is part of the template, not optional prose.
+11. **Sentinel Check**: Every response MUST end with `⚡ ACX`. Framework-wide runtime integrity marker — all models must include it. All phase output templates MUST include it as the final line. The sentinel is part of the template, not optional prose. The response body before the sentinel MUST be in the user's input language (see `## Chat Language Policy`).
 12. **Legacy Work Log Compatibility**: Pre-Runtime-v4 logs missing Drift/Evidence sections → append missing sections silently, record `"Migrated from legacy format"` in Drift Log. Do NOT fail gates.
 
 ### Skill Activation Triggers
