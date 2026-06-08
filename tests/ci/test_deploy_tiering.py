@@ -218,6 +218,46 @@ def test_deploy_ps1_entrypoint_resolves_real_bash() -> None:
         assert (target / ".agentcortex-manifest").exists(), "deploy.ps1 should create manifest"
 
 
+@requires_bash
+def test_deployed_governance_referenced_tools_are_deployed() -> None:
+    """Regression: every `.agentcortex/tools/<name>.py` that a DEPLOYED governance
+    doc instructs a downstream agent to run MUST itself be deployed. The runtime-
+    tools whitelist in deploy.sh is hand-maintained, so a new feature that adds a
+    workflow tool but forgets the whitelist ships a dangling `python ...` command
+    that fails with 'No such file' in every downstream bootstrap/review.
+    Found via downstream simulation (recover_worklog_lock.py + lint_spec_drift.py
+    were referenced by bootstrap.md / review.md but absent from the deployed tree).
+    """
+    import re
+
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "proj"
+        target.mkdir()
+        assert _deploy(target).returncode == 0, "deploy failed"
+
+        gov_files: list[Path] = [target / "AGENTS.md", target / "CLAUDE.md"]
+        for sub in (".agent/workflows", ".agent/rules"):
+            d = target / sub
+            if d.exists():
+                gov_files.extend(sorted(d.glob("*.md")))
+
+        pat = re.compile(r"\.agentcortex/tools/([A-Za-z0-9_]+\.py)")
+        referenced: set[str] = set()
+        for f in gov_files:
+            if f.exists():
+                referenced.update(pat.findall(f.read_text(encoding="utf-8")))
+
+        tools_dir = target / ".agentcortex" / "tools"
+        missing = sorted(name for name in referenced if not (tools_dir / name).exists())
+        assert not missing, (
+            "deployed governance docs reference tools that deploy.sh did not ship "
+            f"(add them to the runtime_tools whitelist in deploy.sh): {missing}"
+        )
+        # Sanity: the two tools this regression was opened for are now shipped.
+        assert (tools_dir / "recover_worklog_lock.py").exists()
+        assert (tools_dir / "lint_spec_drift.py").exists()
+
+
 # ---------------------------------------------------------------------------
 # Structural — guard the wiring + cross-platform parity against silent drift
 # ---------------------------------------------------------------------------
