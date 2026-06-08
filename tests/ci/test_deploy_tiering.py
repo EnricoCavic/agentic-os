@@ -258,6 +258,31 @@ def test_deployed_governance_referenced_tools_are_deployed() -> None:
         assert (tools_dir / "lint_spec_drift.py").exists()
 
 
+@requires_bash
+def test_deploy_does_not_scaffold_docs_architecture() -> None:
+    """`docs/architecture/` is intentionally capability-by-presence, NOT a fixed
+    anchor like docs/adr/ + docs/specs/. It is created on demand by /app-init;
+    bootstrap.md keys the "skip all Domain Doc steps, zero extra reads"
+    optimization on its ABSENCE. Scaffolding it empty on deploy would silently
+    flip that optimization off for every downstream project. This guard locks in
+    the no-scaffold design so a well-meaning "fix" cannot regress it.
+    (engineering_guardrails.md §4.2 / bootstrap.md capability-by-presence.)
+    """
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "proj"
+        target.mkdir()
+        assert _deploy(target).returncode == 0, "deploy failed"
+
+        # The two fixed anchors ARE scaffolded ...
+        assert (target / "docs" / "adr").is_dir(), "docs/adr/ is a fixed anchor"
+        assert (target / "docs" / "specs").is_dir(), "docs/specs/ is a fixed anchor"
+        # ... but docs/architecture/ must NOT be (capability-by-presence).
+        assert not (target / "docs" / "architecture").exists(), (
+            "deploy must NOT scaffold docs/architecture/ — it is created on demand "
+            "by /app-init; its absence drives bootstrap's zero-read optimization"
+        )
+
+
 # ---------------------------------------------------------------------------
 # Structural — guard the wiring + cross-platform parity against silent drift
 # ---------------------------------------------------------------------------
