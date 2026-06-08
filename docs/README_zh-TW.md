@@ -19,6 +19,28 @@
 - **命名空間隔離**：下游專案可自由添加自定義 skill 和 workflow，框架用 `.agentcortex-manifest` 區分管理範圍，用戶指令永遠優先。
 - **14 項專業技能**：每個 skill metadata 都宣告在哪個 phase 自動啟用，AI 不需要人類提示就知道何時使用。
 
+## 運作原理
+
+每個階段的核心信條都一樣：沒有可驗證的證據，任務就不算完成 —— 而 Gate 會強制執行這件事，而不是信任 AI 自行誠實回報。
+
+```mermaid
+flowchart LR
+    U["使用者<br/>提出需求"] --> G{"Gate<br/>引擎"}
+    G -->|通過| W["工作流程<br/>+ 技能"]
+    W --> E{"證據<br/>要求"}
+    E -->|通過| S["交付<br/>→ SSoT"]
+    G -->|未過| X1["⛔ 停止"]
+    E -->|未過| X2["⛔ 停止"]
+
+    style U fill:#8b5cf6,color:#fff,stroke:none
+    style G fill:#f59e0b,color:#fff,stroke:none
+    style W fill:#3b82f6,color:#fff,stroke:none
+    style E fill:#22c55e,color:#fff,stroke:none
+    style S fill:#06b6d4,color:#fff,stroke:none
+    style X1 fill:#ef4444,color:#fff,stroke:none
+    style X2 fill:#ef4444,color:#fff,stroke:none
+```
+
 ## 三條起點路徑
 
 依你的專案狀態挑一條（詳細開場提示見「快速開始 §3」）：
