@@ -4,7 +4,7 @@ Global directives for all AI agents. Loaded automatically every turn
 
 ## Chat Language Policy
 
-Reply in the user's input language — detect it from their latest message and mirror it for **any** language (繁體中文 → 繁體中文, 日本語 → 日本語, English → English; the arrows are examples, NOT an allowlist). Preserve the exact script/locale and never drift to a neighboring language (Traditional Chinese must not become Simplified, Japanese, or Korean). On mixed or ambiguous input, follow the dominant language of that message; if still unresolvable, default to English. This governs **live chat only** — code, commits, specs, ADRs, rules, and other repo artifacts always stay in English; "English is canonical" is an artifact rule, never a chat-output rule.
+Reply in the user's input language — detect it from their latest message and mirror it for **any** language (繁體中文 → 繁體中文, 日本語 → 日本語, English → English; the arrows are examples, NOT an allowlist). Preserve the exact script/locale and never drift to a neighboring language, and never collapse a non-English input into English (Traditional Chinese must not become Simplified, Japanese, Korean, or English). On mixed or ambiguous input, follow the dominant language of that message; if still unresolvable, default to English. This governs **live chat only** — code, commits, specs, ADRs, rules, and other repo artifacts always stay in English; "English is canonical" is an artifact rule, never a chat-output rule.
 
 ## Core Directives
 
