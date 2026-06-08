@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.4.0] - 2026-06-08
+
+Release covering work merged since the v1.3.0 tag. Adds local validation tooling, work-log lock resilience, advisory governance linters, and multi-agent review guidance; hardens cross-platform deploy/validation; and polishes the public README.
+
+**Features**
+- **Opt-in pre-commit local validation hook (#192)**: a bundled `.githooks/pre-commit.guard-ssot.sample` runs Agentic OS validation before each commit (PowerShell-aware on Windows, falls back to `validate.sh`). Validator failures block the commit; guarded SSoT receipt warnings stay advisory.
+- **Work Log lock auto-recovery (#188)**: stale `<worklog-key>.lock.json` advisory locks are recovered automatically instead of hard-blocking, while genuinely active CLI-created locks are preserved.
+- **Advisory spec drift linter (#156)**: flags acceptance-criteria coverage gaps between a spec and the staged git diff (advisory, non-blocking).
+- **Multi-agent review guidelines + contributor adapters (#162)**: shared review guidance that maps back to canonical rules instead of duplicating them.
+
+**Validator & deploy hardening**
+- Deploy now backs up and warns on locally-modified core-file overwrite instead of silently clobbering; `sha256` comparison hardened for Windows/Git-Bash backslash paths (#173).
+- `validate.sh` uses POSIX `[[:space:]]` instead of GNU-only `\s` for portability (#190); PowerShell validator parity gaps closed; flaky SIGPIPE in `cs_content` index parsing eliminated (#182).
+
+**Governance**
+- `CLAUDE.md` / `GEMINI.md` added to the tiny-fix exclusion set with a 4-way drift guard; the Claude/Gemini startup line reframed as an intent-first pointer.
+
+**Docs**
+- README v1.4.0 polish: fixed the broken top version badge (the shields.io URL had an unencoded space in `Agentic OS`, which returned HTTP 000 on GitHub) and converted the ASCII "The Solution" hero diagram to a mermaid flowchart with explicit `FAIL → STOP` branches. Version banners bumped to v1.4.0 across `README.md`, `docs/README_zh-TW.md`, `CITATION.cff`, the Model Selection Guide (EN + zh-TW), the Testing Protocol (EN + zh-TW), `deploy.sh` (`ACX_VERSION`), and the Antigravity runtime guide. Measurement-tied banners (`LIFECYCLE_BENCHMARK`, dated to the 2026-05-31 snapshot) were intentionally left unchanged.
+
 ## [1.3.0] - 2026-06-03
 
 Consolidated release covering PRs #124–#177 since v1.2.0. Activates the downstream override layer, adds a merge-conflict-marker validator gate, brings the sh/ps1 validators to full count parity, expands governance contract tests, and polishes the public-facing docs.

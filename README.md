@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/Agentic OS-v1.3.0-blueviolet?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJ3aGl0ZSI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTAgMThjLTQuNDEgMC04LTMuNTktOC04czMuNTktOCA4LTggOCAzLjU5IDggOC0zLjU5IDgtOCA4eiIvPjwvc3ZnPg==" alt="Agentic OS v1.3.0"/>
+  <img src="https://img.shields.io/badge/Agentic%20OS-v1.4.0-blueviolet?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJ3aGl0ZSI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTAgMThjLTQuNDEgMC04LTMuNTktOC04czMuNTktOCA4LTggOCAzLjU5IDggOC0zLjU5IDgtOCA4eiIvPjwvc3ZnPg==" alt="Agentic OS v1.4.0"/>
 </p>
 
 <h1 align="center">Agentic OS</h1>
@@ -38,15 +38,22 @@ AI coding agents are powerful, but they need shared operating rules. Without str
 
 **Agentic OS** is a portable governance framework that gives AI agents a repeatable engineering workflow. Install it into your project, and your AI agents gain:
 
-```
-   Intent          Gate           Workflow         Evidence        Ship
-  ┌──────┐      ┌──────┐       ┌──────────┐     ┌──────────┐   ┌──────┐
-  │ User │ ───▸ │ Gate │ ───▸  │ Workflow  │ ──▸ │ Evidence │ ─▸│ Ship │
-  │ says │      │Engine│       │ + Skills  │     │ Required │   │ SSoT │
-  └──────┘      └──────┘       └──────────┘     └──────────┘   └──────┘
-                  │ FAIL                           │ FAIL
-                  ▼                                ▼
-               ⛔ STOP                          ⛔ STOP
+```mermaid
+flowchart LR
+    U["User<br/>says"] --> G{"Gate<br/>Engine"}
+    G -->|PASS| W["Workflow<br/>+ Skills"]
+    W --> E{"Evidence<br/>Required"}
+    E -->|PASS| S["Ship<br/>→ SSoT"]
+    G -->|FAIL| X1["⛔ STOP"]
+    E -->|FAIL| X2["⛔ STOP"]
+
+    style U fill:#8b5cf6,color:#fff,stroke:none
+    style G fill:#f59e0b,color:#fff,stroke:none
+    style W fill:#3b82f6,color:#fff,stroke:none
+    style E fill:#22c55e,color:#fff,stroke:none
+    style S fill:#06b6d4,color:#fff,stroke:none
+    style X1 fill:#ef4444,color:#fff,stroke:none
+    style X2 fill:#ef4444,color:#fff,stroke:none
 ```
 
 The idea behind every phase is the same: if there's no verifiable evidence, the task isn't done — and the gates enforce that, instead of trusting the agent to self-report honestly.

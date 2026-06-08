@@ -1,4 +1,4 @@
-# Agentic OS v1.3.0 (Runtime v1.1 Anti-Drift Edition)
+# Agentic OS v1.4.0 (Runtime v1.1 Anti-Drift Edition)
 
 [English Version](../README.md)
 
