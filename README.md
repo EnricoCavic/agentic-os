@@ -253,6 +253,9 @@ powershell -ExecutionPolicy Bypass -File .\installers\deploy_brain.ps1 .
 powershell -ExecutionPolicy Bypass -File .\.agentcortex\bin\validate.ps1
 
 # Lightweight validation when Python is not installed
+powershell -ExecutionPolicy Bypass -File .\.agentcortex\bin\validate.ps1 -NoPython
+
+# (Git Bash equivalent)
 bash ./.agentcortex/bin/validate.sh --no-python
 ```
 
