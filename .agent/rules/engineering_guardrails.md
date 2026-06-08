@@ -104,7 +104,7 @@ Before emitting any verdict (phase pass/fail, classification, completion claim),
 ### 4.2 Spec Freezing (SSoT Protection)
 
 - Whenever a Spec is approved or the task transitions to implementation, the Spec MUST be marked as **FROZEN** (e.g., via YAML frontmatter `status: frozen`).
-- **Shipped Status**: After `/ship` delivers a spec's feature, `/ship` sets `status: shipped` on the spec frontmatter. Shipped specs are **historical reference only** — they document past decisions. For current system design, read the corresponding Domain Doc L1 (`docs/architecture/<domain>.md`) instead. Shipped specs MUST NOT be cited as authoritative current design.
+- **Shipped Status**: After `/ship` delivers a spec's feature, `/ship` sets `status: shipped` on the spec frontmatter. Shipped specs are **historical reference only** — they document past decisions. For current system design, read the corresponding Domain Doc L1 (`docs/architecture/<domain>.md`) instead, when present — `docs/architecture/` is created on demand by `/app-init` (capability-by-presence; absent on a fresh project until the first domain doc is written). Shipped specs MUST NOT be cited as authoritative current design.
 - AI agents MUST NOT modify, review, or suggest refactoring for any document marked as `FROZEN` or `Finalized` during normal tasks.
 - **Exception (AI-Initiated Unfreeze)**: If the AI discovers that a FROZEN spec must be changed (due to a bug or requirement change), the AI MUST:
   1. **STOP** and surface the issue explicitly: "⚠️ [Filename] is FROZEN but requires update: [Reason]. Approve to unfreeze and continue? (yes/no)"
