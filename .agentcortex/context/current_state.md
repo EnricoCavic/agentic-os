@@ -21,7 +21,7 @@
   - docs/adr/ADR-003-hash-chained-audit-log.md — ADR-003: Hash-Chained Tamper-Evident Audit Log (INDEX.jsonl), accepted 2026-04-25 (amended 2026-05-29: tail-truncation witness + migrate fail-closed)
   - docs/adr/ADR-004-override-layer-activation.md — ADR-004: Override Layer Activation (lazy per-fork/per-user governance override), accepted 2026-06-03 · applies_to: AGENTS.md, bootstrap.md, doc-governance.md, platform entries
   - docs/adr/ADR-005-downstream-file-preservation-tiering.md — ADR-005: Downstream File-Preservation Tiering (skills→sidecar, framework-authoritative→force-update, custom/* namespace), accepted 2026-06-03 · applies_to: deploy.sh, deploy.ps1, tests/deploy
-- **Active Backlog**: `docs/specs/_product-backlog.md` (23 active items; Kind/Labels/Priority columns active 2026-05-06)
+- **Active Backlog**: `docs/specs/_product-backlog.md` (21 active items; Kind/Labels/Priority columns active 2026-05-06)
 - **Spec Index** (shipped specs at `docs/specs/`; drafts/research tracked in `_product-backlog.md`):
   - docs/specs/lock-unification.md — Guarded Governance Writes implementation spec, [Shipped 2026-04-25] (ADR-002)
   - docs/specs/ci-security-scanning.md — CI Security Scanning (Semgrep + TruffleHog + dependency audit), [Shipped 2026-05-11] (backlog #20)

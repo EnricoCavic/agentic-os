@@ -3,7 +3,7 @@ status: archive
 title: Product Backlog — Completed Archive
 source: split out of _product-backlog.md (backlog item #8)
 created: 2026-06-02
-last_updated: 2026-06-02
+last_updated: 2026-06-09
 ---
 
 # Product Backlog — Completed Archive
@@ -51,3 +51,5 @@ living backlog still resolve here. Ship details: see Ship History in
 | 42 | Audit-chain tamper-evidence hardening: tail-truncation detection (git append-only witness) + guard `migrate` against re-blessing forged history [audit C1+C2] | framework | governance | P1 | docs/specs/audit-chain-tamper-evidence.md | feature | Shipped | — |
 | 43 | ~~Guard write lock unification [audit C3]~~ — **Cancelled (verified not-a-bug 2026-05-29)**: cmd_write wraps BOTH replace & append in `file_lock(lock_path_for_target)`; append_write's sidecar is a redundant nested lock and has no direct callers. No disjoint-lock path. Defensive docstrings added to prevent the latent direct-call footgun. | framework | concurrency | P1 | — | — | Cancelled | — |
 | 44 | validate.sh ↔ validate.ps1 parity backfill [audit D] — verified: only gate-receipt-schema check was a real PS1 gap (others already at parity); backfilled into validate.ps1 | framework | tooling | P2 | — | quick-win | Shipped | — |
+| 50 | Spec drift linter (AC coverage vs git diff, advisory) | framework | governance | P2 | docs/specs/spec-drift-linter.md | feature | Shipped | — |
+| 56 | Cross-platform adapter generator (Gemini/Cursor/Copilot stubs) | framework | platform | P2 | docs/specs/multi-agent-review-guidelines.md | feature | Shipped | — |
