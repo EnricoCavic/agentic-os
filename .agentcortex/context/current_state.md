@@ -13,16 +13,16 @@
   - Workflows & Policies: `.agent/workflows/*.md`, `.agent/rules/*.md`
 - **Project Name**: (set by /app-init)
 - **Last Updated**: 2026-06-08T18:00:00+08:00
-- **Last Verified**: 2026-06-08
+- **Last Verified**: 2026-06-09
 - **Update Sequence**: 43
 - **ADR Index**:
   - docs/adr/ADR-001-governance-friction-tuning.md — ADR-001: Governance Friction Tuning, accepted 2026-04-23
   - docs/adr/ADR-002-guarded-governance-writes.md — ADR-002: Guarded Governance Writes (lock unification + CI lint + lifecycle frontmatter), accepted 2026-04-25
   - docs/adr/ADR-003-hash-chained-audit-log.md — ADR-003: Hash-Chained Tamper-Evident Audit Log (INDEX.jsonl), accepted 2026-04-25 (amended 2026-05-29: tail-truncation witness + migrate fail-closed)
-  - docs/adr/ADR-004-override-layer-activation.md — ADR-004: Override Layer Activation (lazy per-fork/per-user governance override), proposed 2026-06-03 · applies_to: AGENTS.md, bootstrap.md, doc-governance.md, platform entries
-  - docs/adr/ADR-005-downstream-file-preservation-tiering.md — ADR-005: Downstream File-Preservation Tiering (skills→sidecar, framework-authoritative→force-update, custom/* namespace), proposed 2026-06-03 · applies_to: deploy.sh, deploy.ps1, tests/deploy
-- **Active Backlog**: docs/specs/_product-backlog.md (40 items; Kind/Labels/Priority columns active 2026-05-06)
-- **Spec Index** (project specs at `docs/specs/`):
+  - docs/adr/ADR-004-override-layer-activation.md — ADR-004: Override Layer Activation (lazy per-fork/per-user governance override), accepted 2026-06-03 · applies_to: AGENTS.md, bootstrap.md, doc-governance.md, platform entries
+  - docs/adr/ADR-005-downstream-file-preservation-tiering.md — ADR-005: Downstream File-Preservation Tiering (skills→sidecar, framework-authoritative→force-update, custom/* namespace), accepted 2026-06-03 · applies_to: deploy.sh, deploy.ps1, tests/deploy
+- **Active Backlog**: docs/specs/_product-backlog.md (23 active items; Kind/Labels/Priority columns active 2026-05-06; Shipped/Cancelled rows split to _product-backlog-archive.md 2026-06-02 per backlog #8)
+- **Spec Index** (shipped project specs at `docs/specs/`; lists shipped graduations only — draft/research specs are tracked in `docs/specs/_product-backlog.md` `Spec File` column, not here):
   - docs/specs/lock-unification.md — Guarded Governance Writes implementation spec, [Shipped 2026-04-25] (ADR-002)
   - docs/specs/ci-security-scanning.md — CI Security Scanning (Semgrep + TruffleHog + dependency audit), [Shipped 2026-05-11] (backlog #20)
   - docs/specs/audit-chain-tamper-evidence.md — Audit-Chain Tamper-Evidence Hardening (C1 truncation + C2 migrate), [Shipped 2026-05-29] (ADR-003 amendment, backlog #42)
