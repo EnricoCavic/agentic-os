@@ -3,7 +3,7 @@ status: living
 title: Product Backlog
 source: governance-bloat-review-2026-04-12 + optimization-round-2026-05-04 + optimization-research-2026-06-02
 created: 2026-04-12
-last_updated: 2026-06-04
+last_updated: 2026-06-09
 ---
 
 # Product Backlog
@@ -44,9 +44,7 @@ Governance file bloat review (2026-04-12) identified 10 findings across P0–P2:
 | 33 | Claude Code plugin packaging (.claude-plugin/plugin.json + bin/ + commands/agents/hooks bundling, no monitors) | dx | packaging | P2 | — | feature | Pending | [#150](https://github.com/KbWen/agentic-os/issues/150) | #30, #31 |
 | 45 | Governance behavioral eval harness + DELETE-bias diff | framework | governance | P1 | — | feature | Pending | [#151](https://github.com/KbWen/agentic-os/issues/151) | — |
 | 48 | Skill discovery linter + skill-cards.json index | framework | skills | P2 | — | quick-win | Pending | [#154](https://github.com/KbWen/agentic-os/issues/154) | — |
-| 50 | Spec drift linter (AC coverage vs git diff, advisory) | framework | governance | P2 | docs/specs/spec-drift-linter.md | feature | Shipped | [#156](https://github.com/KbWen/agentic-os/issues/156) | — |
 | 51 | Token lifecycle baseline + drift detector | framework | ci | P2 | — | quick-win | Pending | [#157](https://github.com/KbWen/agentic-os/issues/157) | — |
-| 56 | Cross-platform adapter generator (Gemini/Cursor/Copilot stubs) | framework | platform | P2 | docs/specs/multi-agent-review-guidelines.md | feature | Shipped | [#162](https://github.com/KbWen/agentic-os/issues/162) | — |
 | 57 | CI hardening: pinned requirements + pip cache + UTF-8 + pytest on PR | framework | ci | P2 | — | quick-win | Pending | [#163](https://github.com/KbWen/agentic-os/issues/163) | — |
 | 58 | Downstream local_guardrails.md extension point | framework | governance | P2 | — | quick-win | Pending | [#164](https://github.com/KbWen/agentic-os/issues/164) | — |
 | 65 | Deletion-First Norm + ADD-gate signal tiering | framework | governance | P1 | — | feature | Pending | [#166](https://github.com/KbWen/agentic-os/issues/166) | #45 |
