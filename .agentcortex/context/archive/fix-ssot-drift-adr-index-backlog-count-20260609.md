@@ -85,3 +85,10 @@ none
   - L25 Spec Index header → notes shipped-only graduation convention
 - Integrity: `bash validate.sh` → pass=99 warn=9 fail=0 skip=2. fail=0. warn delta vs v1.4.1 baseline (7→9) = my own in-flight work log ("active work log count 9>8") + a pre-existing stale-lock fluctuation; none touch current_state.md.
 - SSoT write routed through guard_context_write.py (optimistic lock, expected-sha verified). Receipt: `.guard_receipts/337ffd90d88a8b4f.json`.
+
+## Post-Ship Addendum (work continued in same PR #208)
+This log was archived at the ship snapshot; the bullets above are accurate as of that moment. The work unit then continued at user request — superseding state:
+- **Active Backlog count**: the "23 active items / archive-split note" above was later (a) trimmed of the over-annotation, and (b) superseded by archiving the 2 remaining Shipped rows (#50, #56) to `_product-backlog-archive.md` → active is now **21 all-Pending rows**; SSoT count synced 40→21. The "#50/#56 deferred" note above is therefore obsolete — they were archived in this PR.
+- **Extension fix (post-ship multi-angle review)**: activated a dormant guard — both `validate.sh`/`validate.ps1` and `ship.md` expect the Active Backlog path backtick-quoted, but the SSoT used a bare path so the path-consistency check was vacuously passing; backtick-quoting re-activated it (no new validator added).
+- **Process catch**: archiving #50/#56 with a leading-`\n` Edit anchor on a CRLF file merged rows #48/#51/#57 onto one line; caught by a row-count check (19 vs expected 21) and repaired before commit (final diff clean). See memory `feedback-edit-row-delete-verify-count`.
+- **Final integrity**: `bash validate.sh` → pass=101 warn=7 fail=0 skip=2 (v1.4.1 baseline). Commits `f3ac21c` → `400333b` (6 total). PR #208 CI green.
