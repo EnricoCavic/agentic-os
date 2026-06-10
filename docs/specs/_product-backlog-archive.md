@@ -53,3 +53,4 @@ living backlog still resolve here. Ship details: see Ship History in
 | 44 | validate.sh ↔ validate.ps1 parity backfill [audit D] — verified: only gate-receipt-schema check was a real PS1 gap (others already at parity); backfilled into validate.ps1 | framework | tooling | P2 | — | quick-win | Shipped | — |
 | 50 | Spec drift linter (AC coverage vs git diff, advisory) | framework | governance | P2 | docs/specs/spec-drift-linter.md | feature | Shipped | — |
 | 56 | Cross-platform adapter generator (Gemini/Cursor/Copilot stubs) | framework | platform | P2 | docs/specs/multi-agent-review-guidelines.md | feature | Shipped | — |
+| 17 | Hard Work Log lock (advisory → blocking) | framework | concurrency | P1 | docs/specs/worklog-lock-blocking.md | feature | Shipped | [#147](https://github.com/KbWen/agentic-os/issues/147) |

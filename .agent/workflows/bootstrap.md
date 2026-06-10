@@ -44,7 +44,7 @@ Each classification reads ONLY the rows marked REQUIRED. Skip rows marked SKIP �
 | §1 Step 2b Domain Doc Context Loading | SKIP | SKIP | REQUIRED | SKIP |
 | §1 Steps 3–6 (private, migration, backlog, raw material) | SKIP | conditional | conditional | conditional |
 | §2 Work Log Header Setup | SKIP | REQUIRED | REQUIRED | REQUIRED |
-| §2a Advisory Work Log Lock | SKIP | REQUIRED | REQUIRED | REQUIRED |
+| §2a Work Log Lock | SKIP | REQUIRED | REQUIRED | REQUIRED |
 | §2b Phase Tracking Contract | SKIP | REQUIRED | REQUIRED | REQUIRED |
 | §3 Expected Output Format | inline only | REQUIRED | REQUIRED | REQUIRED |
 | §3.6 / §3.6a Recommended Skills | SKIP | REQUIRED | REQUIRED | REQUIRED |
@@ -126,7 +126,7 @@ Tool exit codes:
      - If `Current Phase: test` AND classification is `feature` or `architecture-change`: output `Next: /handoff` — the formal handoff step is required before ship.
      - If `Current Phase: handoff` (HANDEDOFF state — handoff completed, ship pending): output `Next: /ship` immediately. This is the only legal continuation; do NOT re-bootstrap from scratch.
      - If `Current Phase: ship`: output `Next: /ship — previously started, check Work Log ## Gate Evidence for completion status`.
-     - If metadata differs (another agent/user owns it) → **WARN the user AND require confirmation before proceeding** ("⚠️ Concurrent session detected. Proceed?").
+     - If metadata differs (another agent/user owns it) → note the differing owner/session in chat, but do NOT prompt here — the §2a lock verdict is the single authoritative concurrency check (under `worklog_lock.mode: blocking`, an active other-holder lock is a Gate FAIL at §2a; duplicate prompts with different semantics are prohibited). If the lock verdict permits proceeding (stale/recovered/takeover), use the multi-person variant `<owner>-<worklog-key>.md` instead of writing to another session's log.
      - If metadata is missing → warn "⚠️ Legacy Work Log detected, verify ownership".
    - If Work Log has `## Lessons` block (from prior retro): acknowledge relevant patterns in your bootstrap output.
    - If Work Log has `## Risks` block: include in your bootstrap context summary.
@@ -262,9 +262,9 @@ none
 - Pending: bootstrap only; no implementation evidence yet.
 ```
 
-## 2a. Advisory Work Log Lock
+## 2a. Work Log Lock (single-writer)
 
-When creating or resuming a Work Log (non-`tiny-fix`), write or update an advisory lock file at `.agentcortex/context/work/<worklog-key>.lock.json`:
+When creating or resuming a Work Log (non-`tiny-fix`), acquire the Work Log lock at `.agentcortex/context/work/<worklog-key>.lock.json`. Lock semantics are governed by `.agent/config.yaml §worklog_lock.mode` (`blocking` by default; `advisory` = legacy warn-and-confirm). Phase-entry refresh and exit-code consumption rules: `shared-contracts.md §Phase-Entry Lock`. Lock file schema:
 
 ```json
 {
@@ -290,19 +290,19 @@ python .agentcortex/tools/recover_worklog_lock.py ensure \
   --phase bootstrap
 ```
 
-The helper classifies the lock as `missing`, `active`, or `recoverable`, checks optional `pid` liveness, overwrites missing/recoverable locks, and records recoveries in the Work Log `## Drift Log`. Exit code `2` means a non-stale lock is active for another owner/session and MUST be surfaced before continuing.
+The helper classifies the lock as `missing`, `active`, or `recoverable`, checks optional `pid` liveness, atomically acquires missing/recoverable locks (`O_CREAT|O_EXCL`; racing recoverers serialize via unlink + exclusive create), and records recoveries in the Work Log `## Drift Log`. Exit code `2` means a non-stale lock is active for another owner/session: under `worklog_lock.mode: blocking` (default) this is a **Gate FAIL** — STOP and offer wait-for-staleness / user-approved `ensure --takeover` / switch branch; under `mode: advisory` surface it and ask confirmation before continuing. Exit code `3` is a filesystem failure, not a held lock.
 
 The CLI intentionally omits `pid` by default because the helper process exits immediately after writing the lock; a short-lived helper PID does not represent the owning agent session. Only pass `--pid <owner-pid>` from a long-lived process that truly owns the lock.
 
-**Python-unavailable fallback / manual resume**: If the helper cannot run and a lock file exists that belongs to another session:
+**Python-unavailable fallback / manual resume**: Blocking enforcement requires the helper; without Python the lock degrades to this manual advisory checklist (stated honestly — no fake MUST). If the helper cannot run and a lock file exists that belongs to another session:
 
 - Check `updated_at` + `stale_timeout_minutes`. If stale (expired), warn and overwrite.
 - If `pid` is present and not alive, warn, overwrite, and record the recovery in the Work Log `## Drift Log`.
 - If the lock JSON is corrupted or lacks a parseable `updated_at`, warn, overwrite, and record the recovery in the Work Log `## Drift Log`.
 - If non-stale, output: `"⚠️ Active lock held by [owner] since [updated_at]. Concurrent edit risk. Proceed? (yes/no)"`.
-- This is advisory — it warns but does not hard-block.
+- This manual fallback path is advisory — it warns but does not hard-block (no Python = no machine verdict to gate on).
 
-**On phase transitions**: Each workflow SHOULD update the lock file's `phase` and `updated_at` when entering a new phase.
+**On phase transitions**: Each non-`tiny-fix` workflow MUST re-run `ensure` with the entering phase name (refreshes `phase` + `updated_at`) — per `shared-contracts.md §Phase-Entry Lock`. Without per-phase refresh, a long session's lock goes stale mid-work and another session can legitimately recover it.
 
 Lock file schema and timeout are defined in `.agent/config.yaml §worklog_lock`.
 

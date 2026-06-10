@@ -141,7 +141,7 @@ Every project has one canonical state file. AI agents read it first, write to it
 Built for teams where multiple AI sessions work on the same codebase:
 
 - **One Branch = One Owner** — prevents concurrent Work Log corruption
-- **Advisory Locking** — lock files signal active sessions without blocking
+- **Single-Writer Locking** — atomic lock files block concurrent sessions per branch (configurable back to advisory)
 - **Ship Guard** — checks for SSoT conflicts before merging
 - **Session Identity** — every AI session writes its model name and timestamp
 
