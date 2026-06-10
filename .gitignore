@@ -49,3 +49,4 @@ __pycache__/
 
 # Node (if subcomponents added)
 node_modules/
+.claude/worktrees/

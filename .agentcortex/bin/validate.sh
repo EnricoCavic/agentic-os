@@ -2394,7 +2394,7 @@ if [[ -f "$ACX_EVAL_YAML" ]]; then
     _eval_zero_count="$(printf '%s' "$_eval_cov_text" | grep -oE 'Zero-coverage rules: [0-9]+' | grep -oE '[0-9]+' | head -1)"
     _eval_zero_count="${_eval_zero_count:-0}"
     if [[ "$_eval_zero_count" -gt 0 ]]; then
-      record_result WARN "governance eval coverage: ${_eval_zero_count} MUST-rule section(s) with zero guarding cases" || true
+      record_result WARN "governance eval coverage: ${_eval_zero_count} MUST-rule section(s) without eval cases (tier-blind: includes machine-enforced and principle-tier rules; see guardrails s13)" || true
       print_indented_output "$(printf '%s' "$_eval_cov_text" | grep -A9999 'Rules with zero guarding cases:' | head -20)" || true
     else
       record_result PASS "governance eval coverage: 0 MUST-rule section(s) with zero guarding cases" || true
