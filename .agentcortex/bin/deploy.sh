@@ -349,8 +349,9 @@ fi
 # --- Smart deploy a single file (public API) ---
 # deploy_file <source_abs> <target_rel> [chmod]
 #
-# Batch path (Bash 4+, !ACX_FORCE_PERFILE): appends a queue record and returns.
-#   All hashing is deferred to process_queue (one xargs sha256sum over all files).
+# Batch path (Bash 4.3+, !ACX_FORCE_PERFILE): appends a queue record and returns.
+#   All hashing is deferred to process_queue (one single-process pass per list,
+#   order-paired hash output — see _batch_hash_normalized).
 # Per-file fallback (Bash 3.2 or ACX_FORCE_PERFILE=1): computes hashes inline
 #   and calls _deploy_file_now immediately — identical behavior, just slower on
 #   high-spawn-cost hosts (MSYS/Windows ~28ms/spawn × ~2600 files = 43-72s).
@@ -427,7 +428,8 @@ process_queue() {
     #      corrupting associative-array keys on raw output.
     #   2. grep -P '\r' (or grep -l $'\r') silently strips CRs in MSYS text
     #      mode, making CR-detection unreliable — CRLF files always missed.
-    # Output format: "<hash>  <abs-path>" (one per line, no trailing spaces).
+    # Output format: ONE line per input path, IN ORDER — the hash hex or MISS.
+    # (Hash-only by design: path strings never round-trip through Python.)
     _PYTHON_CMD=""
     for _py_cand in python3 python py; do
         if command -v "$_py_cand" >/dev/null 2>&1; then
@@ -540,7 +542,7 @@ for raw in lines:
 
 DEPLOYED_FILES_TMP="$(mktemp)"
 _DEPLOY_QUEUE_TMP="$(mktemp)"
-trap 'rm -f "$DEPLOYED_FILES_TMP" "$_DEPLOY_QUEUE_TMP" "${TMP_STRIPPED_GITIGNORE:-}" "${TMP_NORMALIZED_GITIGNORE:-}" "${GITIGNORE:-}.tmp"' EXIT
+trap 'rm -f "$DEPLOYED_FILES_TMP" "$_DEPLOY_QUEUE_TMP" "${_src_list_tmp:-}" "${_dst_list_tmp:-}" "${_xlat_tmp:-}" "${TMP_STRIPPED_GITIGNORE:-}" "${TMP_NORMALIZED_GITIGNORE:-}" "${GITIGNORE:-}.tmp"' EXIT
 
 SOURCE_COMMIT="$(get_source_commit)"
 IS_UPDATE=false
@@ -1003,8 +1005,8 @@ fi
 
 # --- Flush deploy queue (batch hashing — Bash 4+ path) ---
 # All deploy_file calls above have queued their records; process_queue now
-# batch-hashes them in two xargs sha256sum invocations (one over src paths,
-# one over existing dst paths) and calls _deploy_file_now per entry.
+# batch-hashes them in two single-process passes (one over src paths, one over
+# existing dst paths; order-paired output) and calls _deploy_file_now per entry.
 # No-op when _ACX_BATCH_OK=false (per-file path already ran inline above).
 if $_ACX_BATCH_OK; then
     process_queue
@@ -1251,14 +1253,17 @@ _user_skill_names=""   # aggregated list of user-created (non-framework) skill n
 _skill_in_old_manifest() {
     local _look="$1"
     [ -f "$MANIFEST_FILE" ] || return 1
-    # For dir skills the prefix is ".agents/skills/<name>/"; match any line with that prefix.
-    # For flat skills the exact path is ".agent/skills/<name>".
+    # Dir skills pass ".agents/skills/<name>/" (trailing slash = safe prefix match).
+    # Flat skills pass ".agent/skills/<name>" (NO slash) and must match the rel
+    # path EXACTLY — an unbounded prefix would let a user-created flat skill
+    # named as a strict prefix of a manifested one (e.g. "red-team" vs
+    # "red-team-adversarial") be falsely accused as retired-upstream.
     awk -v p="$_look" '
         /^(core|scaffold|wrapper) / {
-            # $2 is the rel_path
             n = split($0, a, " ")
             rel = a[2]
-            if (index(rel, p) == 1) { found=1; exit }
+            if (p ~ /\/$/) { if (index(rel, p) == 1) { found=1; exit } }
+            else            { if (rel == p)           { found=1; exit } }
         }
         END { exit (found ? 0 : 1) }
     ' "$MANIFEST_FILE"
