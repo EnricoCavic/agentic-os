@@ -441,7 +441,7 @@ if $DRY_RUN; then
     _dry_count=0
     # Enumerate only the files that are actually deployed (mirrors real deploy logic).
     # Runtime Python tools are a whitelist — NOT all *.py in tools/.
-    _runtime_tools="guard_context_write.py _yaml_loader.py check_command_sync.py check_text_integrity.py check_text_integrity.ps1 text_integrity_baseline.txt sync_skills.sh lint_governed_writes.py check_lifecycle_frontmatter.py check_lesson_chain.py check_adr_coverage.py append_chain_entry.py append_lesson.py recover_worklog_lock.py lint_spec_drift.py"
+    _runtime_tools="guard_context_write.py _yaml_loader.py check_command_sync.py check_text_integrity.py check_text_integrity.ps1 text_integrity_baseline.txt sync_skills.sh lint_governed_writes.py check_lifecycle_frontmatter.py check_lesson_chain.py check_adr_coverage.py append_chain_entry.py append_lesson.py recover_worklog_lock.py lint_spec_drift.py run_governance_eval.py"
     for f in "$REPO_ROOT"/AGENTS.md "$REPO_ROOT"/CLAUDE.md \
              "$REPO_ROOT"/.gitattributes \
              "$REPO_ROOT"/installers/deploy_brain.sh "$REPO_ROOT"/installers/deploy_brain.ps1 "$REPO_ROOT"/installers/deploy_brain.cmd \
@@ -638,6 +638,7 @@ runtime_tools=(
   append_lesson.py
   recover_worklog_lock.py
   lint_spec_drift.py
+  run_governance_eval.py
 )
 for bname in "${runtime_tools[@]}"; do
     f="$REPO_ROOT/.agentcortex/tools/$bname"

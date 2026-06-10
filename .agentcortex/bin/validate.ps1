@@ -2191,6 +2191,35 @@ if (Test-Path -Path $agentsDir -PathType Container) {
     Add-Result -Level 'SKIP' -Message 'acx phase shim skill check -- .claude/agents/ not present'
 }
 
+# Governance eval coverage advisory (AC-7): capability-by-presence.
+# If .agentcortex/eval/governance.yaml exists AND python is available, run
+# run_governance_eval.py --coverage and WARN with the count of MUST-rule
+# sections that have zero guarding cases. Never FAIL; silent skip when the
+# eval file or python is absent. Zero zero-coverage rules -> PASS.
+$acxEvalYaml   = Join-NormalPath $root '.agentcortex/eval/governance.yaml'
+$acxEvalRunner = Join-NormalPath $root '.agentcortex/tools/run_governance_eval.py'
+if (Test-Path -Path $acxEvalYaml -PathType Leaf) {
+    if (-not $script:PythonCommand) {
+        Add-Result -Level 'SKIP' -Message 'governance eval coverage -- python unavailable (install Python 3.9+ for full validation)'
+    } elseif (-not (Test-Path -Path $acxEvalRunner -PathType Leaf)) {
+        Add-Result -Level 'SKIP' -Message 'governance eval coverage -- runner not present (run_governance_eval.py missing)'
+    } else {
+        $prevEA = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        $evalCovText = & $script:PythonCommand.Source $acxEvalRunner --coverage 2>&1 | Out-String
+        $ErrorActionPreference = $prevEA
+        $zeroMatch = [regex]::Match($evalCovText, 'Zero-coverage rules:\s*(\d+)')
+        $zeroCnt = if ($zeroMatch.Success) { [int]$zeroMatch.Groups[1].Value } else { 0 }
+        if ($zeroCnt -gt 0) {
+            Add-Result -Level 'WARN' -Message "governance eval coverage: $zeroCnt MUST-rule section(s) with zero guarding cases"
+            $zeroLines = ($evalCovText -split "`r?`n") | Where-Object { $_ -match '^\s+-\s+' } | Select-Object -First 20
+            foreach ($zl in $zeroLines) { Write-Output "  $zl" }
+        } else {
+            Add-Result -Level 'PASS' -Message 'governance eval coverage: 0 MUST-rule section(s) with zero guarding cases'
+        }
+    }
+}
+
 Write-Output ''
 Write-Output "Summary: pass=$($script:PassCount) warn=$($script:WarnCount) fail=$($script:FailCount) skip=$($script:SkipCount)"
 if ($script:FailCount -gt 0) {

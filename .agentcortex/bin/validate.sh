@@ -2376,6 +2376,32 @@ else
   record_result SKIP "acx phase shim skill check -- .claude/agents/ not present"
 fi
 
+# Governance eval coverage advisory (AC-7): capability-by-presence.
+# If .agentcortex/eval/governance.yaml exists AND python is available, run
+# run_governance_eval.py --coverage --format json and WARN with the count of
+# MUST-rule sections that have zero guarding cases. Never FAIL; silent skip
+# when the eval file or python is absent. Zero zero-coverage rules → PASS.
+ACX_EVAL_YAML="$ROOT/.agentcortex/eval/governance.yaml"
+ACX_EVAL_RUNNER="$ROOT/.agentcortex/tools/run_governance_eval.py"
+if [[ -f "$ACX_EVAL_YAML" ]]; then
+  if [[ -z "${PYTHON_BIN:-}" ]]; then
+    record_result SKIP "governance eval coverage -- python unavailable (install Python 3.9+ for full validation)" || true
+  elif [[ ! -f "$ACX_EVAL_RUNNER" ]]; then
+    record_result SKIP "governance eval coverage -- runner not present (run_governance_eval.py missing)" || true
+  else
+    # Coverage mode emits text; parse the "Zero-coverage rules:" line.
+    _eval_cov_text="$("$PYTHON_BIN" "$ACX_EVAL_RUNNER" --coverage 2>&1)" || true
+    _eval_zero_count="$(printf '%s' "$_eval_cov_text" | grep -oE 'Zero-coverage rules: [0-9]+' | grep -oE '[0-9]+' | head -1)"
+    _eval_zero_count="${_eval_zero_count:-0}"
+    if [[ "$_eval_zero_count" -gt 0 ]]; then
+      record_result WARN "governance eval coverage: ${_eval_zero_count} MUST-rule section(s) with zero guarding cases" || true
+      print_indented_output "$(printf '%s' "$_eval_cov_text" | grep -A9999 'Rules with zero guarding cases:' | head -20)" || true
+    else
+      record_result PASS "governance eval coverage: 0 MUST-rule section(s) with zero guarding cases" || true
+    fi
+  fi
+fi
+
 echo ""
 printf 'Summary: pass=%s warn=%s fail=%s skip=%s\n' "$PASS_COUNT" "$WARN_COUNT" "$FAIL_COUNT" "$SKIP_COUNT"
 if [[ "$FAIL_COUNT" -gt 0 ]]; then
