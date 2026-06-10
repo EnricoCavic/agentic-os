@@ -2220,6 +2220,67 @@ if (Test-Path -Path $acxEvalYaml -PathType Leaf) {
     }
 }
 
+# AC-6: governance specs missing signal_tier frontmatter (guardrails §13 ADD-Gate).
+# Advisory WARN only — never FAIL. Checks docs/specs/*.md (skips _* meta/index
+# files). Conditions to WARN (ALL must hold):
+#   1. frontmatter primary_domain: contains "governance" (case-insensitive).
+#   2. frontmatter created: >= 2026-06-10 (ISO, lexical compare). Missing = skip.
+#   3. frontmatter status: is NOT shipped or cancelled.
+#   4. frontmatter has NO signal_tier: line (any value silences).
+$stWarnCount = 0
+$stWarnFiles = @()
+$stSpecDir = Join-NormalPath $root 'docs/specs'
+if (Test-Path -Path $stSpecDir -PathType Container) {
+    foreach ($stSpec in Get-ChildItem -Path $stSpecDir -Filter '*.md' -File -ErrorAction SilentlyContinue) {
+        # Skip underscore-prefixed meta/index specs (_*.md).
+        if ($stSpec.Name -like '_*') { continue }
+        $stRaw = Get-Content -LiteralPath $stSpec.FullName -Raw -Encoding utf8 -ErrorAction SilentlyContinue
+        if ($null -eq $stRaw) { continue }
+        # Normalize line endings, then extract YAML frontmatter between first --- pair.
+        $stNorm = $stRaw -replace "`r`n", "`n" -replace "`r", "`n"
+        $stLines = $stNorm -split "`n"
+        $stFmLines = @()
+        $stInFm = $false
+        $stFmDone = $false
+        foreach ($stLine in $stLines) {
+            if (-not $stFmDone) {
+                if ($stLine -eq '---') {
+                    if (-not $stInFm) { $stInFm = $true; continue }
+                    else { $stFmDone = $true; break }
+                }
+                if ($stInFm) { $stFmLines += $stLine }
+            }
+        }
+        $stFm = $stFmLines -join "`n"
+        # Condition 1: primary_domain contains "governance" (case-insensitive).
+        $stDomainMatch = [regex]::Match($stFm, '(?m)^primary_domain:\s*(.+)$')
+        if (-not $stDomainMatch.Success) { continue }
+        $stDomain = $stDomainMatch.Groups[1].Value.Trim()
+        if ($stDomain -notmatch '(?i)governance') { continue }
+        # Condition 2: created: >= 2026-06-10 (lexical). Missing = grandfathered, skip.
+        $stCreatedMatch = [regex]::Match($stFm, '(?m)^created:\s*(.+)$')
+        if (-not $stCreatedMatch.Success) { continue }
+        $stCreated = $stCreatedMatch.Groups[1].Value.Trim()
+        if ($stCreated -lt '2026-06-10') { continue }
+        # Condition 3: status not shipped or cancelled.
+        $stStatusMatch = [regex]::Match($stFm, '(?m)^status:\s*(\S+)')
+        $stStatus = if ($stStatusMatch.Success) { $stStatusMatch.Groups[1].Value.Trim() } else { '' }
+        if ($stStatus -eq 'shipped' -or $stStatus -eq 'cancelled') { continue }
+        # Condition 4: no signal_tier: line present.
+        if ($stFm -match '(?m)^signal_tier:') { continue }
+        $stWarnFiles += $stSpec.Name
+        $stWarnCount++
+    }
+}
+if ($stWarnCount -gt 0) {
+    Add-Result -Level 'WARN' -Message "governance specs missing signal_tier frontmatter (guardrails §13 ADD-Gate): $stWarnCount"
+    foreach ($stF in $stWarnFiles) {
+        Write-Output "  governance spec missing signal_tier: $stF"
+    }
+} else {
+    Add-Result -Level 'PASS' -Message 'governance-rule specs declare signal_tier (or none apply)'
+}
+
 Write-Output ''
 Write-Output "Summary: pass=$($script:PassCount) warn=$($script:WarnCount) fail=$($script:FailCount) skip=$($script:SkipCount)"
 if ($script:FailCount -gt 0) {

@@ -44,7 +44,7 @@ Governance file bloat review (2026-04-12) identified 10 findings across P0–P2:
 | 48 | Skill discovery linter + skill-cards.json index | framework | skills | P2 | — | quick-win | Pending | [#154](https://github.com/KbWen/agentic-os/issues/154) | — |
 | 51 | Token lifecycle baseline + drift detector | framework | ci | P2 | — | quick-win | Pending | [#157](https://github.com/KbWen/agentic-os/issues/157) | — |
 | 58 | Downstream local_guardrails.md extension point | framework | governance | P2 | — | quick-win | Pending | [#164](https://github.com/KbWen/agentic-os/issues/164) | — |
-| 65 | Deletion-First Norm + ADD-gate signal tiering | framework | governance | P1 | — | feature | Pending | [#166](https://github.com/KbWen/agentic-os/issues/166) | #45 |
+| 65 | Deletion-First Norm + ADD-gate signal tiering | framework | governance | P1 | docs/specs/deletion-first-add-gate.md | feature | In Progress | [#166](https://github.com/KbWen/agentic-os/issues/166) | #45 |
 | 66 | Recommended-workflows advisory layer | framework | routing | P2 | — | feature | Pending | [#167](https://github.com/KbWen/agentic-os/issues/167) | — |
 | 67 | Canonical-doc-path gate + research-wiki sidecar | framework | governance | P2 | — | quick-win | Pending | [#168](https://github.com/KbWen/agentic-os/issues/168) | — |
 | 68 | Authority-map metadata (read-this-not-that resolver) | framework | governance | P2 | — | quick-win | Pending | [#169](https://github.com/KbWen/agentic-os/issues/169) | — |

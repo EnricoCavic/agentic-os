@@ -2402,6 +2402,59 @@ if [[ -f "$ACX_EVAL_YAML" ]]; then
   fi
 fi
 
+# AC-6: governance specs missing signal_tier frontmatter (guardrails §13 ADD-Gate).
+# Advisory WARN only — never FAIL. Checks docs/specs/*.md (skips _* meta/index
+# files). Conditions to WARN (ALL must hold):
+#   1. frontmatter primary_domain: contains "governance" (case-insensitive).
+#   2. frontmatter created: >= 2026-06-10 (ISO, lexical compare). Missing = skip.
+#   3. frontmatter status: is NOT shipped or cancelled.
+#   4. frontmatter has NO signal_tier: line (any value silences).
+_st_warn_count=0
+_st_warn_files=()
+shopt -s nullglob
+for _st_spec in "$ROOT"/docs/specs/*.md; do
+  [[ -f "$_st_spec" ]] || continue
+  _st_base="$(basename "$_st_spec")"
+  # Skip underscore-prefixed meta/index specs (_*.md).
+  [[ "$_st_base" == _* ]] && continue
+  # Extract YAML frontmatter (between first pair of --- lines); strip \r.
+  _st_fm="$(awk '/^---/{if(found){exit}else{found=1;next}} found{print}' "$_st_spec" | tr -d '\r')"
+  # Condition 1: primary_domain contains "governance" (case-insensitive).
+  # Use || true on grep to avoid set -e exit when grep finds no match.
+  _st_domain="$(printf '%s' "$_st_fm" | grep -i '^primary_domain:' | head -1 | sed 's/^[^:]*:[[:space:]]*//' || true)"
+  if ! printf '%s' "$_st_domain" | grep -qi 'governance'; then
+    continue
+  fi
+  # Condition 2: created: >= 2026-06-10 (lexical). Missing = grandfathered, skip.
+  _st_created="$(printf '%s' "$_st_fm" | grep '^created:' | head -1 | sed 's/^[^:]*:[[:space:]]*//' || true)"
+  if [[ -z "$_st_created" ]]; then
+    continue
+  fi
+  if [[ "$_st_created" < "2026-06-10" ]]; then
+    continue
+  fi
+  # Condition 3: status not shipped or cancelled.
+  _st_status="$(printf '%s' "$_st_fm" | grep '^status:' | head -1 | sed 's/^[^:]*:[[:space:]]*//' || true)"
+  if [[ "$_st_status" == "shipped" ]] || [[ "$_st_status" == "cancelled" ]]; then
+    continue
+  fi
+  # Condition 4: no signal_tier: line present.
+  if printf '%s' "$_st_fm" | grep -q '^signal_tier:'; then
+    continue
+  fi
+  _st_warn_files+=("$_st_base")
+  _st_warn_count=$((_st_warn_count + 1))
+done
+shopt -u nullglob
+if [[ "$_st_warn_count" -gt 0 ]]; then
+  record_result WARN "governance specs missing signal_tier frontmatter (guardrails §13 ADD-Gate): ${_st_warn_count}" || true
+  for _st_f in "${_st_warn_files[@]}"; do
+    printf '  governance spec missing signal_tier: %s\n' "$_st_f"
+  done
+else
+  record_result PASS "governance-rule specs declare signal_tier (or none apply)" || true
+fi
+
 echo ""
 printf 'Summary: pass=%s warn=%s fail=%s skip=%s\n' "$PASS_COUNT" "$WARN_COUNT" "$FAIL_COUNT" "$SKIP_COUNT"
 if [[ "$FAIL_COUNT" -gt 0 ]]; then

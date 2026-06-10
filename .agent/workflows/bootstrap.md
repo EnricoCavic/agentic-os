@@ -21,13 +21,13 @@ Before loading any context, walk the decision table below top-to-bottom — **fi
 |---|---|
 | modifies `docs/specs/_product-backlog.md` | route to `/spec-intake` (not bootstrap) |
 | modifies any file in `docs/specs/` or `docs/architecture/` | minimum `quick-win` — continue to Step 1 |
-| modifies `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.agent/rules/*`, or `.agent/config.yaml` | minimum `quick-win` — continue to Step 1 |
+| modifies `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.agent/rules/*`, or `.agent/config.yaml` | minimum `quick-win` — continue to Step 1; read `engineering_guardrails.md §13` (Deletion-First / ADD-Gate) before editing |
 | modifies `.agentcortex/templates/*` or `.agentcortex/bin/validate.*` | minimum `quick-win` — continue to Step 1 |
 | modifies any file with `status: frozen` frontmatter | minimum `quick-win` — continue to Step 1 |
 | modifies <3 files (PR-scope, NOT per-logical-change) AND is non-semantic (typo, docs, non-functional config) AND scope is unambiguous AND target paths do NOT match any ADR's `applies_to:` glob | **tiny-fix** — skip Steps 1–6, inline plan + execute + evidence (Work Log skipped per §5). **Misclassification checkpoint**: if during the inline edit the change proves semantic, crosses a module boundary, or exceeds 3 files — STOP immediately, escalate to `quick-win`, create a Work Log, and re-enter from §1. |
 | scope is unclear or multi-module | continue to Step 1 for full context loading |
 
-**TOKEN LEAK BLOCK**: If the task is ultimately classified as `tiny-fix` or `quick-win`, reading `engineering_guardrails.md` at any point is a structural Token Leak violation. Rely purely on AGENTS.md §Core Directives and bypass full guardrails. Rationale: loading SSoT + specs + archives for a typo fix wastes ~2,500 tokens (P6).
+**TOKEN LEAK BLOCK**: If the task is ultimately classified as `tiny-fix` or `quick-win`, reading `engineering_guardrails.md` at any point is a structural Token Leak violation. Rely purely on AGENTS.md §Core Directives and bypass full guardrails. Rationale: loading SSoT + specs + archives for a typo fix wastes ~2,500 tokens (P6). **Sole exemption**: a quick-win that edits governance paths (the rows above) MAY do a heading-scoped read of `§13 Governance Change Norms` ONLY — the norm would otherwise be unreadable on the most common governance-edit flow.
 
 ## 0b. Reading Mode Table (Token Efficiency Index)
 
