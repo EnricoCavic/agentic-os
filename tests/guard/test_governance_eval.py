@@ -382,6 +382,31 @@ class TestMalformedYaml(unittest.TestCase):
         finally:
             Path(tf_path).unlink(missing_ok=True)
 
+    def test_malformed_scoring_fields_rejected_not_crashed(self) -> None:
+        """Scoring-mode fields (assertions / expect_substrings / max_lines) with
+        wrong shapes must give a clear error, not an AttributeError traceback or
+        a wrong-but-plausible result (review round 2 NEW-1)."""
+        bad_specs = [
+            # assertions entry is a bare string, not a {type, pattern} mapping
+            'cases:\n  - id: a1\n    prompt: "p"\n    protects: "AGENTS.md"\n    assertions: ["oops"]\n',
+            # expect_substrings as a scalar string would silently iterate characters
+            'cases:\n  - id: a2\n    prompt: "p"\n    protects: "AGENTS.md"\n    expect_substrings: "not-a-list"\n',
+            # max_lines as a string
+            'cases:\n  - id: a3\n    prompt: "p"\n    protects: "AGENTS.md"\n    max_lines: "ten"\n    expect_substrings: ["x"]\n',
+        ]
+        for spec in bad_specs:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False, encoding="utf-8") as tf:
+                tf.write(spec)
+                tf_path = tf.name
+            try:
+                result = _run_runner("--eval", tf_path, "--transcripts", str(Path(tf_path).parent))
+                self.assertNotEqual(result.returncode, 0, spec)
+                combined = (result.stdout + result.stderr).lower()
+                self.assertIn("malformed eval spec", combined, spec)
+                self.assertNotIn("traceback", combined, spec)
+            finally:
+                Path(tf_path).unlink(missing_ok=True)
+
     def test_malformed_yaml_fails_clearly_on_subset_parser_path(self) -> None:
         """The lenient no-PyYAML subset parser may 'parse' garbage into strings
         instead of raising — the runner's structural validation must still give

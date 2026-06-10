@@ -330,6 +330,23 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
+    for c in cases:
+        for fld in ("expect_substrings", "forbid_substrings"):
+            v = c.get(fld)
+            if v is not None and not (isinstance(v, list) and all(isinstance(s, str) for s in v)):
+                print(f"error: malformed eval spec: case {c['id']!r} field {fld!r} must be a list of strings", file=sys.stderr)
+                return 1
+        a = c.get("assertions")
+        if a is not None and not (
+            isinstance(a, list)
+            and all(isinstance(e, dict) and isinstance(e.get("type"), str) and isinstance(e.get("pattern"), str) for e in a)
+        ):
+            print(f"error: malformed eval spec: case {c['id']!r} field 'assertions' must be a list of {{type, pattern}} mappings", file=sys.stderr)
+            return 1
+        ml = c.get("max_lines")
+        if ml is not None and not isinstance(ml, int):
+            print(f"error: malformed eval spec: case {c['id']!r} field 'max_lines' must be an integer", file=sys.stderr)
+            return 1
 
     # Coverage mode
     if args.coverage:
