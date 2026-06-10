@@ -284,6 +284,11 @@ def build_skill_registry_snapshot(
     skill_package_root: str = DEFAULT_SKILL_PACKAGE_ROOT,
     manifest_name: str = SKILL_MANIFEST_NAME,
 ) -> dict[str, Any]:
+    # Resolve root BEFORE deriving skill_root: skill_root is resolved (8.3
+    # short paths like RUNNER~1 expand to long form on Windows), so an
+    # unresolved root makes every relative_to(root) below raise ValueError
+    # when the caller's path came from tempfile/%TEMP% in short form.
+    root = root.resolve()
     skill_root = (root / skill_package_root).resolve()
     packages: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
