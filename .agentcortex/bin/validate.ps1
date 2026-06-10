@@ -1438,6 +1438,61 @@ if (Test-Path -Path $worklogDir -PathType Container) {
     if ($staleLocks -gt 0) {
         Add-Result -Level 'WARN' -Message "stale advisory work log locks detected: $staleLocks"
     }
+
+    # Advisory lock owner/phase mismatch checks — WARN only, never FAIL.
+    # Skips stale and unreadable locks (already covered above); skips orphan locks
+    # (no matching Work Log .md).
+    $ownerPhaseMismatches = 0
+    foreach ($lockf in $lockFiles) {
+        $lockData = $null
+        try {
+            $lockData = Get-Content -Path $lockf.FullName -Raw | ConvertFrom-Json
+        } catch {
+            continue  # unreadable — already covered
+        }
+        $updatedAt = $lockData.updated_at
+        if (-not $updatedAt) { continue }  # unreadable — already covered
+        $timeoutMin = if ($lockData.stale_timeout_minutes) { [int]$lockData.stale_timeout_minutes } else { 60 }
+        try {
+            $lockTime = [DateTimeOffset]::Parse($updatedAt)
+            $ageMin = ((Get-Date) - $lockTime.LocalDateTime).TotalMinutes
+            if ($ageMin -gt $timeoutMin) { continue }  # stale — already covered
+        } catch {
+            continue  # unparseable timestamp — already covered
+        }
+        $lockOwner = if ($lockData.owner) { $lockData.owner } else { '' }
+        $lockPhase = if ($lockData.phase) { $lockData.phase } else { '' }
+        # Derive Work Log path: strip .lock.json -> .md
+        $wlName = $lockf.BaseName -replace '\.lock$', ''
+        $wlPath = Join-NormalPath $worklogDir "$wlName.md"
+        if (-not (Test-Path -Path $wlPath -PathType Leaf)) { continue }  # orphan lock
+        $wlContent = Get-Content -Path $wlPath -Raw -Encoding utf8
+        # Extract Owner: list form "- Owner: `x`" or table form "| Owner | x |"
+        $wlOwner = ''
+        if ($wlContent -match '(?m)^-\s+Owner\s*:\s*`?([^`\r\n]+)`?\s*$') {
+            $wlOwner = $Matches[1].Trim().TrimStart('`').TrimEnd('`').Trim()
+        } elseif ($wlContent -match '(?m)^\|\s*Owner\s*\|\s*([^|\r\n]+)\|') {
+            $wlOwner = $Matches[1].Trim().TrimStart('`').TrimEnd('`').Trim()
+        }
+        # Extract Current Phase: list form or table form
+        $wlPhase = ''
+        if ($wlContent -match '(?m)^-\s+Current Phase\s*:\s*`?([^`\r\n]+)`?\s*$') {
+            $wlPhase = $Matches[1].Trim().TrimStart('`').TrimEnd('`').Trim()
+        } elseif ($wlContent -match '(?m)^\|\s*Current Phase\s*\|\s*([^|\r\n]+)\|') {
+            $wlPhase = $Matches[1].Trim().TrimStart('`').TrimEnd('`').Trim()
+        }
+        if ($wlOwner -and $lockOwner -ne $wlOwner) {
+            Write-Output "  worklog lock owner mismatch: $($lockf.Name) owner=$lockOwner worklog Owner=$wlOwner"
+            $ownerPhaseMismatches++
+        }
+        if ($wlPhase -and $lockPhase -ne $wlPhase) {
+            Write-Output "  worklog lock phase mismatch: $($lockf.Name) phase=$lockPhase worklog Current Phase=$wlPhase"
+            $ownerPhaseMismatches++
+        }
+    }
+    if ($ownerPhaseMismatches -gt 0) {
+        Add-Result -Level 'WARN' -Message "work log lock owner/phase mismatches detected: $ownerPhaseMismatches"
+    }
 }
 else {
     Add-Result -Level 'SKIP' -Message 'active work log directory not present'

@@ -1616,6 +1616,70 @@ PYEOF
       record_result WARN "advisory lock staleness check -- python unavailable (install Python 3.9+ for full validation)"
     fi
   fi
+  # Advisory lock owner/phase mismatch checks — WARN only, never FAIL.
+  # Skips stale and unreadable locks (already covered above); skips orphan locks
+  # (no matching Work Log .md).  JSON parsing uses Python (same as stale check).
+  owner_phase_mismatches=0
+  if [[ -n "$PYTHON_BIN" ]]; then
+    _acx_lockfields_py=$(cat <<'PYEOF'
+import json, sys, datetime
+try:
+    with open(sys.argv[1]) as f:
+        d = json.load(f)
+    ua = d.get('updated_at', '')
+    tm = int(d.get('stale_timeout_minutes', 60))
+    if not ua:
+        print('unreadable'); sys.exit(0)
+    dt = datetime.datetime.fromisoformat(ua)
+    now = datetime.datetime.now(dt.tzinfo or datetime.timezone.utc)
+    age_min = (now - dt).total_seconds() / 60
+    if age_min > tm:
+        print('stale'); sys.exit(0)
+    owner = d.get('owner', '')
+    phase = d.get('phase', '')
+    print('ok|' + owner + '|' + phase)
+except Exception:
+    print('unreadable')
+PYEOF
+)
+    for lockf in "$WORKLOG_DIR"/*.lock.json; do
+      [[ -f "$lockf" ]] || continue
+      _fields="$("$PYTHON_BIN" -c "$_acx_lockfields_py" "$lockf" 2>/dev/null)" || true
+      case "$_fields" in
+        stale|unreadable) continue ;;
+        ok\|*)
+          _lock_owner="$(printf '%s' "$_fields" | cut -d'|' -f2)"
+          _lock_phase="$(printf '%s' "$_fields" | cut -d'|' -f3)"
+          ;;
+        *) continue ;;
+      esac
+      # Derive Work Log path from lock filename: strip .lock.json -> .md
+      _lockbase="$(basename "$lockf" .lock.json)"
+      _wl="$WORKLOG_DIR/${_lockbase}.md"
+      [[ -f "$_wl" ]] || continue  # orphan lock — not this check's job
+      # Extract Owner: strip backticks and whitespace; handle list form and table form
+      _wl_owner="$(grep -m1 -iE '^\-[[:space:]]+Owner[[:space:]]*:|^\|[[:space:]]*Owner[[:space:]]*\|' "$_wl" 2>/dev/null \
+        | sed -E 's/.*Owner[[:space:]]*:[[:space:]]*//; s/.*\|[[:space:]]*Owner[[:space:]]*\|[[:space:]]*([^|]+)\|.*/\1/' \
+        | tr -d '`\r' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')" || true
+      # Extract Current Phase: same stripping
+      _wl_phase="$(grep -m1 -iE '^\-[[:space:]]+Current Phase[[:space:]]*:|^\|[[:space:]]*Current Phase[[:space:]]*\|' "$_wl" 2>/dev/null \
+        | sed -E 's/.*Current Phase[[:space:]]*:[[:space:]]*//; s/.*\|[[:space:]]*Current Phase[[:space:]]*\|[[:space:]]*([^|]+)\|.*/\1/' \
+        | tr -d '`\r' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')" || true
+      if [[ -n "$_wl_owner" && "$_lock_owner" != "$_wl_owner" ]]; then
+        printf '  worklog lock owner mismatch: %s owner=%s worklog Owner=%s\n' \
+          "$(basename "$lockf")" "$_lock_owner" "$_wl_owner"
+        owner_phase_mismatches=$((owner_phase_mismatches + 1))
+      fi
+      if [[ -n "$_wl_phase" && "$_lock_phase" != "$_wl_phase" ]]; then
+        printf '  worklog lock phase mismatch: %s phase=%s worklog Current Phase=%s\n' \
+          "$(basename "$lockf")" "$_lock_phase" "$_wl_phase"
+        owner_phase_mismatches=$((owner_phase_mismatches + 1))
+      fi
+    done
+  fi
+  if [[ "$owner_phase_mismatches" -gt 0 ]]; then
+    record_result WARN "work log lock owner/phase mismatches detected: ${owner_phase_mismatches}"
+  fi
 else
   record_result SKIP "active work log directory not present"
 fi

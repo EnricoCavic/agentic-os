@@ -41,7 +41,7 @@ Reply in the user's input language — detect it from their latest message and m
 
 ## Multi-Person / Multi-Session Collaboration
 
-**One branch = one owner** (no concurrent Work Log writes). Each session writes distinct `## Session Info`. Advisory lock at `<worklog-key>.lock.json`. Ship checks `current_state.md` for cross-session drift. Full rules: `engineering_guardrails.md §11`. Multi-person: use `<owner>-<worklog-key>.md`.
+**One branch = one owner** (no concurrent Work Log writes). Each session writes distinct `## Session Info`. Single-writer lock at `<worklog-key>.lock.json` (`worklog_lock.mode: blocking` by default — active other-holder lock = phase-entry Gate FAIL; contract: `shared-contracts.md §Phase-Entry Lock`). Ship checks `current_state.md` for cross-session drift. Full rules: `engineering_guardrails.md §11`. Multi-person: use `<owner>-<worklog-key>.md`.
 
 ## Delivery Gates
 

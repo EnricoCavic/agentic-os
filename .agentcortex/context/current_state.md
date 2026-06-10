@@ -13,7 +13,7 @@
   - Workflows & Policies: `.agent/workflows/*.md`, `.agent/rules/*.md`
 - **Project Name**: (set by /app-init)
 - **Last Updated**: 2026-06-09T16:37:47+08:00
-- **Last Verified**: 2026-06-09
+- **Last Verified**: 2026-06-10
 - **Update Sequence**: 44
 - **ADR Index**:
   - docs/adr/ADR-001-governance-friction-tuning.md — ADR-001: Governance Friction Tuning, accepted 2026-04-23
