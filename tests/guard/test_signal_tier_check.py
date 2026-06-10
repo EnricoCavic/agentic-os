@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -40,6 +41,13 @@ requires_bash = pytest.mark.skipif(bash is None, reason="bash not available")
 powershell = shutil.which("pwsh") or shutil.which("powershell")
 requires_powershell = pytest.mark.skipif(
     powershell is None, reason="PowerShell not available"
+)
+# validate.ps1 is the native Windows validator; running it under Linux pwsh
+# mis-resolves $root (see test_validator_false_positives.py requires_windows —
+# the Linux CI 'CI Structural Tests' job must NOT execute the native PS validator).
+requires_windows = pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="validate.ps1 parity is exercised on Windows only (Linux pwsh mis-resolves $root)",
 )
 
 # ---------------------------------------------------------------------------
@@ -177,6 +185,7 @@ def test_signal_tier_warn_bash() -> None:
 
 @requires_bash
 @requires_powershell
+@requires_windows
 def test_signal_tier_warn_powershell() -> None:
     """validate.ps1: same parity assertions as the bash test."""
     _write_fixtures()
