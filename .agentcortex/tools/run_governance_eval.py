@@ -63,8 +63,11 @@ def _extract_rule_inventory(gov_files: list[Path]) -> list[str]:
     """Extract MUST-bearing ## / ### section anchors from governance files.
 
     Returns a list of normalized "<file> §<section>" strings, one per
-    ## / ### heading that contains the word MUST in its section body
-    (searching up to the next same-or-higher-level heading).
+    ## / ### heading whose OWN text (heading line + lines up to the next
+    heading of ANY level) contains the word MUST. Counting to the next
+    same-or-higher heading double-counted parents whose MUSTs all live in
+    already-inventoried children (~9 phantom anchors inflating the
+    zero-coverage WARN).
     """
     inventory: list[str] = []
     must_re = re.compile(r"\bMUST\b")
@@ -84,13 +87,9 @@ def _extract_rule_inventory(gov_files: list[Path]) -> list[str]:
                 headings.append((level, m.group(2).strip(), i))
 
         for idx, (level, name, start) in enumerate(headings):
-            # Body = lines from start+1 up to the next heading of same or higher level
-            end = len(lines)
-            for j in range(idx + 1, len(headings)):
-                next_level, _, next_start = headings[j]
-                if next_level <= level:
-                    end = next_start
-                    break
+            # Own text only: heading line up to the next heading of ANY level.
+            # A child's MUST belongs to the child anchor, not the parent.
+            end = headings[idx + 1][2] if idx + 1 < len(headings) else len(lines)
             body = "\n".join(lines[start:end])
             if must_re.search(body):
                 anchor = f"{rel} §{name}"
