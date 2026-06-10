@@ -1439,7 +1439,7 @@ if (Test-Path -Path $worklogDir -PathType Container) {
         Add-Result -Level 'WARN' -Message "stale advisory work log locks detected: $staleLocks"
     }
 
-    # Advisory lock owner/phase mismatch checks — WARN only, never FAIL.
+    # Work Log lock owner/phase mismatch checks — WARN only, never FAIL.
     # Skips stale and unreadable locks (already covered above); skips orphan locks
     # (no matching Work Log .md).
     $ownerPhaseMismatches = 0

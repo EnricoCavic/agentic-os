@@ -219,6 +219,10 @@ def _unlink_tolerant(lock: Path) -> None:
 
 
 def append_drift_log(worklog: Path, line: str) -> None:
+    # Force single-line entries. Interpolated fields (owner/session) come from
+    # an untrusted lock JSON; embedded newlines could otherwise forge section
+    # headers or gate receipts in the Work Log.
+    line = " ".join(line.replace("\r", "\n").split("\n")).strip()
     text = worklog.read_text(encoding="utf-8") if worklog.exists() else ""
     marker = "## Drift Log"
     if marker not in text:

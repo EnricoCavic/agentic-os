@@ -1616,7 +1616,7 @@ PYEOF
       record_result WARN "advisory lock staleness check -- python unavailable (install Python 3.9+ for full validation)"
     fi
   fi
-  # Advisory lock owner/phase mismatch checks — WARN only, never FAIL.
+  # Work Log lock owner/phase mismatch checks — WARN only, never FAIL.
   # Skips stale and unreadable locks (already covered above); skips orphan locks
   # (no matching Work Log .md).  JSON parsing uses Python (same as stale check).
   owner_phase_mismatches=0
