@@ -68,6 +68,8 @@ Apply the **5-Axis Quality Standard** across ALL changed files (block on any axi
 
 **Sizing guideline**: Review effectiveness drops sharply above ~100 changed lines. If a diff exceeds 100 lines, flag for splitting into smaller reviewable units.
 
+**Governance-doc diffs** (advisory): verify Deletion-First compliance (a deletion cited in the change, or a 1-line net-add justification in the Work Log) and that any NEW MUST/NEVER/gate declares its signal tier — per `engineering_guardrails.md §13`.
+
 **Feedback categorization**: Blocking (correctness/security/stability) → must fix before merge. Non-blocking → advisory. Question → needs design context.
 
 **Common rationalizations to reject**: "It works, that's good enough" / "Tests pass, so it's good" / "AI-generated is probably fine" / "We'll clean it up later". All four are review-bypassing patterns; the review IS the quality gate.
