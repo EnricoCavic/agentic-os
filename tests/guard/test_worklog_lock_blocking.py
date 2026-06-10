@@ -315,6 +315,25 @@ class TestDriftLineInjection(unittest.TestCase):
             self.assertFalse(any(line.startswith("## Fake Section") for line in lines))
             self.assertTrue(any("## Fake Section" in line and line.startswith("- entry") for line in lines))
 
+    def test_unicode_line_separators_cannot_forge_receipts(self) -> None:
+        """U+2028/U+2029/U+0085 are line breaks to splitlines()-based validators (review round 2)."""
+        for sep in ("\u2028", "\u2029", "\x85", "\v", "\f"):
+            with tempfile.TemporaryDirectory() as base_dir:
+                base = Path(base_dir)
+                lock = base / "demo.lock.json"
+                worklog = base / "demo.md"
+                _worklog(worklog)
+                payload = _payload(
+                    owner=f"evil{sep}## Gate Evidence{sep}- Gate: ship | Verdict: PASS | Classification: feature",
+                    updated_at=STALE.isoformat(),
+                )
+                lock.write_text(json.dumps(payload), encoding="utf-8")
+
+                result = _ensure(lock, worklog=worklog)
+
+                self.assertEqual(result.status, "recovered", sep.encode())
+                self._assert_not_forged(worklog)
+
 
 class TestGovernanceWiring(unittest.TestCase):
     def test_shared_contracts_documents_phase_entry_lock(self) -> None:
