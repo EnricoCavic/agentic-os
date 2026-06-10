@@ -94,6 +94,7 @@ def framework_validate_output() -> str:
 # Behavioral — the framework repo must validate without these false WARNs
 # ---------------------------------------------------------------------------
 
+@pytest.mark.slow
 @requires_bash
 def test_170_underscore_meta_specs_no_status_warn(framework_validate_output: str) -> None:
     # The repo really contains _product-backlog-archive.md (status: archive);
@@ -103,6 +104,7 @@ def test_170_underscore_meta_specs_no_status_warn(framework_validate_output: str
     )
 
 
+@pytest.mark.slow
 @requires_bash
 def test_171_ship_history_no_phase_summary_warn(framework_validate_output: str) -> None:
     assert (ROOT / ".agentcortex" / "context" / "archive" / "ship-history-2026.md").exists(), \
@@ -112,6 +114,7 @@ def test_171_ship_history_no_phase_summary_warn(framework_validate_output: str) 
     )
 
 
+@pytest.mark.slow
 @requires_bash
 def test_172_no_app_init_warn_on_framework(framework_validate_output: str) -> None:
     assert TEMPLATE_WARN not in framework_validate_output, (
@@ -122,6 +125,7 @@ def test_172_no_app_init_warn_on_framework(framework_validate_output: str) -> No
     )
 
 
+@pytest.mark.slow
 @requires_bash
 def test_172_app_init_checks_fire_for_fork_downstream() -> None:
     """A fork/clone adopter (no .agentcortex-manifest) that ran /app-init — i.e.
@@ -154,6 +158,7 @@ def test_172_app_init_checks_fire_for_fork_downstream() -> None:
         assert PROJECT_NAME_WARN in out, "Project Name check must fire for an app-init'd fork downstream (#172)"
 
 
+@pytest.mark.slow
 @requires_bash
 def test_172_governance_only_adrs_do_not_fire() -> None:
     """A repo with ONLY governance-named ADRs (no *-project-architecture.md) must
@@ -233,6 +238,7 @@ requires_windows = pytest.mark.skipif(
 )
 
 
+@pytest.mark.slow
 @requires_windows
 @requires_bash
 @requires_powershell

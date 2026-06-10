@@ -66,6 +66,18 @@ bash .agentcortex/bin/validate.sh --no-python
 
 Both scripts must report `fail=0` before submitting a PR. Python-dependent `warn` results are acceptable for text-only contributions.
 
+### Running the Test Suite
+
+```bash
+# Local fast loop (~3 min): skips the ~34 tests that shell out to real deploy.sh/validate.sh
+python -m pytest tests/ci tests/guard .agentcortex/tests -m "not slow"
+
+# Full suite (what CI runs on Linux AND Windows — run before submitting a PR)
+python -m pytest tests/ci tests/guard .agentcortex/tests
+```
+
+The `slow` marker is a local opt-out only — CI always runs the full suite, and the subprocess fidelity of the slow tests is deliberate (they exercise the real deploy/validate scripts, which has repeatedly caught real cross-platform bugs).
+
 ### Testing a Deploy
 
 To test deployment to a scratch project:
