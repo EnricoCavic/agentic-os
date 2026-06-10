@@ -104,6 +104,24 @@ def test_counting_heuristic_fixture() -> None:
     assert count_native_sites(ps1_fixture, _PS1_RE) == 2
 
 
+def test_midline_emission_styles_are_known_uncounted() -> None:
+    """Documented scope limitation (review 2026-06-10, MEDIUM, accepted):
+    mid-line emission styles are NOT counted by the line-leading rule — a new
+    native check authored as `cmd && record_result ...` evades the machine
+    ratchet and is caught by reviewer judgment over the diff instead (spec
+    §Enforcement Boundary). This test pins the blind spot as INTENT so a future
+    heuristic change that silently alters scope is visible.
+    """
+    midline = "\n".join([
+        '[[ -f x ]] && record_result PASS "midline-and"',
+        'grep -q y file || { record_result WARN "midline-or-group"; }',
+    ])
+    assert count_native_sites(midline, _SH_RE) == 0
+
+    ps1_midline = "if ($ok) { Add-Result -Level 'PASS' -Message 'inline-if' }"
+    assert count_native_sites(ps1_midline, _PS1_RE) == 0
+
+
 def test_baseline_schema() -> None:
     data = _load()
     for key in ("original_floor", "baseline", "justifications"):

@@ -1,5 +1,5 @@
 ---
-status: frozen
+status: shipped
 title: Validator Python-Core Strangler Policy (ADR-006)
 source: self-assessment queue E1 + attribution review 2026-06-10
 created: 2026-06-10

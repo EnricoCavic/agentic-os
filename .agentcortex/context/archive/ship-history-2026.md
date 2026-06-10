@@ -2,6 +2,12 @@
 
 Archived from `current_state.md ## Ship History` to stay within the 10-entry cap. Entries are rotated out verbatim (per ship.md §205 — never edited), newest-archived first.
 
+### Ship-fix-deploy-missing-runtime-tools-2026-06-08
+- **Branch `fix/deploy-missing-runtime-tools`** (quick-win, deploy regression) — Found via multi-angle **downstream-simulation testing** of the v1.4.0 release: `deploy.sh`'s hand-maintained runtime-tools whitelist omitted two tools that DEPLOYED governance docs instruct downstream agents to run — `recover_worklog_lock.py` (bootstrap.md "Preferred command") and `lint_spec_drift.py` (review.md advisory linter). Downstream they failed with `python ...: No such file`. Drift entered when #156 + #188 added the tools/workflows but not the whitelist.
+  - **Fix**: added both tools to both whitelists in `deploy.sh` (`_runtime_tools` update path + `runtime_tools` fresh-deploy array). Deps OK (`recover_worklog_lock` → already-deployed `guard_context_write`; `lint_spec_drift` stdlib-only).
+  - **Regression guard**: new `tests/ci/test_deploy_tiering.py::test_deployed_governance_referenced_tools_are_deployed` deploys to temp, scans deployed governance docs for `.agentcortex/tools/*.py` refs, asserts each is shipped — catches any future tool/whitelist drift.
+  - **Evidence**: post-fix re-sim deployed tools 10→12, previously-failing bootstrap command now `{"status":"created","exit_code":0}`, referenced-vs-deployed drift empty; `pytest tests/ci/test_deploy_tiering.py` 13 passed; `validate.sh` pass=101 fail=0. Implementation commit `8a79fb1`. PR #203.
+
 ### Ship-chore-v1.4.0-release-2026-06-08
 - **Branch `chore/v1.4.0-release`** (quick-win, docs/release) — Cut release v1.4.0: bumped version banners, fixed the broken top README badge, and modernized the hero diagram. Captures post-v1.3.0-tag work (spec drift linter #156, multi-agent review guidance #162, pre-commit local validation hook #192, work-log lock auto-recovery #188, deploy core-overwrite backup #173, POSIX/PowerShell validator portability #190).
   - **Banners**: v1.3.0 → v1.4.0 across `README.md` (badge), `docs/README_zh-TW.md`, `CITATION.cff` (+ date-released 2026-06-08), Model Selection Guide (EN+zh), Testing Protocol (EN+zh), `deploy.sh` (`ACX_VERSION`), and `antigravity-v5-runtime.md`. Measurement-tied `LIFECYCLE_BENCHMARK` banners (2026-05-31 snapshot) intentionally left unchanged, per the v1.3.0 precedent.
