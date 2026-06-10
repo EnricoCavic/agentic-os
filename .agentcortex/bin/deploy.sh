@@ -139,6 +139,29 @@ get_tier() {
     esac
 }
 
+# --- Inline tier lookup (no subshell) ---
+# _get_tier_inline <rel_path> sets _TIER without spawning a subshell.
+# Used by _deploy_file_now (hot path) and process_queue to avoid ~187 subshells
+# per deploy. get_tier() above uses echo for compatibility with $(get_tier ...).
+_TIER=""
+_get_tier_inline() {
+    local _rel="$1"
+    case "$_rel" in
+        installers/deploy_brain.sh|installers/deploy_brain.ps1|installers/deploy_brain.cmd) _TIER="wrapper" ;;
+        AGENTS.md|CLAUDE.md) _TIER="scaffold" ;;
+        .gitattributes) _TIER="scaffold" ;;
+        .agentcortex/context/current_state.md) _TIER="scaffold" ;;
+        .agentcortex/adr/*) _TIER="scaffold" ;;
+        .agentcortex/templates/*) _TIER="scaffold" ;;
+        .claude/settings.json) _TIER="scaffold" ;;
+        .github/ISSUE_TEMPLATE/*) _TIER="scaffold" ;;
+        .github/PULL_REQUEST_TEMPLATE.md) _TIER="scaffold" ;;
+        .githooks/*) _TIER="scaffold" ;;
+        .agent/skills/*|.agents/skills/*) _TIER="scaffold" ;;
+        *) _TIER="core" ;;
+    esac
+}
+
 # --- Read hash from existing manifest ---
 # Returns the sha256 hash for a given path, or empty string if not found
 manifest_lookup_hash() {
@@ -155,6 +178,11 @@ record_deployed() {
     echo "$tier $rel_path sha256:$hash" >> "$DEPLOYED_FILES_TMP"
 }
 
+# --- Deploy-queue temp file (batch path) ---
+# When batch hashing is active (Bash 4+ with declare -A), deploy_file appends
+# records here instead of hashing per-file.  process_queue flushes it.
+_DEPLOY_QUEUE_TMP=""
+
 # --- Clean old .acx-incoming sidecars ---
 clean_acx_incoming() {
     local count=0
@@ -167,34 +195,33 @@ clean_acx_incoming() {
     fi
 }
 
-# --- Smart deploy a single file ---
-# deploy_file <source_abs> <target_rel> [chmod]
-deploy_file() {
+# --- Smart deploy a single file (internal — called with pre-computed hashes) ---
+# _deploy_file_now <src> <rel> <chmod> <src_hash> <dst_hash_or_empty> <old_manifest_hash_or_empty>
+#
+# All hash arguments are EOL-normalized (LF-stripped) SHA-256 hex digests.
+# dst_hash_or_empty: normalized hash of existing $TARGET/$rel, or "" if file absent.
+# old_manifest_hash_or_empty: manifest hash for $rel from the OLD manifest, or "" if not found.
+#
+# This function populates DEPLOYED_FILES_TMP (consumed by the removed-files
+# detector ~line 942 and the manifest write ~1040) exactly as the old deploy_file did.
+_deploy_file_now() {
     local src="$1"
     local rel="$2"
     local do_chmod="${3:-}"
+    local src_hash="$4"
+    local dst_hash="$5"        # "" when dst absent
+    local old_manifest_hash="$6"
+
     local dst="$TARGET/$rel"
-    local tier
-    tier="$(get_tier "$rel")"
-
-    [ -f "$src" ] || return 0
-
-    # Use EOL-normalized hashing throughout deploy_file so that a CRLF checkout
-    # of an otherwise-unmodified text file does NOT appear "locally modified".
-    # All deployed files are text; compute_sha256_normalized strips bare CR before
-    # hashing. Old manifests (raw-hash era) stored LF-source hashes which are
-    # identical to normalized hashes, so legacy manifests migrate transparently.
-    local src_hash
-    src_hash="$(compute_sha256_normalized "$src")"
+    # Use inline tier lookup (no subshell) — sets global _TIER.
+    _get_tier_inline "$rel"
+    local tier="$_TIER"
 
     local is_update=false
     [ -f "$MANIFEST_FILE" ] && is_update=true
 
-    if [ -f "$dst" ] && $is_update; then
+    if [ -n "$dst_hash" ] && $is_update; then
         # Update mode — file exists in target
-        local old_manifest_hash
-        old_manifest_hash="$(manifest_lookup_hash "$rel")"
-
         if [ "$tier" = "core" ]; then
             # Core: force-update (ADR-005 — governance/security fixes always land,
             # no drift). But if the downstream locally modified this core file,
@@ -202,8 +229,6 @@ deploy_file() {
             # overwriting, so edits are recoverable instead of silently lost
             # (#173). The force-update invariant is preserved — the new framework
             # version still lands; only the silent-data-loss footgun is closed.
-            local dst_hash
-            dst_hash="$(compute_sha256_normalized "$dst")"
             local locally_modified=false
             if [ -n "$old_manifest_hash" ]; then
                 # EOL-normalized comparison: a CRLF-checked-out unmodified file
@@ -226,8 +251,11 @@ deploy_file() {
                 echo "  [OVERWRITE] $rel (core force-updated; your local edits backed up to $rel.acx-local)"
                 COUNT_CORE_OVERWRITTEN=$((COUNT_CORE_OVERWRITTEN + 1))
             fi
-            cp ${CP_FLAG:+"$CP_FLAG"} "$src" "$dst"
-            [ -n "$do_chmod" ] && chmod +x "$dst"
+            # Skip cp when src and dst already identical (raw bytes match) — pure no-op.
+            if [ "$src_hash" != "$dst_hash" ]; then
+                cp ${CP_FLAG:+"$CP_FLAG"} "$src" "$dst"
+                [ -n "$do_chmod" ] && chmod +x "$dst"
+            fi
             COUNT_UPDATED=$((COUNT_UPDATED + 1))
         else
             # Scaffold/wrapper: check if user modified
@@ -237,8 +265,6 @@ deploy_file() {
                 # era, or content brought in out-of-band). Preserve it via
                 # sidecar when content differs from the framework version —
                 # never silently overwrite scaffold-tier user content.
-                local dst_hash
-                dst_hash="$(compute_sha256_normalized "$dst")"
                 if [ "$src_hash" != "$dst_hash" ]; then
                     cp ${CP_FLAG:+"$CP_FLAG"} "$src" "$dst.acx-incoming"
                     echo "  [SKIP] $rel (pre-existing/migrated; new version at $rel.acx-incoming — merge manually or ask AI agent to merge)"
@@ -250,12 +276,13 @@ deploy_file() {
                 # Same content — no-op; record the matching hash for future runs.
                 COUNT_UPDATED=$((COUNT_UPDATED + 1))
             else
-                local dst_hash
-                dst_hash="$(compute_sha256_normalized "$dst")"
                 if [ "$dst_hash" = "$old_manifest_hash" ]; then
-                    # User didn't modify — safe to update
-                    cp ${CP_FLAG:+"$CP_FLAG"} "$src" "$dst"
-                    [ -n "$do_chmod" ] && chmod +x "$dst"
+                    # User didn't modify — safe to update.
+                    # Skip cp when src already matches dst (pure no-op copy).
+                    if [ "$src_hash" != "$dst_hash" ]; then
+                        cp ${CP_FLAG:+"$CP_FLAG"} "$src" "$dst"
+                        [ -n "$do_chmod" ] && chmod +x "$dst"
+                    fi
                     COUNT_UPDATED=$((COUNT_UPDATED + 1))
                 else
                     # User modified — skip and write sidecar
@@ -273,12 +300,10 @@ deploy_file() {
                 fi
             fi
         fi
-    elif [ -f "$dst" ] && ! $is_update; then
+    elif [ -n "$dst_hash" ] && ! $is_update; then
         # Fresh install but file already exists (pre-manifest era, or first deploy into existing project).
         # For scaffold/wrapper tiers, preserve the user's file and write a sidecar so nothing is clobbered.
         if [ "$tier" != "core" ]; then
-            local dst_hash
-            dst_hash="$(compute_sha256_normalized "$dst")"
             if [ "$src_hash" != "$dst_hash" ]; then
                 cp ${CP_FLAG:+"$CP_FLAG"} "$src" "$dst.acx-incoming"
                 echo "  [SKIP] $rel (pre-existing; new version at $rel.acx-incoming — merge manually or ask AI agent to merge)"
@@ -289,8 +314,11 @@ deploy_file() {
             fi
             # Same content — safe to let it be (no cp needed since identical)
         else
-            cp ${CP_FLAG:+"$CP_FLAG"} "$src" "$dst"
-            [ -n "$do_chmod" ] && chmod +x "$dst"
+            # Skip cp when src already matches dst (pure no-op).
+            if [ "$src_hash" != "$dst_hash" ]; then
+                cp ${CP_FLAG:+"$CP_FLAG"} "$src" "$dst"
+                [ -n "$do_chmod" ] && chmod +x "$dst"
+            fi
         fi
     else
         # File doesn't exist in target — always deploy
@@ -304,12 +332,217 @@ deploy_file() {
     record_deployed "$tier" "$rel" "$src_hash"
 }
 
+# --- Batch-hashing gate (Bash 4+ associative arrays required) ---
+# Set to true only when declare -A succeeds. macOS ships Bash 3.2 which does not
+# support associative arrays; on those hosts we fall back to the per-file path
+# (cheap because macOS fork() is fast). Set ACX_FORCE_PERFILE=1 to always use
+# the per-file path (escape hatch for debugging or unusual environments).
+_ACX_BATCH_OK=false
+if [ -z "${ACX_FORCE_PERFILE:-}" ]; then
+    # shellcheck disable=SC2034  # _acx_assoc_test is intentionally unused
+    # Requires assoc arrays (4.0) AND namerefs (4.3) — test both in a subshell.
+    if (declare -A _acx_assoc_test && _acx_nref_fn() { local -n _r="$1"; }; _acx_nref_fn _acx_assoc_test) 2>/dev/null; then
+        _ACX_BATCH_OK=true
+    fi
+fi
+
+# --- Smart deploy a single file (public API) ---
+# deploy_file <source_abs> <target_rel> [chmod]
+#
+# Batch path (Bash 4.3+, !ACX_FORCE_PERFILE): appends a queue record and returns.
+#   All hashing is deferred to process_queue (one single-process pass per list,
+#   order-paired hash output — see _batch_hash_normalized).
+# Per-file fallback (Bash 3.2 or ACX_FORCE_PERFILE=1): computes hashes inline
+#   and calls _deploy_file_now immediately — identical behavior, just slower on
+#   high-spawn-cost hosts (MSYS/Windows ~28ms/spawn × ~2600 files = 43-72s).
+deploy_file() {
+    local src="$1"
+    local rel="$2"
+    local do_chmod="${3:-}"
+
+    [ -f "$src" ] || return 0
+
+    if $_ACX_BATCH_OK; then
+        # Batch path: append tab-separated record to queue.
+        # Fields: src <TAB> rel <TAB> do_chmod
+        printf '%s\t%s\t%s\n' "$src" "$rel" "$do_chmod" >> "$_DEPLOY_QUEUE_TMP"
+    else
+        # Per-file fallback (Bash 3.2 / ACX_FORCE_PERFILE=1).
+        # Use EOL-normalized hashing so CRLF checkouts do not appear modified.
+        local src_hash dst_hash old_manifest_hash
+        src_hash="$(compute_sha256_normalized "$src")"
+        local dst="$TARGET/$rel"
+        dst_hash=""
+        [ -f "$dst" ] && dst_hash="$(compute_sha256_normalized "$dst")"
+        old_manifest_hash="$(manifest_lookup_hash "$rel")"
+        _deploy_file_now "$src" "$rel" "$do_chmod" "$src_hash" "$dst_hash" "$old_manifest_hash"
+    fi
+}
+
+# --- process_queue: flush the deploy queue using batch normalized hashing ---
+# Called once after the last deploy_file call site, before the .gitignore block.
+# Reads _DEPLOY_QUEUE_TMP, batch-hashes all src + existing dst files using Python
+# (single process, EOL-normalized), loads the old manifest into a lookup array,
+# then calls _deploy_file_now for each queued entry with hashes supplied from the
+# caches.  Falls back to per-file compute_sha256_normalized when Python is
+# unavailable or when Python cannot resolve a path (e.g. MSYS /tmp/ paths).
+process_queue() {
+    [ -s "$_DEPLOY_QUEUE_TMP" ] || return 0
+
+    # --- Load old manifest into associative array (O(n) lookup) ---
+    declare -A _mfst_hash=()
+    if [ -f "$MANIFEST_FILE" ]; then
+        while IFS= read -r _mline; do
+            case "$_mline" in
+                core\ *|scaffold\ *|wrapper\ *)
+                    _mrel="${_mline#* }"; _mrel="${_mrel%% *}"
+                    _mh="${_mline##* }"; _mh="${_mh#sha256:}"
+                    _mfst_hash["$_mrel"]="$_mh"
+                    ;;
+            esac
+        done < "$MANIFEST_FILE"
+    fi
+
+    # --- Collect src paths and existing dst paths ---
+    declare -A _src_hash=()
+    declare -A _dst_hash=()
+
+    # Build NUL-delimited lists of src paths and existing dst paths
+    local _src_list_tmp _dst_list_tmp
+    _src_list_tmp="$(mktemp)"
+    _dst_list_tmp="$(mktemp)"
+
+    # First pass: parse queue, enumerate paths
+    local _q_src _q_rel _q_chmod _q_dst
+    while IFS=$'\t' read -r _q_src _q_rel _q_chmod; do
+        printf '%s\0' "$_q_src" >> "$_src_list_tmp"
+        _q_dst="$TARGET/$_q_rel"
+        [ -f "$_q_dst" ] && printf '%s\0' "$_q_dst" >> "$_dst_list_tmp"
+    done < "$_DEPLOY_QUEUE_TMP"
+
+    # --- Batch EOL-normalized hash using Python (when available) ---
+    # Python reads each NUL-delimited path, strips bare CRs, and computes
+    # SHA-256 in a single process — identical to compute_sha256_normalized.
+    # This avoids two MSYS pitfalls:
+    #   1. sha256sum outputs "<hash>  *<path>" (binary-mode marker) on MSYS,
+    #      corrupting associative-array keys on raw output.
+    #   2. grep -P '\r' (or grep -l $'\r') silently strips CRs in MSYS text
+    #      mode, making CR-detection unreliable — CRLF files always missed.
+    # Output format: ONE line per input path, IN ORDER — the hash hex or MISS.
+    # (Hash-only by design: path strings never round-trip through Python.)
+    _PYTHON_CMD=""
+    for _py_cand in python3 python py; do
+        if command -v "$_py_cand" >/dev/null 2>&1; then
+            _PYTHON_CMD="$_py_cand"
+            break
+        fi
+    done
+
+    # Emits exactly ONE line per input path, IN ORDER: the normalized sha256 hex,
+    # or the sentinel MISS when the file can't be read. Order-pairing (not path-key
+    # matching) is load-bearing: path strings never round-trip through Python, so
+    # neither CRLF-on-stdout nor MSYS-vs-native path forms can corrupt cache keys —
+    # both failure modes were hit in earlier revisions of this function (all 187
+    # lookups silently missed and fell back to per-file spawns).
+    # Path translation: cygpath -f - batch-translates MSYS paths (/tmp/x, /c/x, …)
+    # to native form for Python's open(); on POSIX hosts cygpath is absent and
+    # paths are already native. Constraint: paths must not contain newlines
+    # (repo-controlled deploy set — none do).
+    _batch_hash_normalized() {
+        local _list_file="$1"
+        [ -s "$_list_file" ] || return 0
+        if [ -n "$_PYTHON_CMD" ]; then
+            # Translate to a newline-separated temp file (cygpath batch when on
+            # MSYS) and hand it to Python as ARGV — the script goes via -c, so
+            # neither competes for stdin (a heredoc-fed `python -` clobbered the
+            # path pipe in an earlier revision: 0 output lines, full fallback).
+            local _xlat_tmp _xlat_arg
+            _xlat_tmp="$(mktemp)"
+            if command -v cygpath >/dev/null 2>&1; then
+                tr '\0' '\n' < "$_list_file" | cygpath -m -f - > "$_xlat_tmp" 2>/dev/null
+                _xlat_arg="$(cygpath -m "$_xlat_tmp")"   # the temp path itself needs translating too
+            else
+                tr '\0' '\n' < "$_list_file" > "$_xlat_tmp"
+                _xlat_arg="$_xlat_tmp"
+            fi
+            "$_PYTHON_CMD" -c '
+import sys, hashlib
+with open(sys.argv[1], "rb") as f:
+    lines = f.read().splitlines()
+for raw in lines:
+    raw = raw.rstrip(b"\r")
+    if not raw:
+        sys.stdout.buffer.write(b"MISS\n")
+        continue
+    try:
+        content = open(raw.decode("utf-8", "surrogateescape"), "rb").read()
+        content = content.replace(b"\r\n", b"\n").replace(b"\r", b"")
+        sys.stdout.buffer.write(hashlib.sha256(content).hexdigest().encode("ascii") + b"\n")
+    except Exception:
+        sys.stdout.buffer.write(b"MISS\n")
+' "$_xlat_arg"
+            rm -f "$_xlat_tmp"
+        else
+            # Python unavailable: per-file normalized hashing via shell (O(n) spawns,
+            # last resort; batch path already requires Bash 4+).
+            local _p
+            while IFS= read -r -d '' _p; do
+                if [ -f "$_p" ]; then
+                    printf '%s\n' "$(compute_sha256_normalized "$_p")"
+                else
+                    printf 'MISS\n'
+                fi
+            done < "$_list_file"
+        fi
+    }
+
+    # Pair hashes back to paths BY ORDER. If the line count ever disagrees with
+    # the key count, discard the whole cache — per-entry inline fallbacks in the
+    # second pass keep behavior correct (just slower), never wrong.
+    _fill_hash_cache() {
+        local _list_file="$1" _cache_name="$2"
+        local -n _cache_ref="$_cache_name"
+        local _keys=() _p _h _i=0
+        while IFS= read -r -d '' _p; do _keys+=("$_p"); done < "$_list_file"
+        while IFS= read -r _h; do
+            if [ "$_i" -lt "${#_keys[@]}" ] && [ "$_h" != "MISS" ]; then
+                _cache_ref["${_keys[$_i]}"]="$_h"
+            fi
+            _i=$((_i + 1))
+        done < <(_batch_hash_normalized "$_list_file")
+        if [ "$_i" -ne "${#_keys[@]}" ]; then
+            echo "  note: batch hash count mismatch (${_i}/${#_keys[@]}) — using per-file fallback" >&2
+            _cache_ref=()
+        fi
+    }
+
+    _fill_hash_cache "$_src_list_tmp" _src_hash
+    _fill_hash_cache "$_dst_list_tmp" _dst_hash
+
+    rm -f "$_src_list_tmp" "$_dst_list_tmp"
+
+    # --- Second pass: call _deploy_file_now for each queued entry ---
+    while IFS=$'\t' read -r _q_src _q_rel _q_chmod; do
+        _q_dst="$TARGET/$_q_rel"
+        local _sh="${_src_hash[$_q_src]:-}"
+        # Fallback: if batch hash missed this file (e.g. Python unavailable or path
+        # unresolvable), compute inline so behavior degrades gracefully.
+        [ -z "$_sh" ] && _sh="$(compute_sha256_normalized "$_q_src")"
+        local _dh="${_dst_hash[$_q_dst]:-}"
+        # Fallback for dst: if file exists but batch missed it, compute inline.
+        [ -z "$_dh" ] && [ -f "$_q_dst" ] && _dh="$(compute_sha256_normalized "$_q_dst")"
+        local _omh="${_mfst_hash[$_q_rel]:-}"
+        _deploy_file_now "$_q_src" "$_q_rel" "$_q_chmod" "$_sh" "$_dh" "$_omh"
+    done < "$_DEPLOY_QUEUE_TMP"
+}
+
 # ============================================================
 # MAIN
 # ============================================================
 
 DEPLOYED_FILES_TMP="$(mktemp)"
-trap 'rm -f "$DEPLOYED_FILES_TMP" "${TMP_STRIPPED_GITIGNORE:-}" "${TMP_NORMALIZED_GITIGNORE:-}" "${GITIGNORE:-}.tmp"' EXIT
+_DEPLOY_QUEUE_TMP="$(mktemp)"
+trap 'rm -f "$DEPLOYED_FILES_TMP" "$_DEPLOY_QUEUE_TMP" "${_src_list_tmp:-}" "${_dst_list_tmp:-}" "${_xlat_tmp:-}" "${TMP_STRIPPED_GITIGNORE:-}" "${TMP_NORMALIZED_GITIGNORE:-}" "${GITIGNORE:-}.tmp"' EXIT
 
 SOURCE_COMMIT="$(get_source_commit)"
 IS_UPDATE=false
@@ -579,7 +812,8 @@ deploy_file "$REPO_ROOT/codex/rules/default.rules" "codex/rules/default.rules"
 # --- Deploy: .agent/rules (core) ---
 for f in "$REPO_ROOT"/.agent/rules/*.md; do
     [ -f "$f" ] || continue
-    deploy_file "$f" ".agent/rules/$(basename "$f")"
+    # ${f##*/} avoids a $(basename) subshell (parameter expansion is built-in)
+    deploy_file "$f" ".agent/rules/${f##*/}"
 done
 
 # --- Deploy: .agent/config.yaml (core) ---
@@ -588,7 +822,7 @@ deploy_file "$REPO_ROOT/.agent/config.yaml" ".agent/config.yaml"
 # --- Deploy: workflows (core) ---
 for f in "$REPO_ROOT"/.agent/workflows/*.md; do
     [ -f "$f" ] || continue
-    deploy_file "$f" ".agent/workflows/$(basename "$f")"
+    deploy_file "$f" ".agent/workflows/${f##*/}"
 done
 
 # --- Deploy: skills (core) ---
@@ -598,7 +832,7 @@ done
 # Flat skill metadata files → .agent/skills/
 for skill_file in "$REPO_ROOT"/.agent/skills/*; do
     [ -f "$skill_file" ] || continue
-    bname="$(basename "$skill_file")"
+    bname="${skill_file##*/}"
     [ "$bname" = ".gitkeep" ] && continue
     deploy_file "$skill_file" ".agent/skills/$bname"
 done
@@ -607,7 +841,7 @@ done
 if [ -d "$REPO_ROOT/.agents/skills" ]; then
     for skill_dir in "$REPO_ROOT/.agents/skills"/*/; do
         [ -d "$skill_dir" ] || continue
-        skill_name="$(basename "$skill_dir")"
+        skill_name="${skill_dir%/}"; skill_name="${skill_name##*/}"
         # Guard: if a legacy flat file exists where a directory is needed, remove it
         if [ -f "$TARGET/.agents/skills/$skill_name" ]; then
             rm -f "$TARGET/.agents/skills/$skill_name"
@@ -617,8 +851,10 @@ if [ -d "$REPO_ROOT/.agents/skills" ]; then
         # Deploy all files recursively, preserving subdir structure (e.g. agents/openai.yaml)
         while IFS= read -r -d '' skill_file; do
             rel_to_skill="${skill_file#$skill_dir}"
-            parent_dir="$(dirname ".agents/skills/$skill_name/$rel_to_skill")"
-            mkdir -p "$TARGET/$parent_dir"
+            # ${path%/*} avoids a $(dirname) subshell
+            _parent=".agents/skills/$skill_name/${rel_to_skill%/*}"
+            [ "$_parent" = ".agents/skills/$skill_name/$rel_to_skill" ] && _parent=".agents/skills/$skill_name"
+            mkdir -p "$TARGET/$_parent"
             deploy_file "$skill_file" ".agents/skills/$skill_name/$rel_to_skill"
         done < <(find "$skill_dir" -type f -print0)
     done
@@ -693,13 +929,13 @@ fi
 # --- Deploy: .agentcortex/templates (scaffold) ---
 for f in "$REPO_ROOT"/.agentcortex/templates/*; do
     [ -f "$f" ] || continue
-    deploy_file "$f" ".agentcortex/templates/$(basename "$f")"
+    deploy_file "$f" ".agentcortex/templates/${f##*/}"
 done
 
 # --- Deploy: .agentcortex/adr (scaffold) ---
 for f in "$REPO_ROOT"/.agentcortex/adr/*.md; do
     [ -f "$f" ] || continue
-    deploy_file "$f" ".agentcortex/adr/$(basename "$f")"
+    deploy_file "$f" ".agentcortex/adr/${f##*/}"
 done
 
 # --- Deploy: reference docs to .agentcortex/docs/ (core) ---
@@ -715,24 +951,24 @@ for f in \
   "$REPO_ROOT"/.agentcortex/docs/NONLINEAR_SCENARIOS*.md \
   "$REPO_ROOT"/.agentcortex/docs/CLAUDE_PLATFORM_GUIDE.md; do
   [ -f "$f" ] || continue
-  deploy_file "$f" ".agentcortex/docs/$(basename "$f")"
+  deploy_file "$f" ".agentcortex/docs/${f##*/}"
 done
 for f in "$REPO_ROOT"/.agentcortex/docs/guides/*.md; do
     [ -f "$f" ] || continue
-    deploy_file "$f" ".agentcortex/docs/guides/$(basename "$f")"
+    deploy_file "$f" ".agentcortex/docs/guides/${f##*/}"
 done
 # Downstream-facing quickstart guides live in framework's docs/guides/ (root-style path).
 # Deploy them to .agentcortex/docs/guides/ alongside the framework-internal guides.
 for f in "$REPO_ROOT"/docs/guides/token-optimization-quickstart*.md; do
     [ -f "$f" ] || continue
-    deploy_file "$f" ".agentcortex/docs/guides/$(basename "$f")"
+    deploy_file "$f" ".agentcortex/docs/guides/${f##*/}"
 done
 
 # --- Deploy: .claude/commands (core) ---
 if [ -d "$REPO_ROOT/.claude/commands" ]; then
     for f in "$REPO_ROOT"/.claude/commands/*; do
         [ -f "$f" ] || continue
-        deploy_file "$f" ".claude/commands/$(basename "$f")"
+        deploy_file "$f" ".claude/commands/${f##*/}"
     done
 fi
 
@@ -741,7 +977,7 @@ if [ -d "$REPO_ROOT/.claude/agents" ]; then
     mkdir -p "$TARGET/.claude/agents"
     for f in "$REPO_ROOT"/.claude/agents/*.md; do
         [ -f "$f" ] || continue
-        deploy_file "$f" ".claude/agents/$(basename "$f")"
+        deploy_file "$f" ".claude/agents/${f##*/}"
     done
 fi
 
@@ -757,7 +993,7 @@ deploy_file "$REPO_ROOT/.codex/INSTALL.md" ".codex/INSTALL.md"
 # --- Deploy: .github/ templates (core) ---
 for f in "$REPO_ROOT"/.github/ISSUE_TEMPLATE/*.md; do
     [ -f "$f" ] || continue
-    deploy_file "$f" ".github/ISSUE_TEMPLATE/$(basename "$f")"
+    deploy_file "$f" ".github/ISSUE_TEMPLATE/${f##*/}"
 done
 deploy_file "$REPO_ROOT/.github/PULL_REQUEST_TEMPLATE.md" ".github/PULL_REQUEST_TEMPLATE.md"
 
@@ -765,6 +1001,15 @@ deploy_file "$REPO_ROOT/.github/PULL_REQUEST_TEMPLATE.md" ".github/PULL_REQUEST_
 if [ -f "$REPO_ROOT/.githooks/pre-commit.guard-ssot.sample" ]; then
     mkdir -p "$TARGET/.githooks"
     deploy_file "$REPO_ROOT/.githooks/pre-commit.guard-ssot.sample" ".githooks/pre-commit.guard-ssot.sample"
+fi
+
+# --- Flush deploy queue (batch hashing — Bash 4+ path) ---
+# All deploy_file calls above have queued their records; process_queue now
+# batch-hashes them in two single-process passes (one over src paths, one over
+# existing dst paths; order-paired output) and calls _deploy_file_now per entry.
+# No-op when _ACX_BATCH_OK=false (per-file path already ran inline above).
+if $_ACX_BATCH_OK; then
+    process_queue
 fi
 
 # ============================================================
@@ -962,14 +1207,30 @@ fi
 # it cannot fire for skills retired before a downstream's last deploy. This scan
 # catches orphaned skills that are no longer part of the framework skill set.
 #
-# Logic: derive the live framework skill set from the SOURCE repo's skill dirs
-# (NOT a hand-maintained list). Any target skill entry whose name is absent from
-# that set AND does not match the custom-* reserved namespace is a stale skill.
+# Behavior split (ADR-005 + binding expert design):
+#
+#   custom-*  → silent (unchanged; reserved project namespace).
+#
+#   Non-framework skill whose path appears in the OLD manifest (i.e., was once
+#   deployed by the framework but is now gone from REPO_ROOT) → STALE SKILL:
+#   emit "[STALE SKILL] ... retired upstream; delete it, or rename to custom-<name>"
+#   and count in _stale_count / ⚠ block.
+#
+#   Non-framework skill ABSENT from the old manifest (or no manifest) → user-
+#   created skill (the framework never shipped it). Do NOT emit per-skill STALE
+#   warning and do NOT say "retired". Collect names and emit ONE aggregated note
+#   after the scan.
+#
+# Manifest lookup for dir skill: any manifest path with prefix ".agents/skills/<name>/"
+# Manifest lookup for flat skill: exact manifest path ".agent/skills/<name>"
+#
+# Reuse the batch-loaded manifest hash table when available (batch path set
+# $_mfst_hash during process_queue); otherwise fall back to awk per entry.
 
 _framework_flat_skills=""
 for _sf in "$REPO_ROOT"/.agent/skills/*; do
     [ -f "$_sf" ] || continue
-    _bname="$(basename "$_sf")"
+    _bname="${_sf##*/}"
     [ "$_bname" = ".gitkeep" ] && continue
     _framework_flat_skills="$_framework_flat_skills $_bname"
 done
@@ -978,43 +1239,81 @@ _framework_dir_skills=""
 if [ -d "$REPO_ROOT/.agents/skills" ]; then
     for _sd in "$REPO_ROOT/.agents/skills"/*/; do
         [ -d "$_sd" ] || continue
-        _framework_dir_skills="$_framework_dir_skills $(basename "$_sd")"
+        _sdname="${_sd%/}"; _sdname="${_sdname##*/}"
+        _framework_dir_skills="$_framework_dir_skills $_sdname"
     done
 fi
 
 _stale_count=0
+_user_skill_names=""   # aggregated list of user-created (non-framework) skill names
+
+# Helper: check if a skill path prefix appears in the OLD manifest.
+# $1 = exact rel path (flat skill) or prefix (dir skill, ends with /)
+# Returns 0 (true) if found, 1 if not found or no manifest.
+_skill_in_old_manifest() {
+    local _look="$1"
+    [ -f "$MANIFEST_FILE" ] || return 1
+    # Dir skills pass ".agents/skills/<name>/" (trailing slash = safe prefix match).
+    # Flat skills pass ".agent/skills/<name>" (NO slash) and must match the rel
+    # path EXACTLY — an unbounded prefix would let a user-created flat skill
+    # named as a strict prefix of a manifested one (e.g. "red-team" vs
+    # "red-team-adversarial") be falsely accused as retired-upstream.
+    awk -v p="$_look" '
+        /^(core|scaffold|wrapper) / {
+            n = split($0, a, " ")
+            rel = a[2]
+            if (p ~ /\/$/) { if (index(rel, p) == 1) { found=1; exit } }
+            else            { if (rel == p)           { found=1; exit } }
+        }
+        END { exit (found ? 0 : 1) }
+    ' "$MANIFEST_FILE"
+}
 
 # Scan target .agent/skills/ (flat metadata files)
 for _tsf in "$TARGET/.agent/skills"/*; do
     [ -f "$_tsf" ] || continue
-    _tname="$(basename "$_tsf")"
+    _tname="${_tsf##*/}"
     [ "$_tname" = ".gitkeep" ] && continue
-    # custom-* namespace is reserved for project-owned skills — never warn
+    # custom-* namespace: silent
     case "$_tname" in custom-*) continue ;; esac
+    # Check if this name is still in the framework
     _found=false
     for _fw in $_framework_flat_skills; do
         [ "$_tname" = "$_fw" ] && _found=true && break
     done
     if ! $_found; then
-        echo "  [STALE SKILL] .agent/skills/$_tname — retired upstream; delete it, or rename to custom-$_tname to keep"
-        _stale_count=$((_stale_count + 1))
+        # Determine if this was ever framework-managed (present in OLD manifest)
+        if _skill_in_old_manifest ".agent/skills/$_tname"; then
+            echo "  [STALE SKILL] .agent/skills/$_tname — retired upstream; delete it, or rename to custom-$_tname to keep"
+            _stale_count=$((_stale_count + 1))
+        else
+            # User-created: never in manifest — collect for aggregated note
+            _user_skill_names="${_user_skill_names:+$_user_skill_names, }$_tname"
+        fi
     fi
 done
 
 # Scan target .agents/skills/ (directory-based skills)
 for _tsd in "$TARGET/.agents/skills"/*/; do
     [ -d "$_tsd" ] || continue
-    _tdname="$(basename "$_tsd")"
+    _tdname="${_tsd%/}"; _tdname="${_tdname##*/}"
     [ "$_tdname" = ".gitkeep" ] && continue
-    # custom-* namespace is reserved for project-owned skills — never warn
+    # custom-* namespace: silent
     case "$_tdname" in custom-*) continue ;; esac
+    # Check if this name is still in the framework
     _found=false
     for _fw in $_framework_dir_skills; do
         [ "$_tdname" = "$_fw" ] && _found=true && break
     done
     if ! $_found; then
-        echo "  [STALE SKILL] .agents/skills/$_tdname — retired upstream; delete it, or rename to custom-$_tdname to keep"
-        _stale_count=$((_stale_count + 1))
+        # Determine if this was ever framework-managed (present in OLD manifest)
+        if _skill_in_old_manifest ".agents/skills/$_tdname/"; then
+            echo "  [STALE SKILL] .agents/skills/$_tdname — retired upstream; delete it, or rename to custom-$_tdname to keep"
+            _stale_count=$((_stale_count + 1))
+        else
+            # User-created: never in manifest — collect for aggregated note
+            _user_skill_names="${_user_skill_names:+$_user_skill_names, }$_tdname"
+        fi
     fi
 done
 
@@ -1022,6 +1321,18 @@ if [ "$_stale_count" -gt 0 ]; then
     echo ""
     echo "  ⚠ $_stale_count stale skill(s) detected. These were removed from the framework"
     echo "    but remain in your project. Review and delete them, or prefix with 'custom-' to keep."
+fi
+
+if [ -n "$_user_skill_names" ]; then
+    # Count names by counting commas+1 (names are comma-space separated)
+    _user_skill_count=1
+    _tmp_names="$_user_skill_names"
+    while [ "${_tmp_names#*,}" != "$_tmp_names" ]; do
+        _user_skill_count=$((_user_skill_count + 1))
+        _tmp_names="${_tmp_names#*,}"
+    done
+    echo "  Note: $_user_skill_count local skill(s) not framework-managed (left as-is): $_user_skill_names"
+    echo "    — rename to custom-<name> to mark project-owned, or delete if leftover."
 fi
 
 # ============================================================
