@@ -2389,19 +2389,7 @@ if [[ -f "$ACX_EVAL_YAML" ]]; then
   elif [[ ! -f "$ACX_EVAL_RUNNER" ]]; then
     record_result SKIP "governance eval coverage -- runner not present (run_governance_eval.py missing)" || true
   else
-    _eval_cov_out="$("$PYTHON_BIN" "$ACX_EVAL_RUNNER" --coverage --format json 2>&1)" || true
-    _eval_zero_count="$(printf '%s' "$_eval_cov_out" | "$PYTHON_BIN" -c "
-import json,sys
-try:
-    d=json.loads(sys.stdin.read())
-    # extract zero count from coverage json or fallback to text parse
-    cases=d.get('cases',[])
-    # coverage mode emits text, not cases json — parse stdout text
-except Exception:
-    pass
-print(0)
-" 2>/dev/null)" || _eval_zero_count=""
-    # Simpler: parse the "Zero-coverage rules:" line from text output
+    # Coverage mode emits text; parse the "Zero-coverage rules:" line.
     _eval_cov_text="$("$PYTHON_BIN" "$ACX_EVAL_RUNNER" --coverage 2>&1)" || true
     _eval_zero_count="$(printf '%s' "$_eval_cov_text" | grep -oE 'Zero-coverage rules: [0-9]+' | grep -oE '[0-9]+' | head -1)"
     _eval_zero_count="${_eval_zero_count:-0}"

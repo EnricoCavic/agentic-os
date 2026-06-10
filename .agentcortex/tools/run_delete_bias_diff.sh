@@ -35,34 +35,29 @@ else
 fi
 
 # --- Argument parsing ---
-EVAL_ARG=""
-TRANSCRIPTS_ARG=""
-AGENT_CMD_ARG=""
-TIMEOUT_ARG=""
+# RUNNER_ARGS is a bash ARRAY: values like --agent-cmd "claude -p {prompt}" or
+# paths with spaces must survive as single argv elements (word-splitting a
+# string here silently broke the documented live mode).
+RUNNER_ARGS=()
 BASELINE_FILE=""
 MUTATED_FILE=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --eval) EVAL_ARG="--eval $2"; shift 2 ;;
-        --transcripts) TRANSCRIPTS_ARG="--transcripts $2"; shift 2 ;;
-        --agent-cmd) AGENT_CMD_ARG="--agent-cmd $2"; shift 2 ;;
-        --timeout) TIMEOUT_ARG="--timeout $2"; shift 2 ;;
+        --eval) RUNNER_ARGS+=(--eval "$2"); shift 2 ;;
+        --transcripts) RUNNER_ARGS+=(--transcripts "$2"); shift 2 ;;
+        --agent-cmd) RUNNER_ARGS+=(--agent-cmd "$2"); shift 2 ;;
+        --timeout) RUNNER_ARGS+=(--timeout "$2"); shift 2 ;;
         --baseline) BASELINE_FILE="$2"; shift 2 ;;
         --mutated) MUTATED_FILE="$2"; shift 2 ;;
         *) echo "error: unknown argument: $1" >&2; exit 1 ;;
     esac
 done
 
-# --- Build eval runner args (everything except --format, which we always set to json) ---
-RUNNER_ARGS="${EVAL_ARG} ${TRANSCRIPTS_ARG} ${AGENT_CMD_ARG} ${TIMEOUT_ARG}"
-RUNNER_ARGS="${RUNNER_ARGS# }"  # strip leading space
-
 _run_eval() {
     local label="$1"
-    if [[ -n "$RUNNER_ARGS" ]]; then
-        # shellcheck disable=SC2086 — word-splitting is intentional for args
-        "$PYTHON" "$EVAL_PY" $RUNNER_ARGS --format json 2>&1
+    if [[ ${#RUNNER_ARGS[@]} -gt 0 ]]; then
+        "$PYTHON" "$EVAL_PY" "${RUNNER_ARGS[@]}" --format json 2>&1
     else
         echo "error: no eval arguments provided (use --transcripts, --agent-cmd, or --baseline/--mutated)" >&2
         exit 1

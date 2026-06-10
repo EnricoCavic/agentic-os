@@ -308,9 +308,27 @@ def main() -> int:
         print(f"error: failed to parse eval YAML: {exc}", file=sys.stderr)
         return 1
 
+    # Structural validation — guarantees a clear error on malformed input even
+    # when the lenient subset parser (no-PyYAML path) "successfully" parses
+    # garbage into strings instead of raising.
+    if not isinstance(data, dict):
+        print("error: malformed eval spec: top level must be a mapping with a 'cases' list", file=sys.stderr)
+        return 1
     cases: list[dict[str, Any]] = data.get("cases", [])
-    if not isinstance(cases, list):
-        print("error: eval YAML 'cases' must be a list", file=sys.stderr)
+    if not isinstance(cases, list) or not all(isinstance(c, dict) for c in cases):
+        print("error: malformed eval spec: 'cases' must be a list of mappings", file=sys.stderr)
+        return 1
+    _bad = [
+        c for c in cases
+        if not (isinstance(c.get("id"), str) and c.get("id")
+                and isinstance(c.get("prompt"), str)
+                and isinstance(c.get("protects"), str))
+    ]
+    if _bad:
+        print(
+            f"error: malformed eval spec: {len(_bad)} case(s) missing required string fields id/prompt/protects",
+            file=sys.stderr,
+        )
         return 1
 
     # Coverage mode

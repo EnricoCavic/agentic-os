@@ -382,6 +382,33 @@ class TestMalformedYaml(unittest.TestCase):
         finally:
             Path(tf_path).unlink(missing_ok=True)
 
+    def test_malformed_yaml_fails_clearly_on_subset_parser_path(self) -> None:
+        """The lenient no-PyYAML subset parser may 'parse' garbage into strings
+        instead of raising — the runner's structural validation must still give
+        a clear error + non-zero exit (review MED-2)."""
+        import os
+
+        tmpdir = Path(tempfile.mkdtemp())
+        eval_file = tmpdir / "malformed.yaml"
+        # Missing required 'protects'; flow-seq garbage in prompt — the subset
+        # parser accepts this shape without raising.
+        eval_file.write_text("cases:\n  - id: broken\n    prompt: [unclosed bracket\n", encoding="utf-8")
+        blocker = tmpdir / "yaml.py"
+        blocker.write_text("raise ImportError('PyYAML disabled for test')\n", encoding="utf-8")
+        env = dict(os.environ)
+        env["PYTHONPATH"] = str(tmpdir)  # blocker shadows PyYAML in the subprocess
+        try:
+            result = subprocess.run(
+                [sys.executable, str(RUNNER), "--eval", str(eval_file), "--coverage"],
+                capture_output=True, text=True, cwd=str(ROOT), env=env,
+            )
+            self.assertNotEqual(result.returncode, 0, "Malformed spec must exit non-zero on the subset-parser path")
+            self.assertIn("malformed eval spec", (result.stdout + result.stderr).lower())
+        finally:
+            import shutil
+
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
 
 # ---------------------------------------------------------------------------
 # Agent-cmd injection safety (AC-9)
