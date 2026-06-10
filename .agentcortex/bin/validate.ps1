@@ -2211,7 +2211,7 @@ if (Test-Path -Path $acxEvalYaml -PathType Leaf) {
         $zeroMatch = [regex]::Match($evalCovText, 'Zero-coverage rules:\s*(\d+)')
         $zeroCnt = if ($zeroMatch.Success) { [int]$zeroMatch.Groups[1].Value } else { 0 }
         if ($zeroCnt -gt 0) {
-            Add-Result -Level 'WARN' -Message "governance eval coverage: $zeroCnt MUST-rule section(s) with zero guarding cases"
+            Add-Result -Level 'WARN' -Message "governance eval coverage: $zeroCnt MUST-rule section(s) without eval cases (tier-blind: includes machine-enforced and principle-tier rules; see guardrails s13)"
             $zeroLines = ($evalCovText -split "`r?`n") | Where-Object { $_ -match '^\s+-\s+' } | Select-Object -First 20
             foreach ($zl in $zeroLines) { Write-Output "  $zl" }
         } else {
