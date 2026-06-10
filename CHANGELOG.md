@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.5.0] - 2026-06-11
+
+Hardening release: a P1 governance sprint (locks, behavioral evals, anti-bloat norms), a validator architecture decision, and major deploy/CI performance and downstream-tolerance fixes. 10 PRs (#209-#218); all gates, reviews, and cross-platform CI enforced throughout.
+
+**Governance**
+- **Blocking Work Log lock (#147)**: the per-branch `<worklog-key>.lock.json` graduates from advisory to single-writer blocking (`worklog_lock.mode: blocking`, configurable back to `advisory`). Atomic acquisition (`O_CREAT|O_EXCL`; racing recoverers serialize), new `release` / `ensure --takeover` verbs (takeover requires an audited Drift Log line), a Phase-Entry Lock contract in `shared-contracts.md`, and validator WARNs for non-stale owner/phase mismatches. Review caught and closed a real injection vector: lock `owner`/`session` strings can no longer forge Work Log gate receipts via any line-break encoding (full `str.splitlines()` set sanitized).
+- **Governance behavioral eval harness + DELETE-bias diff (#151)**: data-only adversarial case set (`.agentcortex/eval/governance.yaml`, 23 cases) + stdlib runner (`run_governance_eval.py`) scoring transcripts or a live `--agent-cmd`; `--coverage` maps MUST-rule sections to guarding cases (honest tier-blind wording; inventory parent double-count fixed); `run_delete_bias_diff.sh` proves whether a rule is load-bearing before deletion. Validators surface coverage as an advisory WARN.
+- **Deletion-First Norm + ADD-Gate (#166)**: new conditional guardrails §13 — changes to always-loaded surfaces must cite a deletion or justify the net-add; new imperative rules declare a signal tier (machine-enforced / eval-backed / named observer). Shipped with net −5 always-loaded lines (the cure passes its own constraint) and a quick-win reachability hook so the norm is loadable on the most common governance-edit flow.
+- **ADR-006 — validator Python-core strangler**: all NEW validator checks are Python tools behind the existing `run_python_check`/`Invoke-PythonCheck` twin wrappers; native additions only via a justified, diff-visible baseline bump (Zero-Python-downstream doctrine honored). Enforced by a bidirectional ratchet test (baseline 187/188 frozen; growth and stale-shrink both fail). Zero runtime change at adoption.
+- Ledger hygiene: Ship History 10-entry rotation enforced (37 accumulated entries rotated out; SSoT halved to ~170 lines), backlog↔tracker resync (5 suspected drifts confirmed as by-design future-direction rows; legend note added).
+
+**Deploy / downstream**
+- **EOL-normalized manifest hashing**: CRLF-checked-out but unmodified files no longer misclassify as "locally modified" — framework updates land instead of silently sidecar-ing (evidenced on a live downstream at v1.2.0). `.gitattributes` now pins `*.md`/`*.yaml`/`*.yml` to LF.
+- **Stale-skill detection with manifest proof**: retired framework skills are named loudly on deploy; user-created non-`custom-*` skills get a single gentle aggregated note (never "retired upstream"/"delete it"); `custom-*` stays silent; flat-skill lookup is exact-match.
+- **Order-paired batch hashing**: deploy update runs drop from ~72s to ~7.5s on Windows (one single-process hash pass; path strings never cross the bash↔python boundary, eliminating an entire key-corruption bug class). bash<4.3 / `ACX_FORCE_PERFILE=1` / no-python paths preserved.
+
+**CI / tests**
+- `.agentcortex/tests` (177 tests) now CI-gated on Linux AND a new Windows pytest job — which caught a real 8.3-short-path bug in `trigger_runtime_core` on day one (fixed with forced-short-path regression tests). UTF-8 file-validity sweep + critical-file presence pre-check added; `verify_agent_evidence`-on-PR was dropped as vacuous (no review-mirror producer) rather than wired as theatre.
+- `slow` pytest markers: local fast loop 17 min → ~3.5 min (CI selection unchanged, full suite still runs); Windows CI pytest job ~15 min → ~8 min after the deploy speedup.
+
+**Process**
+- New discipline applied throughout and recorded: expert attribution review after confirming a fix target and before modifying — it reclassified five suspected drifts as deliberate design, corrected a false performance rationale in ADR-006's history, and sent two delegated "success" claims back for owner-environment reproduction.
+
+
 ## [1.4.1] - 2026-06-08
 
 Patch release: chat-language adherence fix plus a CI time-bomb test fix.
