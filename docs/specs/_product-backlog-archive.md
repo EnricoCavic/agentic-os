@@ -54,3 +54,4 @@ living backlog still resolve here. Ship details: see Ship History in
 | 50 | Spec drift linter (AC coverage vs git diff, advisory) | framework | governance | P2 | docs/specs/spec-drift-linter.md | feature | Shipped | — |
 | 56 | Cross-platform adapter generator (Gemini/Cursor/Copilot stubs) | framework | platform | P2 | docs/specs/multi-agent-review-guidelines.md | feature | Shipped | — |
 | 17 | Hard Work Log lock (advisory → blocking) | framework | concurrency | P1 | docs/specs/worklog-lock-blocking.md | feature | Shipped | [#147](https://github.com/KbWen/agentic-os/issues/147) |
+| 45 | Governance behavioral eval harness + DELETE-bias diff | framework | governance | P1 | docs/specs/governance-eval-harness.md | feature | Shipped | [#151](https://github.com/KbWen/agentic-os/issues/151) | — |

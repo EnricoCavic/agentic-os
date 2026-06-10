@@ -1,5 +1,5 @@
 ---
-status: frozen
+status: shipped
 title: Governance Behavioral Eval Harness + DELETE-bias Diff
 source: GitHub issue #151 / backlog #45
 created: 2026-06-10
