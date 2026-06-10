@@ -1,0 +1,6 @@
+{
+  "_doc": "ADR-006 ratchet baseline. Counting rule: non-comment, line-leading 'record_result ' call sites in validate.sh and 'Add-Result ' in validate.ps1 (regex ^\\s*record_result / ^\\s*Add-Result). Helper-internal calls are a constant offset absorbed here. New checks MUST go through run_python_check / Invoke-PythonCheck (which add zero such lines). Raising a count above original_floor requires a one-line entry in 'justifications' naming the check and why it must run without Python (ADR-006 escape hatch). Lowering counts (migration) requires updating these numbers in the same change. KNOWN SCOPE LIMIT: mid-line emission styles (cmd && record_result / || { record_result } / if(){ Add-Result }) are deliberately uncounted — that authoring style for NEW checks evades the machine ratchet and is caught at review (spec Enforcement Boundary; 4 such pre-existing sites live today).",
+  "original_floor": { "validate_sh": 187, "validate_ps1": 188, "frozen": "2026-06-10" },
+  "baseline": { "validate_sh": 187, "validate_ps1": 188 },
+  "justifications": []
+}
