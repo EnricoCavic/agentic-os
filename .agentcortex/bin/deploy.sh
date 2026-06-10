@@ -340,7 +340,8 @@ _deploy_file_now() {
 _ACX_BATCH_OK=false
 if [ -z "${ACX_FORCE_PERFILE:-}" ]; then
     # shellcheck disable=SC2034  # _acx_assoc_test is intentionally unused
-    if (declare -A _acx_assoc_test) 2>/dev/null; then
+    # Requires assoc arrays (4.0) AND namerefs (4.3) — test both in a subshell.
+    if (declare -A _acx_assoc_test && _acx_nref_fn() { local -n _r="$1"; }; _acx_nref_fn _acx_assoc_test) 2>/dev/null; then
         _ACX_BATCH_OK=true
     fi
 fi
@@ -435,68 +436,86 @@ process_queue() {
         fi
     done
 
+    # Emits exactly ONE line per input path, IN ORDER: the normalized sha256 hex,
+    # or the sentinel MISS when the file can't be read. Order-pairing (not path-key
+    # matching) is load-bearing: path strings never round-trip through Python, so
+    # neither CRLF-on-stdout nor MSYS-vs-native path forms can corrupt cache keys —
+    # both failure modes were hit in earlier revisions of this function (all 187
+    # lookups silently missed and fell back to per-file spawns).
+    # Path translation: cygpath -f - batch-translates MSYS paths (/tmp/x, /c/x, …)
+    # to native form for Python's open(); on POSIX hosts cygpath is absent and
+    # paths are already native. Constraint: paths must not contain newlines
+    # (repo-controlled deploy set — none do).
     _batch_hash_normalized() {
         local _list_file="$1"
         [ -s "$_list_file" ] || return 0
         if [ -n "$_PYTHON_CMD" ]; then
-            "$_PYTHON_CMD" - "$_list_file" <<'PYEOF'
-import sys, hashlib, re
-_msys_re = re.compile(r'^/([a-zA-Z])/')
-def to_native(p):
-    """Convert MSYS /c/... paths to native Windows C:/... for open()."""
-    m = _msys_re.match(p)
-    return (m.group(1).upper() + ':/' + p[3:]) if m else p
-list_file = to_native(sys.argv[1])
-try:
-    with open(list_file, 'rb') as f:
-        data = f.read()
-except OSError:
-    sys.exit(0)
-paths = data.split(b'\x00')
-for raw_path in paths:
-    if not raw_path:
+            # Translate to a newline-separated temp file (cygpath batch when on
+            # MSYS) and hand it to Python as ARGV — the script goes via -c, so
+            # neither competes for stdin (a heredoc-fed `python -` clobbered the
+            # path pipe in an earlier revision: 0 output lines, full fallback).
+            local _xlat_tmp _xlat_arg
+            _xlat_tmp="$(mktemp)"
+            if command -v cygpath >/dev/null 2>&1; then
+                tr '\0' '\n' < "$_list_file" | cygpath -m -f - > "$_xlat_tmp" 2>/dev/null
+                _xlat_arg="$(cygpath -m "$_xlat_tmp")"   # the temp path itself needs translating too
+            else
+                tr '\0' '\n' < "$_list_file" > "$_xlat_tmp"
+                _xlat_arg="$_xlat_tmp"
+            fi
+            "$_PYTHON_CMD" -c '
+import sys, hashlib
+with open(sys.argv[1], "rb") as f:
+    lines = f.read().splitlines()
+for raw in lines:
+    raw = raw.rstrip(b"\r")
+    if not raw:
+        sys.stdout.buffer.write(b"MISS\n")
         continue
     try:
-        path = raw_path.decode('utf-8', errors='replace')
-        native = to_native(path)
-        content = open(native, 'rb').read().replace(b'\r\n', b'\n').replace(b'\r', b'')
-        h = hashlib.sha256(content).hexdigest()
-        # Output the original (MSYS-style) path so bash associative-array keys match.
-        # Use binary stdout to force LF-only line endings on Windows (text-mode stdout
-        # translates \n → \r\n, producing a trailing \r that corrupts assoc-array keys).
-        sys.stdout.buffer.write((h + '  ' + path + '\n').encode())
+        content = open(raw.decode("utf-8", "surrogateescape"), "rb").read()
+        content = content.replace(b"\r\n", b"\n").replace(b"\r", b"")
+        sys.stdout.buffer.write(hashlib.sha256(content).hexdigest().encode("ascii") + b"\n")
     except Exception:
-        pass
-PYEOF
+        sys.stdout.buffer.write(b"MISS\n")
+' "$_xlat_arg"
+            rm -f "$_xlat_tmp"
         else
-            # Python unavailable: fall back to per-file normalized hashing via shell.
-            # Each call spawns tr+sha256sum, so this is O(n) spawns — acceptable as
-            # last resort; batch path (declare -A) already requires Bash 4+.
+            # Python unavailable: per-file normalized hashing via shell (O(n) spawns,
+            # last resort; batch path already requires Bash 4+).
             local _p
             while IFS= read -r -d '' _p; do
-                [ -f "$_p" ] || continue
-                local _h
-                _h="$(compute_sha256_normalized "$_p")"
-                printf '%s  %s\n' "$_h" "$_p"
+                if [ -f "$_p" ]; then
+                    printf '%s\n' "$(compute_sha256_normalized "$_p")"
+                else
+                    printf 'MISS\n'
+                fi
             done < "$_list_file"
         fi
     }
 
-    # Hash src files (EOL-normalized in one pass)
-    while IFS= read -r _hash_line; do
-        [ -z "$_hash_line" ] && continue
-        _h="${_hash_line%% *}"
-        _fp="${_hash_line#*  }"
-        _src_hash["$_fp"]="$_h"
-    done < <(_batch_hash_normalized "$_src_list_tmp")
+    # Pair hashes back to paths BY ORDER. If the line count ever disagrees with
+    # the key count, discard the whole cache — per-entry inline fallbacks in the
+    # second pass keep behavior correct (just slower), never wrong.
+    _fill_hash_cache() {
+        local _list_file="$1" _cache_name="$2"
+        local -n _cache_ref="$_cache_name"
+        local _keys=() _p _h _i=0
+        while IFS= read -r -d '' _p; do _keys+=("$_p"); done < "$_list_file"
+        while IFS= read -r _h; do
+            if [ "$_i" -lt "${#_keys[@]}" ] && [ "$_h" != "MISS" ]; then
+                _cache_ref["${_keys[$_i]}"]="$_h"
+            fi
+            _i=$((_i + 1))
+        done < <(_batch_hash_normalized "$_list_file")
+        if [ "$_i" -ne "${#_keys[@]}" ]; then
+            echo "  note: batch hash count mismatch (${_i}/${#_keys[@]}) — using per-file fallback" >&2
+            _cache_ref=()
+        fi
+    }
 
-    # Hash dst files (EOL-normalized in one pass)
-    while IFS= read -r _hash_line; do
-        [ -z "$_hash_line" ] && continue
-        _h="${_hash_line%% *}"
-        _fp="${_hash_line#*  }"
-        _dst_hash["$_fp"]="$_h"
-    done < <(_batch_hash_normalized "$_dst_list_tmp")
+    _fill_hash_cache "$_src_list_tmp" _src_hash
+    _fill_hash_cache "$_dst_list_tmp" _dst_hash
 
     rm -f "$_src_list_tmp" "$_dst_list_tmp"
 
