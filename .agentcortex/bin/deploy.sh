@@ -462,7 +462,9 @@ for raw_path in paths:
         content = open(native, 'rb').read().replace(b'\r\n', b'\n').replace(b'\r', b'')
         h = hashlib.sha256(content).hexdigest()
         # Output the original (MSYS-style) path so bash associative-array keys match.
-        sys.stdout.write(h + '  ' + path + '\n')
+        # Use binary stdout to force LF-only line endings on Windows (text-mode stdout
+        # translates \n → \r\n, producing a trailing \r that corrupts assoc-array keys).
+        sys.stdout.buffer.write((h + '  ' + path + '\n').encode())
     except Exception:
         pass
 PYEOF
