@@ -328,3 +328,133 @@ def test_framework_ships_no_custom_namespace_skill() -> None:
             continue
         offenders = [p.name for p in base.iterdir() if p.name.startswith("custom-")]
         assert not offenders, f"framework must not ship custom-* skills (ADR-005): {offenders}"
+
+
+# ---------------------------------------------------------------------------
+# EOL-hash correctness (fix for CRLF hash mismatch on Windows autocrlf)
+# ---------------------------------------------------------------------------
+
+@requires_bash
+def test_crlf_deployed_md_does_not_spuriously_sidecar() -> None:
+    """EOL-hash fix: a deployed .md file CRLF-ified by git autocrlf must NOT be
+    classified as 'locally modified' on the next deploy. The normalized hash
+    (tr -d '\\r') must match the manifest entry so the update lands in-place
+    rather than being sidecarred to .acx-incoming (the original regression
+    that caused silent framework updates to fail on Windows)."""
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "proj"
+        target.mkdir()
+
+        assert _deploy(target).returncode == 0
+
+        # Pick a scaffold-tier .md (AGENTS.md) — the exact file that was
+        # misclassified on CRLF checkouts.
+        agents_md = target / "AGENTS.md"
+        assert agents_md.exists(), "AGENTS.md not deployed"
+
+        # Simulate git autocrlf converting the deployed file to CRLF.
+        lf_content = agents_md.read_bytes()
+        crlf_content = lf_content.replace(b"\n", b"\r\n")
+        agents_md.write_bytes(crlf_content)
+
+        # Re-deploy: the CRLF-ified (but otherwise unmodified) file must update
+        # in-place — NOT sidecar to .acx-incoming and NOT warn about local edits.
+        second = _deploy(target)
+        assert second.returncode == 0, f"re-deploy failed:\n{second.stderr}"
+
+        # No sidecar must exist (the EOL-only difference is not a user edit).
+        sidecar = agents_md.with_name("AGENTS.md.acx-incoming")
+        assert not sidecar.exists(), (
+            "CRLF-only difference must NOT produce a .acx-incoming sidecar "
+            "(normalized hash must match manifest)"
+        )
+        # The update must have landed (framework content is in place).
+        assert agents_md.exists(), "AGENTS.md must still exist after re-deploy"
+
+
+@requires_bash
+def test_genuine_content_edit_still_sidecars_after_eol_fix() -> None:
+    """Preservation invariant: a scaffold-tier file with a genuine content edit
+    (not just EOL) must still be sidecarred on re-deploy — normalized hashing
+    must not mask real user modifications."""
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "proj"
+        target.mkdir()
+
+        assert _deploy(target).returncode == 0
+
+        # Pick a framework skill (scaffold tier) and add a real content edit.
+        skill = target / ".agents" / "skills" / "api-design" / "SKILL.md"
+        assert skill.exists(), "api-design skill not deployed"
+        skill.write_text(
+            skill.read_text(encoding="utf-8") + "\n<!-- genuine user edit -->\n",
+            encoding="utf-8",
+        )
+
+        second = _deploy(target)
+        assert second.returncode == 0, f"re-deploy failed:\n{second.stderr}"
+
+        # Genuine content edit → sidecar must be written (preservation intact).
+        sidecar = skill.with_name("SKILL.md.acx-incoming")
+        assert sidecar.exists(), (
+            "A skill with a genuine content edit must still produce a .acx-incoming sidecar "
+            "— normalized hashing must not suppress real user modifications"
+        )
+        # User's edit must be preserved in the live file.
+        assert "<!-- genuine user edit -->" in skill.read_text(encoding="utf-8"), \
+            "user's genuine edit must be preserved in the skill file"
+
+
+@requires_bash
+def test_stale_skill_warning_for_retired_framework_skill() -> None:
+    """Stale-skill detection: an orphan skill present in target but absent from
+    the current framework skill set (simulating a retired/deleted upstream skill)
+    must produce a [STALE SKILL] warning on deploy."""
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "proj"
+        target.mkdir()
+
+        assert _deploy(target).returncode == 0
+
+        # Plant an orphan directory-based skill not in the framework.
+        orphan = target / ".agents" / "skills" / "executing-plans"
+        orphan.mkdir(parents=True, exist_ok=True)
+        (orphan / "SKILL.md").write_text(
+            "# executing-plans\nRetired skill — simulating stale upstream.\n",
+            encoding="utf-8",
+        )
+
+        second = _deploy(target)
+        assert second.returncode == 0, f"re-deploy failed:\n{second.stderr}"
+
+        # The warning must name the stale skill.
+        assert "[STALE SKILL]" in second.stdout, \
+            "deploy must emit [STALE SKILL] for a skill absent from the framework set"
+        assert "executing-plans" in second.stdout, \
+            "the stale skill warning must name the specific skill directory"
+
+
+@requires_bash
+def test_custom_namespace_skill_is_silent_in_stale_detection() -> None:
+    """Custom-* namespace exemption: a project-owned skill prefixed with 'custom-'
+    must NEVER produce a [STALE SKILL] warning, even if absent from the framework."""
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "proj"
+        target.mkdir()
+
+        assert _deploy(target).returncode == 0
+
+        # Plant a custom-* project skill — should be silently ignored.
+        custom = target / ".agents" / "skills" / "custom-my-project-skill"
+        custom.mkdir(parents=True, exist_ok=True)
+        (custom / "SKILL.md").write_text(
+            "# custom-my-project-skill\nProject-owned skill.\n",
+            encoding="utf-8",
+        )
+
+        second = _deploy(target)
+        assert second.returncode == 0, f"re-deploy failed:\n{second.stderr}"
+
+        # No stale warning for custom-* skills.
+        assert "custom-my-project-skill" not in second.stdout, \
+            "custom-* skills must never produce a [STALE SKILL] warning"
