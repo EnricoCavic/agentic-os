@@ -45,3 +45,27 @@ def test_workflow_forces_utf8() -> None:
     txt = WORKFLOW.read_text(encoding="utf-8")
     assert re.search(r"PYTHONUTF8:\s*[\"']?1", txt), \
         "CI must export PYTHONUTF8=1 for cross-platform encoding safety (#163)"
+
+
+def test_workflow_gates_legacy_framework_tests_on_linux() -> None:
+    txt = WORKFLOW.read_text(encoding="utf-8")
+    linux_pytest = re.search(r"pytest tests/ci/ tests/guard/ \.agentcortex/tests/ -v", txt)
+    assert linux_pytest, \
+        ".agentcortex/tests/ must be CI-gated alongside tests/ci + tests/guard on Linux (#163)"
+
+
+def test_workflow_runs_pytest_on_windows() -> None:
+    txt = WORKFLOW.read_text(encoding="utf-8")
+    assert "test-windows:" in txt and "runs-on: windows-latest" in txt, \
+        "CI must have a Windows pytest job (#163)"
+    win_block = txt.split("test-windows:", 1)[1]
+    assert re.search(r"pytest tests/ci/ tests/guard/ \.agentcortex/tests/", win_block), \
+        "Windows job must run the full pytest set, not only validate.ps1 (#163)"
+
+
+def test_workflow_has_utf8_sweep_and_critical_file_precheck() -> None:
+    txt = WORKFLOW.read_text(encoding="utf-8")
+    assert "utf8-and-critical-files:" in txt, "CI must have the UTF-8 sweep job (#163)"
+    block = txt.split("utf8-and-critical-files:", 1)[1]
+    for needle in ('decode("utf-8")', "AGENTS.md", "validate.ps1", "git", "ls-files"):
+        assert needle in block, f"UTF-8 sweep job must contain {needle!r} (#163)"

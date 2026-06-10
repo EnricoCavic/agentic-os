@@ -166,8 +166,75 @@ jobs:
       - name: Install test dependencies
         run: pip install -r .github/requirements-ci.txt
 
-      - name: Run CI structural + guard tests
-        run: python -m pytest tests/ci/ tests/guard/ -v
+      - name: Run CI structural + guard + framework tests
+        run: python -m pytest tests/ci/ tests/guard/ .agentcortex/tests/ -v
+
+  test-windows:
+    name: Pytest (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: .github/requirements-ci.txt
+
+      - name: Install test dependencies
+        run: pip install -r .github/requirements-ci.txt
+
+      # Windows previously ran only validate.ps1 — cross-platform pytest
+      # regressions (CRLF, path separators, cp1252) went uncaught. (#163)
+      - name: Run full test suite on Windows
+        run: python -m pytest tests/ci/ tests/guard/ .agentcortex/tests/ -q
+
+  utf8-and-critical-files:
+    name: UTF-8 Sweep + Critical Files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      # File-validity sweep: every tracked .md/.sh/.yml/.yaml must decode as
+      # UTF-8 (cp1252/latin-1 files have repeatedly broken cross-platform
+      # validator tooling), plus a presence pre-check for governance-critical
+      # files before anything else relies on them. (#163)
+      - name: UTF-8 file-validity sweep + critical-file presence
+        run: |
+          python - <<'PYEOF'
+          import subprocess, sys
+          from pathlib import Path
+
+          critical = [
+              "AGENTS.md", "CLAUDE.md", "GEMINI.md",
+              ".agent/config.yaml",
+              ".agentcortex/bin/validate.sh", ".agentcortex/bin/validate.ps1",
+              ".agentcortex/bin/deploy.sh",
+          ]
+          missing = [c for c in critical if not Path(c).is_file()]
+          if missing:
+              print(f"::error::critical file(s) missing: {missing}")
+              sys.exit(1)
+
+          tracked = subprocess.run(
+              ["git", "ls-files", "*.md", "*.sh", "*.yml", "*.yaml"],
+              capture_output=True, text=True, check=True,
+          ).stdout.splitlines()
+          bad = []
+          for name in tracked:
+              try:
+                  Path(name).read_bytes().decode("utf-8")
+              except (UnicodeDecodeError, OSError) as exc:
+                  bad.append((name, str(exc)))
+          for name, err in bad:
+              print(f"::error file={name}::not valid UTF-8: {err}")
+          print(f"checked {len(tracked)} tracked files; critical files present: {len(critical)}")
+          sys.exit(1 if bad else 0)
+          PYEOF
 
   deploy-no-python:
     name: Deploy Smoke Test (No Python)
