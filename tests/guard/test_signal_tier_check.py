@@ -18,6 +18,9 @@ from pathlib import Path
 
 import pytest
 
+# Every test here shells out to real deploy.sh/validate.sh (fidelity by design).
+pytestmark = pytest.mark.slow
+
 ROOT = Path(__file__).resolve().parents[2]
 VALIDATE_SH = ROOT / ".agentcortex" / "bin" / "validate.sh"
 VALIDATE_PS1 = ROOT / ".agentcortex" / "bin" / "validate.ps1"

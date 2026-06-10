@@ -46,6 +46,9 @@ def _manifest_hash(manifest: Path, rel: str) -> str | None:
             return h.removeprefix("sha256:") if h.startswith("sha256:") else h
     return None
 
+# Every test here shells out to real deploy.sh/validate.sh (fidelity by design).
+pytestmark = pytest.mark.slow
+
 ROOT = Path(__file__).resolve().parents[2]
 DEPLOY_SH = ROOT / ".agentcortex" / "bin" / "deploy.sh"
 BOOTSTRAP = ROOT / ".agent" / "workflows" / "bootstrap.md"

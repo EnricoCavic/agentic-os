@@ -6,6 +6,8 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+
+import pytest
 from pathlib import Path
 
 from test_helpers import sanitize_deployed_ssot
@@ -70,6 +72,10 @@ def init_git_repo(target: Path) -> None:
     add_all = run_process(["git", "add", "-A"], target)
     if add_all.returncode != 0:
         raise AssertionError(add_all.stderr or add_all.stdout)
+
+
+# Each test spawns a full validate.sh run (~40s each) — fidelity by design.
+pytestmark = pytest.mark.slow
 
 
 @unittest.skipUnless(has_bash_launcher(), "bash launcher unavailable for deploy smoke")
