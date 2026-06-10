@@ -1,5 +1,5 @@
 ---
-status: frozen
+status: shipped
 title: Hard Work Log Lock (advisory → blocking)
 source: GitHub issue #147 / backlog #17
 created: 2026-06-10
