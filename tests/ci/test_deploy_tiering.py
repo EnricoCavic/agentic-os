@@ -475,9 +475,9 @@ def test_genuine_content_edit_still_sidecars_after_eol_fix() -> None:
 
 @requires_bash
 def test_stale_skill_warning_for_retired_framework_skill() -> None:
-    """Stale-skill detection: an orphan skill present in target but absent from
-    the current framework skill set (simulating a retired/deleted upstream skill)
-    must produce a [STALE SKILL] warning on deploy."""
+    """Stale-skill detection: an orphan skill present in target, absent from the
+    current framework skill set, AND present in the OLD manifest (simulating a
+    framework-retired skill) must produce a [STALE SKILL] warning on deploy."""
     with tempfile.TemporaryDirectory() as td:
         target = Path(td) / "proj"
         target.mkdir()
@@ -487,19 +487,70 @@ def test_stale_skill_warning_for_retired_framework_skill() -> None:
         # Plant an orphan directory-based skill not in the framework.
         orphan = target / ".agents" / "skills" / "executing-plans"
         orphan.mkdir(parents=True, exist_ok=True)
-        (orphan / "SKILL.md").write_text(
+        skill_file = orphan / "SKILL.md"
+        skill_file.write_text(
             "# executing-plans\nRetired skill — simulating stale upstream.\n",
             encoding="utf-8",
         )
 
+        # Simulate this skill having been framework-managed: append a matching
+        # OLD-manifest line so _skill_in_old_manifest returns true.
+        # The hash must be the LF-normalized hash of the planted SKILL.md.
+        manifest = target / ".agentcortex-manifest"
+        lf_hash = _lf_sha256(skill_file)
+        with manifest.open("a", encoding="utf-8") as mf:
+            mf.write(f"scaffold .agents/skills/executing-plans/SKILL.md sha256:{lf_hash}\n")
+
         second = _deploy(target)
         assert second.returncode == 0, f"re-deploy failed:\n{second.stderr}"
 
-        # The warning must name the stale skill.
+        # The warning must name the stale skill and say "retired upstream".
         assert "[STALE SKILL]" in second.stdout, \
-            "deploy must emit [STALE SKILL] for a skill absent from the framework set"
+            "deploy must emit [STALE SKILL] for a framework-retired skill"
         assert "executing-plans" in second.stdout, \
             "the stale skill warning must name the specific skill directory"
+        assert "retired upstream" in second.stdout, \
+            "the warning must say 'retired upstream' for a manifest-present skill"
+
+
+@requires_bash
+def test_user_created_skill_is_not_accused_as_stale() -> None:
+    """Item B: a non-custom-* skill planted by the user AFTER deploy (absent from
+    the old manifest) must NOT receive a per-skill [STALE SKILL] warning and must
+    NOT say 'retired upstream' or 'delete it'.  It must instead be named in the
+    aggregated 'local skill(s) not framework-managed' note."""
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "proj"
+        target.mkdir()
+
+        assert _deploy(target).returncode == 0
+
+        # Plant a non-custom-* skill that was never in the manifest.
+        user_skill = target / ".agents" / "skills" / "my-project-helper"
+        user_skill.mkdir(parents=True, exist_ok=True)
+        (user_skill / "SKILL.md").write_text(
+            "# my-project-helper\nProject-specific skill not from framework.\n",
+            encoding="utf-8",
+        )
+        # Do NOT add it to the manifest — it was never deployed by the framework.
+
+        second = _deploy(target)
+        assert second.returncode == 0, f"re-deploy failed:\n{second.stderr}"
+
+        out = second.stdout
+        # Must NOT produce a per-skill [STALE SKILL] line naming this skill.
+        stale_lines = [ln for ln in out.splitlines() if "[STALE SKILL]" in ln and "my-project-helper" in ln]
+        assert not stale_lines, \
+            "user-created skill (absent from manifest) must not get a [STALE SKILL] warning"
+        # Must not contain 'retired upstream' adjacent to the skill name.
+        retired_lines = [ln for ln in out.splitlines() if "retired upstream" in ln and "my-project-helper" in ln]
+        assert not retired_lines, \
+            "user-created skill must not be labelled 'retired upstream'"
+        # Must appear in the aggregated 'local skill' note.
+        assert "local skill" in out, \
+            "user-created skills must produce the aggregated 'local skill(s) not framework-managed' note"
+        assert "my-project-helper" in out, \
+            "the aggregated note must name the user-created skill"
 
 
 @requires_bash
