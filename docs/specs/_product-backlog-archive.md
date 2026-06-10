@@ -56,3 +56,4 @@ living backlog still resolve here. Ship details: see Ship History in
 | 17 | Hard Work Log lock (advisory → blocking) | framework | concurrency | P1 | docs/specs/worklog-lock-blocking.md | feature | Shipped | [#147](https://github.com/KbWen/agentic-os/issues/147) |
 | 45 | Governance behavioral eval harness + DELETE-bias diff | framework | governance | P1 | docs/specs/governance-eval-harness.md | feature | Shipped | [#151](https://github.com/KbWen/agentic-os/issues/151) | — |
 | 57 | CI hardening: pinned requirements + pip cache + UTF-8 + pytest on PR | framework | ci | P2 | — | quick-win | Shipped | [#163](https://github.com/KbWen/agentic-os/issues/163) | — |
+| 65 | Deletion-First Norm + ADD-gate signal tiering | framework | governance | P1 | docs/specs/deletion-first-add-gate.md | feature | Shipped | [#166](https://github.com/KbWen/agentic-os/issues/166) | #45 |

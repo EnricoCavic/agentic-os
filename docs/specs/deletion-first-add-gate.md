@@ -1,5 +1,5 @@
 ---
-status: frozen
+status: shipped
 title: Deletion-First Norm + ADD-Gate Signal Tiering
 source: GitHub issue #166 / backlog #65
 created: 2026-06-10
