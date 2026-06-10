@@ -2,6 +2,11 @@
 
 Archived from `current_state.md ## Ship History` to stay within the 10-entry cap. Entries are rotated out verbatim (per ship.md §205 — never edited), newest-archived first.
 
+### Ship-docs-architecture-ondemand-clarify-2026-06-08
+- **Branch `docs/architecture-ondemand-clarify`** (quick-win, governance docs) — Follow-up to the v1.4.0 downstream simulation (spawned chip): a sim pass flagged `docs/architecture/<domain>.md` (referenced by `engineering_guardrails.md §4.2`) as dangling on fresh deploys. Investigation proved it a **false alarm** — `docs/architecture/` is intentionally capability-by-presence (created on demand by `/app-init`; `bootstrap.md` keys its "skip Domain Doc steps, zero extra reads" optimization on the dir being ABSENT; all consumers guard existence). Scaffolding it empty (the naive fix) would silently disable that optimization downstream, so option 1 was rejected.
+  - **Minimal fix**: `engineering_guardrails.md §4.2` got an inline "(when present; created on demand by `/app-init`)" qualifier — the one reference lacking it; no semantic rule change. Added `tests/ci/test_deploy_tiering.py::test_deploy_does_not_scaffold_docs_architecture` locking in the no-scaffold design (deploy creates docs/adr + docs/specs but NOT docs/architecture).
+  - **Evidence**: `pytest -k "docs_architecture or referenced_tools"` 2 passed; `validate.sh` pass=101 fail=0. No deploy behavior change. Implementation commit `2d415b0`. PR #204.
+
 ### Ship-fix-deploy-missing-runtime-tools-2026-06-08
 - **Branch `fix/deploy-missing-runtime-tools`** (quick-win, deploy regression) — Found via multi-angle **downstream-simulation testing** of the v1.4.0 release: `deploy.sh`'s hand-maintained runtime-tools whitelist omitted two tools that DEPLOYED governance docs instruct downstream agents to run — `recover_worklog_lock.py` (bootstrap.md "Preferred command") and `lint_spec_drift.py` (review.md advisory linter). Downstream they failed with `python ...: No such file`. Drift entered when #156 + #188 added the tools/workflows but not the whitelist.
   - **Fix**: added both tools to both whitelists in `deploy.sh` (`_runtime_tools` update path + `runtime_tools` fresh-deploy array). Deps OK (`recover_worklog_lock` → already-deployed `guard_context_write`; `lint_spec_drift` stdlib-only).
