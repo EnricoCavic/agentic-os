@@ -527,5 +527,49 @@ agentcortex:
                 resolve_skill_execution_policy(snapshot, ["connector-skill"], "antigravity", "connector-skill")
 
 
+class SnapshotRootPathFormTests(unittest.TestCase):
+    """Regression: snapshot must tolerate unresolved root path forms.
+
+    GitHub windows-latest runners hand out %TEMP% as an 8.3 short path
+    (RUNNER~1); build_skill_registry_snapshot resolved skill_root but not
+    root, so every manifest relative_to(root) raised ValueError the first
+    time this suite was CI-gated on Windows (PR #211).
+    """
+
+    @unittest.skipUnless(sys.platform == "win32", "8.3 short paths are Windows-only")
+    def test_snapshot_accepts_8dot3_short_path_root(self) -> None:
+        import ctypes
+
+        with tempfile.TemporaryDirectory() as base:
+            root = Path(base)
+            write_temp_skill_package(root, "alpha-skill")
+            buf = ctypes.create_unicode_buffer(260)
+            if ctypes.windll.kernel32.GetShortPathNameW(str(root), buf, 260) == 0:
+                self.skipTest("GetShortPathNameW failed")
+            short_root = Path(buf.value)
+            if str(short_root) == str(root):
+                self.skipTest("filesystem has 8.3 name generation disabled")
+
+            snapshot = build_skill_registry_snapshot(short_root)
+
+            ids = [p["id"] for p in snapshot.get("packages", [])]
+            self.assertIn("alpha-skill", ids)
+
+    def test_snapshot_accepts_unresolved_relative_root(self) -> None:
+        """Cross-platform cousin of the same defect class."""
+        import os
+
+        with tempfile.TemporaryDirectory() as base:
+            write_temp_skill_package(Path(base), "beta-skill")
+            cwd = os.getcwd()
+            os.chdir(base)
+            try:
+                snapshot = build_skill_registry_snapshot(Path("."))
+            finally:
+                os.chdir(cwd)
+            ids = [p["id"] for p in snapshot.get("packages", [])]
+            self.assertIn("beta-skill", ids)
+
+
 if __name__ == "__main__":
     unittest.main()
