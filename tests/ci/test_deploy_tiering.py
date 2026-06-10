@@ -13,6 +13,7 @@ Structural tests guard the wiring/parity against silent deletion.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import shutil
 import subprocess
@@ -20,6 +21,30 @@ import tempfile
 from pathlib import Path
 
 import pytest
+
+
+def _lf_sha256(path: Path) -> str:
+    """Return the hex SHA-256 of ``path`` after normalizing CRLF → LF.
+
+    This mirrors what ``compute_sha256_normalized`` in deploy.sh does
+    (``tr -d '\\r'`` before hashing).  Used in EOL-hash mutation guards
+    to assert that the manifest stores LF-normalized hashes.
+    """
+    raw = path.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"")
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _manifest_hash(manifest: Path, rel: str) -> str | None:
+    """Parse the .agentcortex-manifest and return the hash for *rel*, or None."""
+    if not manifest.exists():
+        return None
+    for line in manifest.read_text(encoding="utf-8", errors="replace").splitlines():
+        parts = line.split()
+        # format: <tier> <rel_path> sha256:<hash>
+        if len(parts) >= 3 and parts[1] == rel:
+            h = parts[2]
+            return h.removeprefix("sha256:") if h.startswith("sha256:") else h
+    return None
 
 ROOT = Path(__file__).resolve().parents[2]
 DEPLOY_SH = ROOT / ".agentcortex" / "bin" / "deploy.sh"
@@ -352,8 +377,29 @@ def test_crlf_deployed_md_does_not_spuriously_sidecar() -> None:
         agents_md = target / "AGENTS.md"
         assert agents_md.exists(), "AGENTS.md not deployed"
 
+        # --- Mutation guard: manifest must store the LF-normalized hash -------
+        # compute_sha256_normalized (the fix) strips \r before hashing, so the
+        # manifest entry for AGENTS.md MUST equal the LF-normalized hash of the
+        # *source* file.  If someone reverts to compute_sha256 (raw), the
+        # manifest will store the CRLF hash on Windows CI and this assertion
+        # fails — exactly the regression we are guarding against.
+        src_agents_md = ROOT / "AGENTS.md"
+        expected_lf_hash = _lf_sha256(src_agents_md)
+        manifest = target / ".agentcortex-manifest"
+        stored_hash = _manifest_hash(manifest, "AGENTS.md")
+        assert stored_hash == expected_lf_hash, (
+            f"manifest must store the LF-normalized hash of AGENTS.md "
+            f"(got {stored_hash!r}, expected {expected_lf_hash!r}); "
+            "revert to compute_sha256 (raw) = regression"
+        )
+        # --- End mutation guard -----------------------------------------------
+
         # Simulate git autocrlf converting the deployed file to CRLF.
-        lf_content = agents_md.read_bytes()
+        # Normalize to LF first (in case CI checkout already CRLF-ified the
+        # source tree), then CRLF-ify — guarantees exactly one \r\n per line
+        # regardless of the host git autocrlf setting.
+        raw = agents_md.read_bytes()
+        lf_content = raw.replace(b"\r\n", b"\n")   # strip any existing CRs
         crlf_content = lf_content.replace(b"\n", b"\r\n")
         agents_md.write_bytes(crlf_content)
 
@@ -386,9 +432,28 @@ def test_genuine_content_edit_still_sidecars_after_eol_fix() -> None:
         # Pick a framework skill (scaffold tier) and add a real content edit.
         skill = target / ".agents" / "skills" / "api-design" / "SKILL.md"
         assert skill.exists(), "api-design skill not deployed"
-        skill.write_text(
-            skill.read_text(encoding="utf-8") + "\n<!-- genuine user edit -->\n",
-            encoding="utf-8",
+
+        # --- Mutation guard: manifest must store the LF-normalized hash -------
+        # Same principle as test_crlf_deployed_md_does_not_spuriously_sidecar:
+        # if deploy.sh reverts to raw compute_sha256, the manifest hash on a
+        # CRLF checkout will be a CRLF hash — verify it is the LF-normalized one.
+        src_skill = ROOT / ".agents" / "skills" / "api-design" / "SKILL.md"
+        expected_lf_hash = _lf_sha256(src_skill)
+        manifest = target / ".agentcortex-manifest"
+        stored_hash = _manifest_hash(manifest, ".agents/skills/api-design/SKILL.md")
+        assert stored_hash == expected_lf_hash, (
+            f"manifest must store the LF-normalized hash of api-design/SKILL.md "
+            f"(got {stored_hash!r}, expected {expected_lf_hash!r}); "
+            "revert to compute_sha256 (raw) = regression"
+        )
+        # --- End mutation guard -----------------------------------------------
+
+        # Write bytes directly to avoid text-mode CRLF conversion on Windows:
+        # append LF-terminated marker so the normalized hash differs from the
+        # manifest entry regardless of the CI checkout EOL setting.
+        skill.write_bytes(
+            skill.read_bytes().replace(b"\r\n", b"\n")  # normalize to LF baseline
+            + b"\n<!-- genuine user edit -->\n"
         )
 
         second = _deploy(target)
