@@ -13,6 +13,7 @@ Structural tests guard the wiring/parity against silent deletion.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import shutil
 import subprocess
@@ -20,6 +21,30 @@ import tempfile
 from pathlib import Path
 
 import pytest
+
+
+def _lf_sha256(path: Path) -> str:
+    """Return the hex SHA-256 of ``path`` after normalizing CRLF → LF.
+
+    This mirrors what ``compute_sha256_normalized`` in deploy.sh does
+    (``tr -d '\\r'`` before hashing).  Used in EOL-hash mutation guards
+    to assert that the manifest stores LF-normalized hashes.
+    """
+    raw = path.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"")
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _manifest_hash(manifest: Path, rel: str) -> str | None:
+    """Parse the .agentcortex-manifest and return the hash for *rel*, or None."""
+    if not manifest.exists():
+        return None
+    for line in manifest.read_text(encoding="utf-8", errors="replace").splitlines():
+        parts = line.split()
+        # format: <tier> <rel_path> sha256:<hash>
+        if len(parts) >= 3 and parts[1] == rel:
+            h = parts[2]
+            return h.removeprefix("sha256:") if h.startswith("sha256:") else h
+    return None
 
 ROOT = Path(__file__).resolve().parents[2]
 DEPLOY_SH = ROOT / ".agentcortex" / "bin" / "deploy.sh"
@@ -328,3 +353,173 @@ def test_framework_ships_no_custom_namespace_skill() -> None:
             continue
         offenders = [p.name for p in base.iterdir() if p.name.startswith("custom-")]
         assert not offenders, f"framework must not ship custom-* skills (ADR-005): {offenders}"
+
+
+# ---------------------------------------------------------------------------
+# EOL-hash correctness (fix for CRLF hash mismatch on Windows autocrlf)
+# ---------------------------------------------------------------------------
+
+@requires_bash
+def test_crlf_deployed_md_does_not_spuriously_sidecar() -> None:
+    """EOL-hash fix: a deployed .md file CRLF-ified by git autocrlf must NOT be
+    classified as 'locally modified' on the next deploy. The normalized hash
+    (tr -d '\\r') must match the manifest entry so the update lands in-place
+    rather than being sidecarred to .acx-incoming (the original regression
+    that caused silent framework updates to fail on Windows)."""
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "proj"
+        target.mkdir()
+
+        assert _deploy(target).returncode == 0
+
+        # Pick a scaffold-tier .md (AGENTS.md) — the exact file that was
+        # misclassified on CRLF checkouts.
+        agents_md = target / "AGENTS.md"
+        assert agents_md.exists(), "AGENTS.md not deployed"
+
+        # --- Mutation guard: manifest must store the LF-normalized hash -------
+        # compute_sha256_normalized (the fix) strips \r before hashing, so the
+        # manifest entry for AGENTS.md MUST equal the LF-normalized hash of the
+        # *source* file.  If someone reverts to compute_sha256 (raw), the
+        # manifest will store the CRLF hash on Windows CI and this assertion
+        # fails — exactly the regression we are guarding against.
+        src_agents_md = ROOT / "AGENTS.md"
+        expected_lf_hash = _lf_sha256(src_agents_md)
+        manifest = target / ".agentcortex-manifest"
+        stored_hash = _manifest_hash(manifest, "AGENTS.md")
+        assert stored_hash == expected_lf_hash, (
+            f"manifest must store the LF-normalized hash of AGENTS.md "
+            f"(got {stored_hash!r}, expected {expected_lf_hash!r}); "
+            "revert to compute_sha256 (raw) = regression"
+        )
+        # --- End mutation guard -----------------------------------------------
+
+        # Simulate git autocrlf converting the deployed file to CRLF.
+        # Normalize to LF first (in case CI checkout already CRLF-ified the
+        # source tree), then CRLF-ify — guarantees exactly one \r\n per line
+        # regardless of the host git autocrlf setting.
+        raw = agents_md.read_bytes()
+        lf_content = raw.replace(b"\r\n", b"\n")   # strip any existing CRs
+        crlf_content = lf_content.replace(b"\n", b"\r\n")
+        agents_md.write_bytes(crlf_content)
+
+        # Re-deploy: the CRLF-ified (but otherwise unmodified) file must update
+        # in-place — NOT sidecar to .acx-incoming and NOT warn about local edits.
+        second = _deploy(target)
+        assert second.returncode == 0, f"re-deploy failed:\n{second.stderr}"
+
+        # No sidecar must exist (the EOL-only difference is not a user edit).
+        sidecar = agents_md.with_name("AGENTS.md.acx-incoming")
+        assert not sidecar.exists(), (
+            "CRLF-only difference must NOT produce a .acx-incoming sidecar "
+            "(normalized hash must match manifest)"
+        )
+        # The update must have landed (framework content is in place).
+        assert agents_md.exists(), "AGENTS.md must still exist after re-deploy"
+
+
+@requires_bash
+def test_genuine_content_edit_still_sidecars_after_eol_fix() -> None:
+    """Preservation invariant: a scaffold-tier file with a genuine content edit
+    (not just EOL) must still be sidecarred on re-deploy — normalized hashing
+    must not mask real user modifications."""
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "proj"
+        target.mkdir()
+
+        assert _deploy(target).returncode == 0
+
+        # Pick a framework skill (scaffold tier) and add a real content edit.
+        skill = target / ".agents" / "skills" / "api-design" / "SKILL.md"
+        assert skill.exists(), "api-design skill not deployed"
+
+        # --- Mutation guard: manifest must store the LF-normalized hash -------
+        # Same principle as test_crlf_deployed_md_does_not_spuriously_sidecar:
+        # if deploy.sh reverts to raw compute_sha256, the manifest hash on a
+        # CRLF checkout will be a CRLF hash — verify it is the LF-normalized one.
+        src_skill = ROOT / ".agents" / "skills" / "api-design" / "SKILL.md"
+        expected_lf_hash = _lf_sha256(src_skill)
+        manifest = target / ".agentcortex-manifest"
+        stored_hash = _manifest_hash(manifest, ".agents/skills/api-design/SKILL.md")
+        assert stored_hash == expected_lf_hash, (
+            f"manifest must store the LF-normalized hash of api-design/SKILL.md "
+            f"(got {stored_hash!r}, expected {expected_lf_hash!r}); "
+            "revert to compute_sha256 (raw) = regression"
+        )
+        # --- End mutation guard -----------------------------------------------
+
+        # Write bytes directly to avoid text-mode CRLF conversion on Windows:
+        # append LF-terminated marker so the normalized hash differs from the
+        # manifest entry regardless of the CI checkout EOL setting.
+        skill.write_bytes(
+            skill.read_bytes().replace(b"\r\n", b"\n")  # normalize to LF baseline
+            + b"\n<!-- genuine user edit -->\n"
+        )
+
+        second = _deploy(target)
+        assert second.returncode == 0, f"re-deploy failed:\n{second.stderr}"
+
+        # Genuine content edit → sidecar must be written (preservation intact).
+        sidecar = skill.with_name("SKILL.md.acx-incoming")
+        assert sidecar.exists(), (
+            "A skill with a genuine content edit must still produce a .acx-incoming sidecar "
+            "— normalized hashing must not suppress real user modifications"
+        )
+        # User's edit must be preserved in the live file.
+        assert "<!-- genuine user edit -->" in skill.read_text(encoding="utf-8"), \
+            "user's genuine edit must be preserved in the skill file"
+
+
+@requires_bash
+def test_stale_skill_warning_for_retired_framework_skill() -> None:
+    """Stale-skill detection: an orphan skill present in target but absent from
+    the current framework skill set (simulating a retired/deleted upstream skill)
+    must produce a [STALE SKILL] warning on deploy."""
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "proj"
+        target.mkdir()
+
+        assert _deploy(target).returncode == 0
+
+        # Plant an orphan directory-based skill not in the framework.
+        orphan = target / ".agents" / "skills" / "executing-plans"
+        orphan.mkdir(parents=True, exist_ok=True)
+        (orphan / "SKILL.md").write_text(
+            "# executing-plans\nRetired skill — simulating stale upstream.\n",
+            encoding="utf-8",
+        )
+
+        second = _deploy(target)
+        assert second.returncode == 0, f"re-deploy failed:\n{second.stderr}"
+
+        # The warning must name the stale skill.
+        assert "[STALE SKILL]" in second.stdout, \
+            "deploy must emit [STALE SKILL] for a skill absent from the framework set"
+        assert "executing-plans" in second.stdout, \
+            "the stale skill warning must name the specific skill directory"
+
+
+@requires_bash
+def test_custom_namespace_skill_is_silent_in_stale_detection() -> None:
+    """Custom-* namespace exemption: a project-owned skill prefixed with 'custom-'
+    must NEVER produce a [STALE SKILL] warning, even if absent from the framework."""
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "proj"
+        target.mkdir()
+
+        assert _deploy(target).returncode == 0
+
+        # Plant a custom-* project skill — should be silently ignored.
+        custom = target / ".agents" / "skills" / "custom-my-project-skill"
+        custom.mkdir(parents=True, exist_ok=True)
+        (custom / "SKILL.md").write_text(
+            "# custom-my-project-skill\nProject-owned skill.\n",
+            encoding="utf-8",
+        )
+
+        second = _deploy(target)
+        assert second.returncode == 0, f"re-deploy failed:\n{second.stderr}"
+
+        # No stale warning for custom-* skills.
+        assert "custom-my-project-skill" not in second.stdout, \
+            "custom-* skills must never produce a [STALE SKILL] warning"

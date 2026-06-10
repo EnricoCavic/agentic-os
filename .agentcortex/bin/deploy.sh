@@ -67,6 +67,31 @@ compute_sha256() {
     fi
 }
 
+# --- EOL-normalized SHA256 (CR-stripped) ---
+# Strips bare CR (\r) before hashing so that a CRLF working-tree checkout of an
+# otherwise-unmodified text file produces the same hash as the LF source. This
+# closes the CRLF hash-mismatch bug: downstream repos using git autocrlf=true (or
+# .gitattributes `*.md text` without eol=lf) check out .md/.yaml files with CRLF,
+# making every unmodified scaffold file appear "locally modified" and spuriously
+# sidecar'd to .acx-incoming on every re-deploy.
+#
+# All files deployed by Agentic OS are text (no binaries in the deploy set), so
+# normalizing unconditionally is safe. For genuinely binary files, compute_sha256
+# (raw) must be used explicitly.
+compute_sha256_normalized() {
+    local file="$1"
+    if command -v sha256sum >/dev/null 2>&1; then
+        tr -d '\r' < "$file" | sha256sum | cut -d' ' -f1
+    elif command -v shasum >/dev/null 2>&1; then
+        tr -d '\r' < "$file" | shasum -a 256 | cut -d' ' -f1
+    elif command -v openssl >/dev/null 2>&1; then
+        tr -d '\r' < "$file" | openssl dgst -sha256 | awk '{print $NF}'
+    else
+        echo "ERROR: No SHA-256 tool found (need sha256sum, shasum, or openssl)." >&2
+        exit 1
+    fi
+}
+
 # --- Source commit (best-effort) ---
 get_source_commit() {
     if command -v git >/dev/null 2>&1 && [ -e "$REPO_ROOT/.git" ]; then
@@ -154,8 +179,13 @@ deploy_file() {
 
     [ -f "$src" ] || return 0
 
+    # Use EOL-normalized hashing throughout deploy_file so that a CRLF checkout
+    # of an otherwise-unmodified text file does NOT appear "locally modified".
+    # All deployed files are text; compute_sha256_normalized strips bare CR before
+    # hashing. Old manifests (raw-hash era) stored LF-source hashes which are
+    # identical to normalized hashes, so legacy manifests migrate transparently.
     local src_hash
-    src_hash="$(compute_sha256 "$src")"
+    src_hash="$(compute_sha256_normalized "$src")"
 
     local is_update=false
     [ -f "$MANIFEST_FILE" ] && is_update=true
@@ -173,9 +203,12 @@ deploy_file() {
             # (#173). The force-update invariant is preserved — the new framework
             # version still lands; only the silent-data-loss footgun is closed.
             local dst_hash
-            dst_hash="$(compute_sha256 "$dst")"
+            dst_hash="$(compute_sha256_normalized "$dst")"
             local locally_modified=false
             if [ -n "$old_manifest_hash" ]; then
+                # EOL-normalized comparison: a CRLF-checked-out unmodified file
+                # produces the same normalized hash as the LF manifest entry, so
+                # it is correctly classified as unmodified (not spuriously flagged).
                 [ "$dst_hash" != "$old_manifest_hash" ] && locally_modified=true
             else
                 # Pre-manifest/legacy: no baseline to compare against; treat
@@ -205,12 +238,12 @@ deploy_file() {
                 # sidecar when content differs from the framework version —
                 # never silently overwrite scaffold-tier user content.
                 local dst_hash
-                dst_hash="$(compute_sha256 "$dst")"
+                dst_hash="$(compute_sha256_normalized "$dst")"
                 if [ "$src_hash" != "$dst_hash" ]; then
                     cp ${CP_FLAG:+"$CP_FLAG"} "$src" "$dst.acx-incoming"
                     echo "  [SKIP] $rel (pre-existing/migrated; new version at $rel.acx-incoming — merge manually or ask AI agent to merge)"
                     COUNT_SKIPPED=$((COUNT_SKIPPED + 1))
-                    # Record the user's current hash so future updates still detect modification.
+                    # Record the user's current normalized hash so future updates detect modification.
                     record_deployed "$tier" "$rel" "$dst_hash"
                     return 0
                 fi
@@ -218,7 +251,7 @@ deploy_file() {
                 COUNT_UPDATED=$((COUNT_UPDATED + 1))
             else
                 local dst_hash
-                dst_hash="$(compute_sha256 "$dst")"
+                dst_hash="$(compute_sha256_normalized "$dst")"
                 if [ "$dst_hash" = "$old_manifest_hash" ]; then
                     # User didn't modify — safe to update
                     cp ${CP_FLAG:+"$CP_FLAG"} "$src" "$dst"
@@ -245,12 +278,12 @@ deploy_file() {
         # For scaffold/wrapper tiers, preserve the user's file and write a sidecar so nothing is clobbered.
         if [ "$tier" != "core" ]; then
             local dst_hash
-            dst_hash="$(compute_sha256 "$dst")"
+            dst_hash="$(compute_sha256_normalized "$dst")"
             if [ "$src_hash" != "$dst_hash" ]; then
                 cp ${CP_FLAG:+"$CP_FLAG"} "$src" "$dst.acx-incoming"
                 echo "  [SKIP] $rel (pre-existing; new version at $rel.acx-incoming — merge manually or ask AI agent to merge)"
                 COUNT_SKIPPED=$((COUNT_SKIPPED + 1))
-                # Record the USER's current hash so future updates still detect modification.
+                # Record the USER's current normalized hash so future updates detect modification.
                 record_deployed "$tier" "$rel" "$dst_hash"
                 return 0
             fi
@@ -919,6 +952,76 @@ if $IS_UPDATE; then
             COUNT_REMOVED=$((COUNT_REMOVED + 1))
         fi
     done <<< "$_removed_paths"
+fi
+
+# ============================================================
+# Stale-skill detection (warn-only, no auto-delete)
+# ============================================================
+# Skills deleted upstream (retired) remain in deployed targets forever because
+# the removed-files detector above only sees files tracked in the OLD manifest —
+# it cannot fire for skills retired before a downstream's last deploy. This scan
+# catches orphaned skills that are no longer part of the framework skill set.
+#
+# Logic: derive the live framework skill set from the SOURCE repo's skill dirs
+# (NOT a hand-maintained list). Any target skill entry whose name is absent from
+# that set AND does not match the custom-* reserved namespace is a stale skill.
+
+_framework_flat_skills=""
+for _sf in "$REPO_ROOT"/.agent/skills/*; do
+    [ -f "$_sf" ] || continue
+    _bname="$(basename "$_sf")"
+    [ "$_bname" = ".gitkeep" ] && continue
+    _framework_flat_skills="$_framework_flat_skills $_bname"
+done
+
+_framework_dir_skills=""
+if [ -d "$REPO_ROOT/.agents/skills" ]; then
+    for _sd in "$REPO_ROOT/.agents/skills"/*/; do
+        [ -d "$_sd" ] || continue
+        _framework_dir_skills="$_framework_dir_skills $(basename "$_sd")"
+    done
+fi
+
+_stale_count=0
+
+# Scan target .agent/skills/ (flat metadata files)
+for _tsf in "$TARGET/.agent/skills"/*; do
+    [ -f "$_tsf" ] || continue
+    _tname="$(basename "$_tsf")"
+    [ "$_tname" = ".gitkeep" ] && continue
+    # custom-* namespace is reserved for project-owned skills — never warn
+    case "$_tname" in custom-*) continue ;; esac
+    _found=false
+    for _fw in $_framework_flat_skills; do
+        [ "$_tname" = "$_fw" ] && _found=true && break
+    done
+    if ! $_found; then
+        echo "  [STALE SKILL] .agent/skills/$_tname — retired upstream; delete it, or rename to custom-$_tname to keep"
+        _stale_count=$((_stale_count + 1))
+    fi
+done
+
+# Scan target .agents/skills/ (directory-based skills)
+for _tsd in "$TARGET/.agents/skills"/*/; do
+    [ -d "$_tsd" ] || continue
+    _tdname="$(basename "$_tsd")"
+    [ "$_tdname" = ".gitkeep" ] && continue
+    # custom-* namespace is reserved for project-owned skills — never warn
+    case "$_tdname" in custom-*) continue ;; esac
+    _found=false
+    for _fw in $_framework_dir_skills; do
+        [ "$_tdname" = "$_fw" ] && _found=true && break
+    done
+    if ! $_found; then
+        echo "  [STALE SKILL] .agents/skills/$_tdname — retired upstream; delete it, or rename to custom-$_tdname to keep"
+        _stale_count=$((_stale_count + 1))
+    fi
+done
+
+if [ "$_stale_count" -gt 0 ]; then
+    echo ""
+    echo "  ⚠ $_stale_count stale skill(s) detected. These were removed from the framework"
+    echo "    but remain in your project. Review and delete them, or prefix with 'custom-' to keep."
 fi
 
 # ============================================================
