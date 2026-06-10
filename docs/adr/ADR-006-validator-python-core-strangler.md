@@ -10,6 +10,8 @@ lifecycle:
   owner: framework
   review_cadence: on-event
   review_trigger: "next shipped validator parity defect, native-check count crossing the committed baseline, or a downstream no-python user reporting lost coverage"
+  supersedes: none
+  superseded_by: none
 ---
 
 # ADR-006: Validator Python-Core Strangler (new checks are Python tools)
