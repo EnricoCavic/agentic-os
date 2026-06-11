@@ -577,3 +577,37 @@ def test_custom_namespace_skill_is_silent_in_stale_detection() -> None:
         # No stale warning for custom-* skills.
         assert "custom-my-project-skill" not in second.stdout, \
             "custom-* skills must never produce a [STALE SKILL] warning"
+
+
+@requires_bash
+def test_gemini_md_is_deployed() -> None:
+    """GEMINI.md is a first-class agent entry point (it @imports AGENTS.md per
+    multi-agent-review-guidelines AC-2) but was absent from deploy.sh's root-file
+    list — downstream Gemini/Antigravity users got no entry point. (sim A1, 2026-06-11)"""
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "proj"
+        target.mkdir()
+        assert _deploy(target).returncode == 0, "deploy failed"
+        for entry in ("AGENTS.md", "CLAUDE.md", "GEMINI.md"):
+            assert (target / entry).is_file(), f"{entry} must be deployed to downstream root"
+        # GEMINI.md is scaffold tier (user-editable, like AGENTS/CLAUDE).
+        manifest = (target / ".agentcortex-manifest").read_text(encoding="utf-8")
+        assert "GEMINI.md" in manifest, "GEMINI.md must be recorded in the manifest"
+
+
+@requires_bash
+def test_no_migration_banner_on_clean_update() -> None:
+    """A bare .agentcortex-manifest is the normal installed state; announcing
+    'Migrating from legacy paths' on every routine re-deploy was pure noise.
+    (sim A1, 2026-06-11) — banner must only appear when real legacy artifacts exist."""
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "proj"
+        target.mkdir()
+        first = _deploy(target)
+        assert first.returncode == 0
+        assert "Migrating from legacy paths" not in first.stdout, \
+            "fresh deploy into an empty dir must not print the migration banner"
+        second = _deploy(target)
+        assert second.returncode == 0
+        assert "Migrating from legacy paths" not in second.stdout, \
+            "routine re-deploy (manifest present, no legacy dirs) must not print the migration banner"

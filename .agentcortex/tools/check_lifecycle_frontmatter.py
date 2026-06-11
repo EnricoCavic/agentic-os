@@ -177,17 +177,32 @@ def list_target_files(root: Path) -> Iterable[Path]:
             yield path
 
 
-def check_file(path: Path, rel_posix: str) -> Finding:
+def _is_downstream_user_content(root: Path, rel_posix: str) -> bool:
+    """Downstream installs (.agentcortex-manifest present) own their docs/ tree —
+    the framework never deploys ADRs/architecture docs there, so any docs/** file
+    is user-authored. Imposing the framework's lifecycle contract on user content
+    as a FAIL blocked innocent downstream validates (sim finding 2026-06-11);
+    degrade to WARN so the nudge survives without breaking their gate.
+    The framework source repo has no manifest, so its own docs stay FAIL-gated."""
+    if not rel_posix.startswith("docs/"):
+        return False
+    return (root / ".agentcortex-manifest").is_file()
+
+
+def check_file(path: Path, rel_posix: str, root: Path | None = None) -> Finding:
     raw, fm = parse_frontmatter(path)
     issues = validate_lifecycle(fm)
     if not issues:
         return Finding("PASS", rel_posix, "lifecycle frontmatter valid")
     doc_date = extract_doc_date(path, raw)
     grandfathered = doc_date is not None and doc_date < CUTOFF_DATE
-    severity = "WARN" if grandfathered else "FAIL"
+    user_content = root is not None and _is_downstream_user_content(root, rel_posix)
+    severity = "WARN" if (grandfathered or user_content) else "FAIL"
     detail = "; ".join(issues)
     if grandfathered:
         detail = f"grandfathered ({doc_date.isoformat()}): {detail}"
+    elif user_content:
+        detail = f"downstream user content (advisory): {detail}"
     return Finding(severity, rel_posix, detail)
 
 
@@ -220,7 +235,7 @@ def main() -> int:
             rel = str(path.resolve().relative_to(root)).replace("\\", "/")
         except ValueError:
             continue
-        findings.append(check_file(path, rel))
+        findings.append(check_file(path, rel, root))
 
     fail_count = sum(1 for f in findings if f.severity == "FAIL")
     warn_count = sum(1 for f in findings if f.severity == "WARN")

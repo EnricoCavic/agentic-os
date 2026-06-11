@@ -1364,7 +1364,7 @@ PYEOF
       wl_class="$(printf '%s' "$wl_content" | sed -n 's/^- \(**\)\?Classification\1\?:[[:space:]]*//p' | head -n 1 | tr -d '\r\`')"
     fi
     if [[ "$wl_class" == "feature" || "$wl_class" == "architecture-change" ]]; then
-      if printf '%s' "$wl_content" | grep -q 'Gate: implement'; then
+      if printf '%s' "$wl_content" | grep -qi 'Gate: implement'; then
         if ! printf '%s' "$wl_content" | grep -qiE '^#+[[:space:]]+Test Gate Results'; then
           test_gate_results_missing=$((test_gate_results_missing + 1))
         fi
@@ -1446,7 +1446,7 @@ PYEOF
     # bootstrap should have run the ADR Coverage Check and recorded the result (yes/skip)
     # in ## Drift Log. Missing record means the check was silently bypassed.
     if [[ "$wl_class" == "feature" || "$wl_class" == "architecture-change" ]]; then
-      if printf '%s' "$wl_content" | grep -q 'Gate: plan\|Gate: implement'; then
+      if printf '%s' "$wl_content" | grep -qi 'Gate: plan\|Gate: implement'; then
         if ! printf '%s' "$wl_content" | grep -qiE 'ADR.*[Cc]overage|[Cc]overage.*ADR|adr.*check|no.*adr.*found'; then
           adr_coverage_undocumented=$((adr_coverage_undocumented + 1))
         fi
