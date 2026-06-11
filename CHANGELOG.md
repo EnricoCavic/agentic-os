@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.5.1] - 2026-06-11
+
+Patch release: post-v1.5.0 downstream-simulation fixes (6-way fleet; 36/40 checks already passing — every v1.5.0 promise held).
+
+**Deploy / downstream**
+- **GEMINI.md now deployed** — it was a first-class agent entry point (imports `AGENTS.md`) present in the source repo but omitted from every `deploy.sh` site, so downstream Gemini/Antigravity users got no entry point. Wired into all deploy sites (scaffold tier, beside `AGENTS.md`/`CLAUDE.md`).
+- **Lifecycle tolerance for user-authored docs** — `check_lifecycle_frontmatter.py` no longer FAILs a downstream user's own `docs/adr/*.md` for lacking the framework's lifecycle frontmatter (it imposed a doc contract on content the framework never wrote, blocking their `validate.sh`). Downstream installs (`.agentcortex-manifest` present) get an advisory WARN; the framework source repo stays FAIL-gated.
+- Quieter deploys: the "Migrating from legacy paths" banner only prints when real legacy artifacts exist, not on every routine re-deploy.
+
+**Validators**
+- `validate.sh` gate-receipt greps made case-insensitive to match the PowerShell mirror (eliminates a 2-count sh/ps1 parity drift); aggregated local-skill note deduped.
+
+
 ## [1.5.0] - 2026-06-11
 
 Hardening release: a P1 governance sprint (locks, behavioral evals, anti-bloat norms), a validator architecture decision, and major deploy/CI performance and downstream-tolerance fixes. 10 PRs (#209-#218); all gates, reviews, and cross-platform CI enforced throughout.
