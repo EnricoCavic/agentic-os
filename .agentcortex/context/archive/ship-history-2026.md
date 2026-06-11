@@ -2,6 +2,13 @@
 
 Archived from `current_state.md ## Ship History` to stay within the 10-entry cap. Entries are rotated out verbatim (per ship.md §205 — never edited), newest-archived first.
 
+### Ship-chore-backlog-tracker-sync-2026-06-10
+- **Branch `chore/backlog-tracker-sync`** (quick-win, ledger hygiene) — Strict self-assessment follow-up: verified the suspected backlog↔tracker drift against actual issue-closure rationales before acting (5 of 6 "drifted" rows were FALSE ALARMS — issues #142/#144/#148/#149/#150 were closed-premature with "row remains as future direction" by design; legend note added so the convention is visible). Real fixes:
+  - Row #48 → Cancelled/archived (issue #154 closed as already-implemented 2026-06-02; row desynced since).
+  - Row #70 added for open issue #193 (JSON Drift Log export) — tracker→backlog gap.
+  - **Ship History cap enforced**: 37 entries had accumulated in SSoT against ship.md's 10-entry rotation rule (unenforced drift, incl. 4 entries added earlier today); 28 rotated verbatim to `archive/ship-history-2026.md` (newest-archived first; relative-link scan clean). SSoT shrinks ~190 lines — every bootstrap reads this file, so the compaction directly serves the instruction-load budget.
+- Tests: validators fail=0 both platforms.
+
 ### Ship-feat-deletion-first-add-gate-2026-06-10
 - **Branch `feat/deletion-first-add-gate`** (feature, spec `docs/specs/deletion-first-add-gate.md`, backlog #65 / issue #166) — Made the DELETE-bias discipline structural at rule-authoring time, under two binding owner constraints verified by the review's bloat self-audit: **zero always-loaded context growth (net −5 lines)** and zero new hard gates.
   - **§13 Governance Change Norms** (engineering_guardrails.md, CONDITIONAL read only): Deletion-First Norm — changes to the 3 always-loaded surfaces (AGENTS.md, .agent/rules/*, shared-contracts.md) must cite a deletion or record a 1-line net-add justification; ADD-Gate — a new imperative rule/gate anywhere in .agent/** declares its signal tier, strongest feasible: T1 machine-enforced · T2 eval-backed (#45 coverage-tracked; governance files only) · T3 named human observer + rationale. External citations are metadata, never a tier; no feasible tier → don't add. Existing rules grandfathered.
