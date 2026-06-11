@@ -110,7 +110,7 @@ get_tier() {
         installers/deploy_brain.sh|installers/deploy_brain.ps1|installers/deploy_brain.cmd) echo "wrapper" ;;
 
         # scaffold — created once, user expected to modify (or merge framework + project content)
-        AGENTS.md|CLAUDE.md) echo "scaffold" ;;
+        AGENTS.md|CLAUDE.md|GEMINI.md) echo "scaffold" ;;
         .gitattributes) echo "scaffold" ;;
         .agentcortex/context/current_state.md) echo "scaffold" ;;
         .agentcortex/adr/*) echo "scaffold" ;;
@@ -148,7 +148,7 @@ _get_tier_inline() {
     local _rel="$1"
     case "$_rel" in
         installers/deploy_brain.sh|installers/deploy_brain.ps1|installers/deploy_brain.cmd) _TIER="wrapper" ;;
-        AGENTS.md|CLAUDE.md) _TIER="scaffold" ;;
+        AGENTS.md|CLAUDE.md|GEMINI.md) _TIER="scaffold" ;;
         .gitattributes) _TIER="scaffold" ;;
         .agentcortex/context/current_state.md) _TIER="scaffold" ;;
         .agentcortex/adr/*) _TIER="scaffold" ;;
@@ -581,10 +581,23 @@ if [ -d "$TARGET/agentcortex" ] || [ -f "$TARGET/.agentcortex-manifest" ]; then
     _acx_legacy_confirmed=true
 fi
 
+# Banner only when actual legacy ARTIFACTS exist — a bare .agentcortex-manifest
+# is the normal installed state, and announcing "Migrating from legacy paths"
+# on every routine update was pure noise (sim finding 2026-06-11). The block
+# still runs for manifest-only targets (its steps are silent no-ops).
+_acx_legacy_artifacts=false
+if [ -d "$TARGET/agentcortex" ] || [ -d "$TARGET/docs/context" ] || \
+   [ -f "$TARGET/tools/validate.sh" ] || [ -f "$TARGET/tools/validate.ps1" ] || \
+   [ -f "$TARGET/tools/validate.cmd" ]; then
+    _acx_legacy_artifacts=true
+fi
+
 if $_acx_legacy_confirmed || [ -f "$TARGET/tools/validate.sh" ] || \
    [ -f "$TARGET/tools/validate.ps1" ] || [ -f "$TARGET/tools/validate.cmd" ]; then
-    echo ""
-    echo "Migrating from legacy paths..."
+    if $_acx_legacy_artifacts; then
+        echo ""
+        echo "Migrating from legacy paths..."
+    fi
 
     # agentcortex/ → .agentcortex/ (unambiguously ours)
     if [ -d "$TARGET/agentcortex" ]; then
@@ -664,8 +677,10 @@ if $_acx_legacy_confirmed || [ -f "$TARGET/tools/validate.sh" ] || \
     done
     rmdir "$TARGET/tools" 2>/dev/null || true
 
-    echo "  Migration complete."
-    echo ""
+    if $_acx_legacy_artifacts; then
+        echo "  Migration complete."
+        echo ""
+    fi
 fi
 
 # --- Pre-deploy write permission check ---
@@ -708,7 +723,7 @@ if $DRY_RUN; then
     # Enumerate only the files that are actually deployed (mirrors real deploy logic).
     # Runtime Python tools are a whitelist — NOT all *.py in tools/.
     _runtime_tools="guard_context_write.py _yaml_loader.py check_command_sync.py check_text_integrity.py check_text_integrity.ps1 text_integrity_baseline.txt sync_skills.sh lint_governed_writes.py check_lifecycle_frontmatter.py check_lesson_chain.py check_adr_coverage.py append_chain_entry.py append_lesson.py recover_worklog_lock.py lint_spec_drift.py run_governance_eval.py"
-    for f in "$REPO_ROOT"/AGENTS.md "$REPO_ROOT"/CLAUDE.md \
+    for f in "$REPO_ROOT"/AGENTS.md "$REPO_ROOT"/CLAUDE.md "$REPO_ROOT"/GEMINI.md \
              "$REPO_ROOT"/.gitattributes \
              "$REPO_ROOT"/installers/deploy_brain.sh "$REPO_ROOT"/installers/deploy_brain.ps1 "$REPO_ROOT"/installers/deploy_brain.cmd \
              "$REPO_ROOT"/.antigravity/rules.md "$REPO_ROOT"/codex/rules/default.rules \
@@ -796,6 +811,7 @@ mkdir -p "$TARGET/docs/adr"
 # --- Deploy: root governance files (core) ---
 deploy_file "$REPO_ROOT/AGENTS.md" "AGENTS.md"
 deploy_file "$REPO_ROOT/CLAUDE.md" "CLAUDE.md"
+deploy_file "$REPO_ROOT/GEMINI.md" "GEMINI.md"
 
 # --- Deploy: .gitattributes (scaffold — user may extend) ---
 deploy_file "$REPO_ROOT/.gitattributes" ".gitattributes"
@@ -1072,6 +1088,7 @@ strip_managed_ignore_blocks() {
         # Legacy paths from older versions (strip during upgrade)
         managed["AGENTS.md"] = 1
         managed["CLAUDE.md"] = 1
+        managed["GEMINI.md"] = 1
         managed[".agent/"] = 1
         managed[".agents/"] = 1
         managed[".antigravity/"] = 1
@@ -1324,6 +1341,8 @@ if [ "$_stale_count" -gt 0 ]; then
 fi
 
 if [ -n "$_user_skill_names" ]; then
+    # Dedupe (a skill present in both flat and dir form would otherwise list twice)
+    _user_skill_names="$(printf '%s' "$_user_skill_names" | tr ',' '\n' | sed 's/^ *//' | sort -u | tr '\n' ',' | sed 's/,$//; s/,/, /g')"
     # Count names by counting commas+1 (names are comma-space separated)
     _user_skill_count=1
     _tmp_names="$_user_skill_names"
@@ -1399,6 +1418,7 @@ echo "Platform Entry Points Ready:"
 echo "   .antigravity/rules.md  -> Google Antigravity"
 echo "   codex/rules/           -> Codex Web/App"
 echo "   CLAUDE.md              -> Claude (manual entry)"
+echo "   GEMINI.md              -> Gemini (manual entry)"
 echo "   AGENTS.md              -> Cross-platform entry"
 echo "   .agentcortex/bin/      -> Canonical Agentic OS implementations"
 echo ""
@@ -1412,7 +1432,7 @@ echo "   1. Validate the installation (optional — Python is NOT required):"
 echo "      .agentcortex/bin/validate.sh              # full validation (uses Python if available)"
 echo "      .agentcortex/bin/validate.sh --no-python  # lightweight, text-only checks"
 echo "   2. Stage framework files for git tracking:"
-echo "      git add .agentcortex-manifest AGENTS.md CLAUDE.md .agent/ .agents/ .agentcortex/ .antigravity/ .codex/ codex/ docs/ installers/"
+echo "      git add .agentcortex-manifest AGENTS.md CLAUDE.md GEMINI.md .agent/ .agents/ .agentcortex/ .antigravity/ .codex/ codex/ docs/ installers/"
 echo "      # Also add if present: .claude/ .github/"
 echo "   3. Tell AI: 'Please run /bootstrap' to start"
 echo "   4. Agentic OS reference docs are under .agentcortex/docs/"

@@ -181,3 +181,41 @@ class TestValidateLifecycle(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestDownstreamUserContentDegradation(unittest.TestCase):
+    """Sim finding 2026-06-11: a downstream install (.agentcortex-manifest present)
+    owns its docs/ tree — the framework never deploys ADRs/specs there, so a
+    user-authored ADR without lifecycle frontmatter must WARN (advisory), not FAIL
+    (which blocked innocent downstream `validate.sh`). The framework source repo
+    has no manifest, so its own governance docs stay FAIL-gated."""
+
+    def _bare_adr(self, root: Path) -> Path:
+        d = root / "docs" / "adr"
+        d.mkdir(parents=True, exist_ok=True)
+        f = d / "ADR-001-user-stack.md"
+        f.write_text("# User ADR\n\nWe use Postgres. No lifecycle frontmatter.\n", encoding="utf-8")
+        return f
+
+    def test_user_adr_fails_without_manifest_upstream(self) -> None:
+        with tempfile.TemporaryDirectory() as base:
+            root = Path(base)
+            f = self._bare_adr(root)
+            finding = lc.check_file(f, "docs/adr/ADR-001-user-stack.md", root)
+            self.assertEqual(finding.severity, "FAIL")
+
+    def test_user_adr_warns_with_manifest_downstream(self) -> None:
+        with tempfile.TemporaryDirectory() as base:
+            root = Path(base)
+            (root / ".agentcortex-manifest").write_text("version: 1.5.0\n", encoding="utf-8")
+            f = self._bare_adr(root)
+            finding = lc.check_file(f, "docs/adr/ADR-001-user-stack.md", root)
+            self.assertEqual(finding.severity, "WARN")
+            self.assertIn("downstream user content", finding.detail)
+
+    def test_root_none_keeps_legacy_fail_behavior(self) -> None:
+        with tempfile.TemporaryDirectory() as base:
+            root = Path(base)
+            f = self._bare_adr(root)
+            finding = lc.check_file(f, "docs/adr/ADR-001-user-stack.md")  # no root arg
+            self.assertEqual(finding.severity, "FAIL")
