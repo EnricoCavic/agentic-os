@@ -96,7 +96,7 @@ A constitution for AI behavior — loaded automatically, enforced at every phase
 
 - **No Evidence = No Completion** — narrative claims are not proof
 - **Scope Discipline** — unauthorized refactoring is strictly prohibited
-- **Destructive Command Blocking** — `rm -rf`, `git reset --hard`, force pushes require pre-approved rollback plans
+- **Destructive Command Gate** — `rm -rf`, `git reset --hard`, force pushes & co. are deny-by-default: blast radius + rollback plan covering untracked state + user confirmation first (canonical rule and full command list: `AGENTS.md §Core Directives`)
 - **OWASP Top 10 Auto-Scan** — security checks run during `/implement` and `/review`
 - **Confidence Gate** — AI must declare confidence level; low confidence triggers escalation
 
