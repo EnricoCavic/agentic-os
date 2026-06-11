@@ -137,6 +137,35 @@ def test_matching_cache_origin_takes_pull_path(tmp_path: Path) -> None:
 
 @requires_bash
 @requires_git
+def test_source_flag_overrides_manifest_for_origin_check(tmp_path: Path) -> None:
+    """deploy_brain.ps1 -Source forwards --source; the origin check must honor it.
+
+    Manifest and cache both point at the OLD repo; the user overrides with
+    --source <new>. The origin check must compare against the override and
+    re-clone — not happily pull the manifest-matching stale cache.
+    """
+    right = _make_source_repo(tmp_path / "right-repo", STUB_MARKER)
+    wrong = _make_source_repo(tmp_path / "wrong-repo", "WRONG REPO DEPLOY")
+    project = _make_project(tmp_path / "proj", wrong)  # manifest says WRONG
+    _git("clone", wrong, str(project / ".agentcortex-src"), cwd=tmp_path)
+
+    env = {k: v for k, v in os.environ.items() if k != "ACX_SOURCE"}
+    result = subprocess.run(
+        [bash, str(project / "installers" / "deploy_brain.sh"), "--source", right, "."],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        cwd=str(project), env=env,
+    )
+
+    combined = result.stdout + result.stderr
+    assert result.returncode == 0, combined
+    assert "does not match" in combined
+    assert STUB_MARKER in combined, "--source override must drive both check and deploy"
+    assert "WRONG REPO DEPLOY" not in combined
+    assert _cache_origin(project) == right
+
+
+@requires_bash
+@requires_git
 def test_origin_url_normalization_is_not_a_mismatch(tmp_path: Path) -> None:
     right = _make_source_repo(tmp_path / "right-repo", STUB_MARKER)
     project = _make_project(tmp_path / "proj", right)

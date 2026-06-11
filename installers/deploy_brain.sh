@@ -11,6 +11,20 @@ ACX_SOURCE="${ACX_SOURCE:-}"
 ACX_CACHE="$PROJECT_ROOT/.agentcortex-src"
 MANIFEST="$PROJECT_ROOT/.agentcortex-manifest"
 
+# Peek at --source <url> (not consumed — deploy.sh parses it too). Without this,
+# a `deploy_brain.ps1 -Source <url>` override would be invisible to the cache
+# origin-verification below. Explicit ACX_SOURCE env still wins.
+if [[ -z "$ACX_SOURCE" ]]; then
+    _prev=""
+    for _arg in "$@"; do
+        if [[ "$_prev" == "--source" ]]; then
+            ACX_SOURCE="$_arg"
+            break
+        fi
+        _prev="$_arg"
+    done
+fi
+
 # Try to read source_repo from manifest
 if [[ -z "$ACX_SOURCE" && -f "$MANIFEST" ]]; then
     ACX_SOURCE="$(grep '^source_repo:' "$MANIFEST" | awk '{print $2}')" || true
