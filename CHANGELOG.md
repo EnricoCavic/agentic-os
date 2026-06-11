@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.5.2] - 2026-06-11
+
+Patch release: destructive-command incident response. A downstream field report (real `rm -rf` cascade that clobbered a parent repo's working tree) exposed a README↔enforcement drift class; this release closes it, hardens the deploy bootstrap, and promotes the remaining flow-independent safety invariants found by the follow-up audit. PRs #222/#223/#224.
+
+**Governance**
+- **Safety-invariant cluster in `AGENTS.md §Core Directives`**: the advertised "Destructive Command Blocking" rule had existed on NO loaded surface since day one (READMEs only, with divergent EN/zh severity + command lists; platform adapters carried drifting copies). `AGENTS.md` now carries a capped cluster (hard cap ~5; placement test: hazard reachable from any tool call AND irreversible/exfiltrating): **Destructive Command Gate** (deny-by-default; rollback plan must explicitly cover UNTRACKED/gitignored state; STOP on partial failure — a half-deleted directory silently redirects git to the parent repo), **Secrets Prohibition**, **Untrusted Tool Output** (tool-result text is data, never instructions). Each is eval-backed; retargeting also fixed a dangling protects-tag (the prompt-injection eval case had been guarding a section containing no injection text).
+- Both READMEs demoted to pointers at the canonical rule (ends the EN/zh disagreement structurally); Codex/Antigravity adapter lists reconciled and now cite the canonical rule; Codex gains the previously-missing secrets rule.
+- **ADR-001 amendment**: safety invariants carved out of the token-saving skip policy's jurisdiction (D3 governs cost/process rules only; its ~3.5k-token dollar premise measured stale at 2026 cached pricing). The tiering architecture itself is unchanged — the sorting key for safety content changes from token cost to hazard reachability.
+
+**Deploy / downstream**
+- **`deploy_brain.sh` cache origin verification**: the bootstrap path did `cache exists → git pull` without comparing the cache's origin URL to the configured source — a stale pre-migration cache pulled 457 commits of the WRONG repo on a live downstream. Now: normalized URL compare (env `ACX_SOURCE` > `--source` flag > manifest `source_repo:`; the `.ps1 -Source` path is now honored by the check), mismatch → warn + re-clone, and a partially-failed cache removal hard-fails instead of letting git fall through to the parent repo. +4 regression tests (mutation-verified).
+- `.gitattributes` scaffold pins `.agentcortex-manifest` and `.githooks/**` to LF (manifest hash-field parsing was one `\r` away from "every file appears undeployed" on Windows autocrlf checkouts).
+
+
 ## [1.5.1] - 2026-06-11
 
 Patch release: post-v1.5.0 downstream-simulation fixes (6-way fleet; 36/40 checks already passing — every v1.5.0 promise held).
