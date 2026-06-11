@@ -92,13 +92,13 @@ flowchart LR
 
 ### Engineering Guardrails
 
-A constitution for AI behavior — loaded automatically, enforced at every phase:
+A constitution for AI behavior — safety invariants always loaded (`AGENTS.md`); deeper rules load by task tier and phase:
 
 - **No Evidence = No Completion** — narrative claims are not proof
 - **Scope Discipline** — unauthorized refactoring is strictly prohibited
 - **Destructive Command Gate** — `rm -rf`, `git reset --hard`, force pushes & co. are deny-by-default: blast radius + rollback plan covering untracked state + user confirmation first (canonical rule and full command list: `AGENTS.md §Core Directives`)
 - **OWASP Top 10 Auto-Scan** — security checks run during `/implement` and `/review`
-- **Confidence Gate** — AI must declare confidence level; low confidence triggers escalation
+- **Confidence Gate** — AI must declare confidence at plan/implement; low confidence triggers escalation
 
 ### 14 Professional Skills
 
