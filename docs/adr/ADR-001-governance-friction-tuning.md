@@ -149,6 +149,21 @@ This preserves the original token-saving intent for the common case (one-shot ti
 | `docs/guides/token-optimization-quickstart.md` | Add "Provider Caching" section explaining the dual-mode rationale |
 | `docs/guides/token-optimization-quickstart_zh-TW.md` | Same, in Traditional Chinese |
 
+### Amendment (2026-06-11): Safety invariants carved out of D3 jurisdiction
+
+A real downstream incident (destructive `rm -rf` cascade; see Ship History 2026-06-11) plus a
+follow-up audit showed that D3's skip policy had been applied to *safety* rules (destructive
+commands, secrets, untrusted tool output), whose worst-case under a probabilistic load gate is
+irreversible data loss — not wasted tokens. A 3-expert panel review concluded:
+
+- **D3 governs cost/process rules only.** Flow-independent safety invariants (hazard reachable
+  from any tool call AND irreversible/exfiltrating) are exempt from all skip policies and live as
+  one-liners in `AGENTS.md §Core Directives` (capped cluster, promote-one-demote-one).
+- **The dollar premise is stale**: the ~3,500-token saving ≈ $0.04/session at 2026 cached
+  pricing — noise relative to the incident class it permitted. The tiering architecture itself
+  (small always-on core + conditional procedural depth) remains correct and is NOT reverted;
+  the sorting key for safety content changes from token cost to hazard reachability.
+
 ---
 
 ## Consequences
