@@ -2,6 +2,14 @@
 
 Archived from `current_state.md ## Ship History` to stay within the 10-entry cap. Entries are rotated out verbatim (per ship.md §205 — never edited), newest-archived first.
 
+### Ship-ci-issue-163-remainder-2026-06-10
+- **Branch `ci/issue-163-remainder`** (quick-win, CI hardening, backlog #57 / issue #163 remainder — core slice was PR #177) — Closed out #163 with each deferred item's premise verified first (evidence-before-adding):
+  - **Legacy suite CI-gated**: `.agentcortex/tests/` (177 tests, previously not CI-gated at all) added to the Linux structural job + a NEW `test-windows` pytest job (windows-latest, pinned reqs, pip cache) — local Windows run 177 passed in 304s disproved the "unproven on Windows" deferral concern; the PR's own CI is the cross-platform proof.
+  - **UTF-8 sweep + critical files**: new `utf8-and-critical-files` job — all tracked `.md/.sh/.yml/.yaml` must decode as UTF-8 (recurring cp1252/encoding failure class; validator encoding canaries exist for the same reason) + presence pre-check for 7 governance-critical files. Local sim: 225 files clean.
+  - **verify_agent_evidence-on-PR DROPPED as vacuous**: the tool inspects only `.agentcortex/context/review/` mirrors — a mechanism this repo deliberately removed 2026-05-22 (no producer). Probed two real merge ranges: both → "No changed reviewable Work Logs found", exit 0. Wiring it = always-skip theatre (Lesson [enforcement]); rationale recorded on the issue.
+  - **Evidence**: +3 regression guards (`test_ci_hardening.py`, 7 total); UTF-8 sweep + critical-file sim pass locally; PR CI green incl. the new Windows job. Rollback = revert PR.
+- Tests: regression guards 7 passed; PR CI green.
+
 ### Ship-feat-governance-eval-harness-2026-06-10
 - **Branch `feat/governance-eval-harness`** (feature, spec `docs/specs/governance-eval-harness.md`, backlog #45 / issue #151) — Operationalized the [enforcement][HIGH] Global Lesson: a data-only behavioral eval harness measuring whether agents actually obey governance under adversarial pressure, plus a DELETE-bias diff workflow proving a rule is load-bearing before deletion.
   - **Eval spec**: `.agentcortex/eval/governance.yaml` — 14 adversarial seed cases (gate-bypass, no-evidence ship, prompt-injection-in-tool-output, classification downgrade, chat-language drift, SSoT write isolation, sentinel omission, lock takeover, unauthorized refactor, frozen-spec edit, scope creep, secret exposure +2); every `protects` tag resolves 1:1 against the live MUST-rule inventory. Data-only — never loaded at runtime (zero token cost).
