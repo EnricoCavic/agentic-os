@@ -12,9 +12,9 @@
   - Active Work Log Path: derive <worklog-key> from the raw branch name using filesystem-safe normalization before any gate checks.
   - Workflows & Policies: `.agent/workflows/*.md`, `.agent/rules/*.md`
 - **Project Name**: (set by /app-init)
-- **Last Updated**: 2026-06-11T20:10:00+08:00
-- **Last Verified**: 2026-06-11
-- **Update Sequence**: 59
+- **Last Updated**: 2026-06-12T11:00:00+08:00
+- **Last Verified**: 2026-06-12
+- **Update Sequence**: 60
 - **ADR Index**:
   - docs/adr/ADR-001-governance-friction-tuning.md — ADR-001: Governance Friction Tuning, accepted 2026-04-23
   - docs/adr/ADR-002-guarded-governance-writes.md — ADR-002: Guarded Governance Writes (lock unification + CI lint + lifecycle frontmatter), accepted 2026-04-25
@@ -22,7 +22,7 @@
   - docs/adr/ADR-004-override-layer-activation.md — ADR-004: Override Layer Activation (lazy per-fork/per-user governance override), accepted 2026-06-03 · applies_to: AGENTS.md, bootstrap.md, doc-governance.md, platform entries
   - docs/adr/ADR-005-downstream-file-preservation-tiering.md — ADR-005: Downstream File-Preservation Tiering (skills→sidecar, framework-authoritative→force-update, custom/* namespace), accepted 2026-06-03 · applies_to: deploy.sh, deploy.ps1, tests/deploy
   - docs/adr/ADR-006-validator-python-core-strangler.md — ADR-006: Validator Python-Core Strangler (new checks = Python tools behind run_python_check; justified-native escape hatch; bidirectional ratchet), accepted 2026-06-10 · applies_to: validate.sh, validate.ps1, tools/*.py
-- **Active Backlog**: `docs/specs/_product-backlog.md` (17 active items; Kind/Labels/Priority columns active 2026-05-06)
+- **Active Backlog**: `docs/specs/_product-backlog.md` (18 active items; Kind/Labels/Priority columns active 2026-05-06)
 - **Spec Index** (shipped specs at `docs/specs/`; drafts/research tracked in `_product-backlog.md`):
   - docs/specs/lock-unification.md — Guarded Governance Writes implementation spec, [Shipped 2026-04-25] (ADR-002)
   - docs/specs/ci-security-scanning.md — CI Security Scanning (Semgrep + TruffleHog + dependency audit), [Shipped 2026-05-11] (backlog #20)
@@ -91,6 +91,11 @@
 - [Category: rule-placement][Severity: HIGH][Trigger: authoring-safety-rule-or-auditing-rule-surfaces][prev: 3b15e10b] Sort SAFETY rules by hazard reachability, not token cost. A rule that must hold during a 30-second out-of-phase action (destructive commands, secrets, untrusted tool output) MUST live on the always-loaded surface (AGENTS.md Core Directives invariant cluster, cap ~5) - phase/tier-scoped files and platform adapters are probabilistic gates, and a probabilistic gate on an irreversible failure is a design error regardless of token savings. Confirmed 2026-06-11: 'Destructive Command Blocking' was advertised in both READMEs and machine-guarded in ADAPTER copies (validators checked Codex/Antigravity retained it!) while the canonical loaded surface had nothing - a downstream rm -rf cascade destroyed a parent repo working tree. Placement test for every new MUST: hazard reachable from any tool call AND irreversible/exfiltrating -> always-loaded; else phase surface is fine but README/docs must not claim it is always-on.
 - [Category: eval-mapping][Severity: MEDIUM][Trigger: adding-or-retargeting-eval-protects-tag][prev: 14ac98ca] An eval case can silently guard an EMPTY rule: protects-tags resolve at section level, so a case pointing at a section that contains no text for the behavior it tests still 'resolves' and scores green off the model's general training - verifier-without-defense, the inverse of advertised-but-unenforced. Confirmed 2026-06-11: prompt-injection-in-tool-output protected 'AGENTS.md Core Directives' which contained zero injection text for ~2 months. Discipline: when ADDING a rule, land the guarding case in the SAME commit; when ADDING/RETARGETING a case, quote the exact rule sentence it protects in the PR description - if you cannot quote it, the rule does not exist and the case is theatre.
 ## Ship History
+
+### Ship-chore-repo-discoverability-seo-2026-06-12
+- **Branch `chore/repo-discoverability-seo`** (quick-win, docs/marketing, PR #230) — Repo discoverability pass (search/SEO/AEO/GEO) + friendlier, less-AI-sounding GitHub description. README gains a `## FAQ` (6 Q&A pairs) for answer-engine extraction; new root `llms.txt` (llmstxt.org convention, raw-markdown doc links) for LLM crawlers; GitHub description rewritten to a friendly, honest voice ("asks for evidence first", not a follow-guarantee) and topics 15→20 (+github-copilot, +codex, +prompt-engineering, +ai-coding-assistant, +agent-orchestration, applied live via `gh repo edit`). README line-8 canary `governance-first layer for AI coding agents` untouched. Independent fable review PASS-WITH-NITS; 4 nits fixed in-session (blob→raw doc URLs, added missing `build` step to the workflow chain across README/llms.txt/description, de-overpromised description, em-dash trim). Branch was rebased `--onto origin/main` off the stacked `codex/fix-deploy-brain-source-parsing` base so the PR carries only the 2 discoverability files. Rollback = revert PR + `gh repo edit` restore of prior description/topics.
+- Follow-up: zh-TW README FAQ mirror → backlog #72 (marketing-prose parity, deferred).
+- Tests: `validate.sh` pass=100 warn=10 fail=0 skip=2; doc-only (no test surface).
 
 ### Ship-chore-v1.5.2-release-2026-06-11
 - **Branch `chore/v1.5.2-release`** (quick-win, docs/release, PR #226) — Patch **v1.5.2**: destructive-command incident response, cut after merging the full stack #222 → #223 → #224 (merge commits; retarget + sync at each level; 13/13 CI checks green per PR). Carries: AGENTS.md safety-invariant cluster (destructive/secrets/untrusted-output, capped, eval-backed), README/adapter canonicalization, deploy_brain cache origin verification + partial-rm hard-fail, manifest/.githooks LF pins, ADR-001 amendment.
