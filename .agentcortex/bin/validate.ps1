@@ -489,6 +489,38 @@ if (Test-Path -Path $ssotCurrentState -PathType Leaf) {
     Add-Result -Level 'SKIP' -Message 'lesson chain integrity -- current_state.md not present'
 }
 
+# Token lifecycle drift advisory (backlog #51 / issue #157): mirror of the
+# validate.sh block. WARN when any scenario/aggregate GREW beyond slack (advisory,
+# never FAIL); baseline absent -> WARN to seed; shrink is intentionally not flagged.
+# Teeth live in tests/ci/test_lifecycle_baseline_drift.py.
+$lifecycleBaseline = Join-Path $root '.agentcortex/metadata/lifecycle-baseline.json'
+$lifecycleUpdater = Join-Path $root '.agentcortex/tools/update_lifecycle_baseline.py'
+if (-not (Test-Path -Path $lifecycleBaseline -PathType Leaf)) {
+    Add-Result -Level 'WARN' -Message 'token lifecycle baseline absent (.agentcortex/metadata/lifecycle-baseline.json); seed with update_lifecycle_baseline.py --init'
+} elseif (-not $script:PythonCommand) {
+    Add-Result -Level 'SKIP' -Message 'token lifecycle drift -- python unavailable or disabled (--NoPython)'
+} elseif (-not (Test-Path -Path $lifecycleUpdater -PathType Leaf)) {
+    Add-Result -Level 'SKIP' -Message 'token lifecycle drift -- updater not present (update_lifecycle_baseline.py missing)'
+} else {
+    $prevEap = $ErrorActionPreference
+    $hadNative = Test-Path variable:PSNativeCommandUseErrorActionPreference
+    if ($hadNative) { $prevNative = $PSNativeCommandUseErrorActionPreference; $PSNativeCommandUseErrorActionPreference = $false }
+    $ErrorActionPreference = 'Continue'
+    try {
+        $driftOut = & $script:PythonCommand.Source $lifecycleUpdater '--root' $root '--dry-run' 2>&1 | Out-String
+    } finally {
+        $ErrorActionPreference = $prevEap
+        if ($hadNative) { $PSNativeCommandUseErrorActionPreference = $prevNative }
+    }
+    $driftExit = if (Get-Variable LASTEXITCODE -ErrorAction SilentlyContinue) { $LASTEXITCODE } else { 0 }
+    if ($driftExit -eq 0) {
+        Add-Result -Level 'PASS' -Message 'token lifecycle drift: within slack'
+    } else {
+        Add-Result -Level 'WARN' -Message 'token lifecycle drift or detector error (advisory, never FAIL); see output. If drift is intended, re-baseline: update_lifecycle_baseline.py --apply'
+        Show-IndentedOutput -Text $driftOut
+    }
+}
+
 # Unresolved merge-conflict markers in tracked files (mirror of validate.sh).
 # See validate.sh for rationale. Matches only the unambiguous "<<<<<<< " /
 # ">>>>>>> " opening/closing forms; bare "=======" is excluded (markdown setext
