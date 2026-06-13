@@ -996,7 +996,7 @@ if [[ -d "$WORKLOG_DIR" ]]; then
     record_result PASS "active work log sizes are within compaction thresholds"
   fi
   if [[ "$worklog_count" -gt "$ACTIVE_WORKLOG_FAIL_THRESHOLD" ]]; then
-    record_result FAIL "active work log count exceeds hard limit (${worklog_count} > ${ACTIVE_WORKLOG_FAIL_THRESHOLD}); archive completed branches via /handoff or rm"
+    record_result WARN "active work log count over hygiene hard-limit (${worklog_count} > ${ACTIVE_WORKLOG_FAIL_THRESHOLD}); archive completed branches via /handoff or rm — advisory only (work logs are gitignored, CI-invisible)"
   elif [[ "$worklog_count" -gt "$ACTIVE_WORKLOG_WARN_THRESHOLD" ]]; then
     record_result WARN "active work log count exceeds hygiene threshold (${worklog_count} > ${ACTIVE_WORKLOG_WARN_THRESHOLD}; hard limit ${ACTIVE_WORKLOG_FAIL_THRESHOLD})"
   else

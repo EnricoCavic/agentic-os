@@ -121,6 +121,10 @@ jobs:
             [[ -f "$f" ]] || continue
             scripts+=("$f")
           done
+          for f in .githooks/*.sample; do      # opt-in hooks are bash w/ shebang (backlog #74)
+            [[ -f "$f" ]] || continue
+            scripts+=("$f")
+          done
           if [[ ${#scripts[@]} -eq 0 ]]; then
             echo "No shell scripts found"
             exit 0

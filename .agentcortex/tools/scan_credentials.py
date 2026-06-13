@@ -72,9 +72,17 @@ def _is_self(path: str) -> bool:
 
 
 def scan_text(text: str, label: str) -> list[tuple[str, int, str]]:
-    """Return ``(label, lineno, pattern_name)`` per match. NEVER returns the value."""
+    """Return ``(label, lineno, pattern_name)`` per match. NEVER returns the value.
+
+    A line containing ``pragma: allowlist secret`` (the detect-secrets convention) is
+    skipped — an escape hatch for documented EXAMPLE tokens that share a real
+    credential's shape (e.g. AWS's own ``AKIAIOSFODNN7EXAMPLE`` in setup docs), so a
+    blocking PR gate does not reject legitimate documentation / fixture changes.
+    """
     findings: list[tuple[str, int, str]] = []
     for lineno, line in enumerate(text.splitlines(), start=1):
+        if "pragma: allowlist secret" in line.lower():
+            continue
         for name, rx in _PATTERNS:
             if rx.search(line):
                 findings.append((label, lineno, name))
@@ -109,11 +117,15 @@ def parse_staged_diff(diff_text: str) -> list[tuple[str, str]]:
     return [(p, "\n".join(v)) for p, v in files.items() if v]
 
 
-def _staged_added_lines() -> list[tuple[str, str]]:
-    """Run ``git diff --cached -U0`` and parse it. Raise ScanError if git fails."""
+def _diff_added_lines(diff_args: list[str]) -> list[tuple[str, str]]:
+    """Run ``git diff <diff_args> -U0`` and parse it. Raise ScanError if git fails.
+
+    ``diff_args`` is e.g. ``["--cached"]`` (the pre-commit staged diff) or
+    ``["<base>..<head>"]`` (a PR range, for CI). Only ADDED lines are returned.
+    """
     try:
         proc = subprocess.run(
-            ["git", "diff", "--cached", "-U0", "--no-color"],
+            ["git", "diff", *diff_args, "-U0", "--no-color"],
             capture_output=True, text=True, encoding="utf-8", errors="replace",
         )
     except (OSError, subprocess.SubprocessError) as exc:
@@ -127,18 +139,22 @@ def main() -> int:
     ap = argparse.ArgumentParser(
         description="Scan for high-confidence credential patterns (redacted output)")
     ap.add_argument("--staged", action="store_true",
-                    help="scan git staged-diff added lines")
+                    help="scan git staged-diff added lines (pre-commit)")
+    ap.add_argument("--range", metavar="A..B", dest="range_spec",
+                    help="scan added lines of `git diff A..B` (e.g. a PR base..head, for CI)")
     ap.add_argument("files", nargs="*", help="files to scan")
     args = ap.parse_args()
 
     findings: list[tuple[str, int, str]] = []
-    if args.staged:
+    diff_args = (["--cached"] if args.staged
+                 else [args.range_spec] if args.range_spec else None)
+    if diff_args is not None:
         try:
-            staged = _staged_added_lines()
+            changed = _diff_added_lines(diff_args)
         except ScanError as exc:
-            print(f"credential pre-screen could not run ({exc})", file=sys.stderr)
+            print(f"credential scan could not run ({exc})", file=sys.stderr)
             return 3
-        for path, content in staged:
+        for path, content in changed:
             if not _is_self(path):
                 findings += scan_text(content, path)
     elif args.files:

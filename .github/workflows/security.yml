@@ -100,6 +100,46 @@ jobs:
         with:
           extra_args: --only-verified
 
+  credential-scan:
+    name: Credential Pattern Scan (PR diff)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      # Pattern-based catch on the PR diff only — complements TruffleHog's
+      # `--only-verified` (which misses revoked / unverifiable but real-shaped
+      # credentials). Precise distinctive-prefix patterns keep false positives low.
+      # Backlog #73 (the cross-contributor T1; the .githooks pre-commit hook is opt-in).
+      - name: Scan PR diff for credential patterns
+        shell: bash
+        run: |
+          set -uo pipefail
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          zero="0000000000000000000000000000000000000000"
+          if [ -z "$base" ] || [ "$base" = "$zero" ]; then
+            echo "::warning::credential-scan: no usable base sha — relying on TruffleHog backstop"
+            exit 0
+          fi
+          # Three-dot = what THIS PR introduced since the merge-base (matches the repo's
+          # `changes` job + GitHub "Files changed"); two-dot would over-scan a diverged base.
+          echo "Scanning credential patterns in ${base}...${head}"
+          rc=0
+          python .agentcortex/tools/scan_credentials.py --range "${base}...${head}" || rc=$?
+          if [ "$rc" = "3" ]; then
+            echo "::warning::credential-scan: scan could not run (git error) — relying on TruffleHog backstop"
+            exit 0
+          fi
+          exit "$rc"
+
   dependency-audit:
     name: Dependency Audit (pip-audit)
     runs-on: ubuntu-latest

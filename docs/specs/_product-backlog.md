@@ -49,8 +49,9 @@ Governance file bloat review (2026-04-12) identified 10 findings across P0–P2:
 | 68 | Authority-map metadata (read-this-not-that resolver) | framework | governance | P2 | — | quick-win | Pending | [#169](https://github.com/KbWen/agentic-os/issues/169) | — |
 | 69 | RPI→QRSPI flow-adaptation study (alignment-side Q/D/S decomposition before Plan; strands A–E incl. governance load) | framework | governance | P1 | docs/specs/_research-rpi-qrspi-corroboration.md | feature | Pending | [#176](https://github.com/KbWen/agentic-os/issues/176) | #45, #65 |
 | 72 | zh-TW README FAQ mirror (parity with EN discoverability FAQ added in PR #230) | docs | i18n | P3 | — | quick-win | Pending | — | — |
-| 73 | CI PR-diff credential scan (extend scan_credentials.py --staged to a --range base..head mode in a pull_request job → contributors who never install the opt-in hook still get pre-merge protection; the real cross-contributor T1) | review-finding | governance | P2 | — | quick-win | Pending | — | #71 |
-| 74 | ShellCheck CI lints only `**/*.sh` so `.githooks/*.sample` is never linted; fix the glob to cover the hook samples | review-finding | ci | P2 | — | quick-win | Pending | — | #71 |
+| 73 | CI PR-diff credential scan (extend scan_credentials.py --staged to a --range base..head mode in a pull_request job → contributors who never install the opt-in hook still get pre-merge protection; the real cross-contributor T1) | review-finding | governance | P2 | — | quick-win | Shipped | — | #71 |
+| 74 | ShellCheck CI lints only `**/*.sh` so `.githooks/*.sample` is never linted; fix the glob to cover the hook samples | review-finding | ci | P2 | — | quick-win | Shipped | — | #71 |
+| 75 | Pre-commit hook dev-friendliness — the #192 hook gates every commit on the full validator; a gitignored, CI-invisible worklog-count FAIL blocked all commits. Shipped: worklog-count FAIL→WARN. Future dev-UX option: changed-files-scoped / advisory validator step in the hook (keep the #225 credential block hard) | review-finding | dx | P2 | — | quick-win | Shipped | — | #71 |
 
 > Rows whose GH issue is CLOSED-premature (#7, #13, #18, #21, #33) are kept deliberately as
 > future directions — reopen the issue when a concrete signal appears (2026-06-02 curation).

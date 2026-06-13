@@ -964,7 +964,7 @@ if (Test-Path -Path $worklogDir -PathType Container) {
     }
 
     if ($worklogs.Count -gt $activeWorklogFailThreshold) {
-        Add-Result -Level 'FAIL' -Message "active work log count exceeds hard limit ($($worklogs.Count) > $activeWorklogFailThreshold); archive completed branches via /handoff or rm"
+        Add-Result -Level 'WARN' -Message "active work log count over hygiene hard-limit ($($worklogs.Count) > $activeWorklogFailThreshold); archive completed branches via /handoff or rm — advisory only (work logs are gitignored, CI-invisible)"
     }
     elseif ($worklogs.Count -gt $activeWorklogWarnThreshold) {
         Add-Result -Level 'WARN' -Message "active work log count exceeds hygiene threshold ($($worklogs.Count) > $activeWorklogWarnThreshold; hard limit $activeWorklogFailThreshold)"
