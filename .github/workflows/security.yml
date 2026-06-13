@@ -121,10 +121,24 @@ jobs:
       - name: Scan PR diff for credential patterns
         shell: bash
         run: |
+          set -uo pipefail
           base="${{ github.event.pull_request.base.sha }}"
           head="${{ github.event.pull_request.head.sha }}"
-          echo "Scanning credential patterns in ${base}..${head}"
-          python .agentcortex/tools/scan_credentials.py --range "${base}..${head}"
+          zero="0000000000000000000000000000000000000000"
+          if [ -z "$base" ] || [ "$base" = "$zero" ]; then
+            echo "::warning::credential-scan: no usable base sha — relying on TruffleHog backstop"
+            exit 0
+          fi
+          # Three-dot = what THIS PR introduced since the merge-base (matches the repo's
+          # `changes` job + GitHub "Files changed"); two-dot would over-scan a diverged base.
+          echo "Scanning credential patterns in ${base}...${head}"
+          rc=0
+          python .agentcortex/tools/scan_credentials.py --range "${base}...${head}" || rc=$?
+          if [ "$rc" = "3" ]; then
+            echo "::warning::credential-scan: scan could not run (git error) — relying on TruffleHog backstop"
+            exit 0
+          fi
+          exit "$rc"
 
   dependency-audit:
     name: Dependency Audit (pip-audit)

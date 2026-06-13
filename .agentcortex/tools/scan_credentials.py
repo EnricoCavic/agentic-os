@@ -72,9 +72,17 @@ def _is_self(path: str) -> bool:
 
 
 def scan_text(text: str, label: str) -> list[tuple[str, int, str]]:
-    """Return ``(label, lineno, pattern_name)`` per match. NEVER returns the value."""
+    """Return ``(label, lineno, pattern_name)`` per match. NEVER returns the value.
+
+    A line containing ``pragma: allowlist secret`` (the detect-secrets convention) is
+    skipped — an escape hatch for documented EXAMPLE tokens that share a real
+    credential's shape (e.g. AWS's own ``AKIAIOSFODNN7EXAMPLE`` in setup docs), so a
+    blocking PR gate does not reject legitimate documentation / fixture changes.
+    """
     findings: list[tuple[str, int, str]] = []
     for lineno, line in enumerate(text.splitlines(), start=1):
+        if "pragma: allowlist secret" in line.lower():
+            continue
         for name, rx in _PATTERNS:
             if rx.search(line):
                 findings.append((label, lineno, name))

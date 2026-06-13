@@ -174,6 +174,16 @@ def test_range_mode(tmp_path):
     assert clean.returncode == 0
 
 
+def test_allowlist_pragma():
+    """A line marked `# pragma: allowlist secret` is skipped — escape hatch for
+    documented EXAMPLE tokens (e.g. AWS's own AKIAIOSFODNN7EXAMPLE) so a blocking
+    gate doesn't reject legit docs/fixtures (backlog #73 review finding)."""
+    tool = _load()
+    example = "AKIA" + "IOSFODNN7" + "EXAMPLE"           # AWS canonical doc example
+    assert tool.scan_text(f"setup: {example}  # pragma: allowlist secret", "docs.md") == []
+    assert tool.scan_text(f"setup: {example}", "docs.md")  # without the pragma → caught
+
+
 def test_staged_git_failure_returns_3(tmp_path):
     """A git failure must fail-CLOSED with exit 3 (warn), never 0 (silent 'clean')."""
     r = subprocess.run([sys.executable, str(TOOL), "--staged"],
