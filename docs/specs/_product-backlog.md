@@ -3,7 +3,7 @@ status: living
 title: Product Backlog
 source: governance-bloat-review-2026-04-12 + optimization-round-2026-05-04 + optimization-research-2026-06-02
 created: 2026-04-12
-last_updated: 2026-06-10
+last_updated: 2026-06-13
 ---
 
 # Product Backlog
@@ -41,7 +41,7 @@ Governance file bloat review (2026-04-12) identified 10 findings across P0–P2:
 | 18 | Lightweight routing heuristics (decision tree in config.yaml, not a DSL) | framework | routing | P2 | — | quick-win | Pending | [#148](https://github.com/KbWen/agentic-os/issues/148) | — |
 | 21 | Skill cache timestamp + staleness invalidation | framework | skills | P2 | — | quick-win | Pending | [#149](https://github.com/KbWen/agentic-os/issues/149) | — |
 | 33 | Claude Code plugin packaging (.claude-plugin/plugin.json + bin/ + commands/agents/hooks bundling, no monitors) | dx | packaging | P2 | — | feature | Pending | [#150](https://github.com/KbWen/agentic-os/issues/150) | #30, #31 |
-| 51 | Token lifecycle baseline + drift detector | framework | ci | P2 | — | quick-win | Pending | [#157](https://github.com/KbWen/agentic-os/issues/157) | — |
+| 51 | Token lifecycle baseline + drift detector | framework | ci | P2 | — | quick-win | Shipped | [#157](https://github.com/KbWen/agentic-os/issues/157) | — |
 | 70 | Export structured JSON Drift Log on ship for CI/CD audit trails | framework | governance | P2 | — | feature | Pending | [#193](https://github.com/KbWen/agentic-os/issues/193) | — |
 | 71 | T1 pre-commit credential regex (secrets L2 machine layer; CI TruffleHog is post-commit backstop) | framework | governance | P2 | — | quick-win | Pending | [#225](https://github.com/KbWen/agentic-os/issues/225) | — |
 | 66 | Recommended-workflows advisory layer | framework | routing | P2 | — | feature | Pending | [#167](https://github.com/KbWen/agentic-os/issues/167) | — |
