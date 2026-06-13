@@ -137,6 +137,22 @@ def test_parse_diff_trailing_tab():
     assert "my file.txt" in parsed
 
 
+def test_parse_diff_content_line_looks_like_header():
+    """Regression: an ADDED content line whose body is a raw diff fragment (e.g.
+    ``++ /dev/null`` → diff ``+++ /dev/null``) must NOT reset the file context and
+    drop the following secret line. Inside a hunk, every ``+`` line is content."""
+    tool = _load()
+    diff = "\n".join([
+        "diff --git a/changelog.md b/changelog.md", "--- a/changelog.md",
+        "+++ b/changelog.md", "@@ -0,0 +1,2 @@",
+        "+++ /dev/null",                       # body '++ /dev/null', NOT a header
+        "+secret on the next line",
+    ])
+    parsed = dict(tool.parse_staged_diff(diff))
+    assert "changelog.md" in parsed
+    assert "secret on the next line" in parsed["changelog.md"]
+
+
 def test_staged_git_failure_returns_3(tmp_path):
     """A git failure must fail-CLOSED with exit 3 (warn), never 0 (silent 'clean')."""
     r = subprocess.run([sys.executable, str(TOOL), "--staged"],

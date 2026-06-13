@@ -84,19 +84,27 @@ def scan_text(text: str, label: str) -> list[tuple[str, int, str]]:
 def parse_staged_diff(diff_text: str) -> list[tuple[str, str]]:
     """Parse ``git diff --cached -U0`` text → ``(path, added-content)`` per file.
 
-    Only ``+`` ADDED content lines are kept. The ``+++ b/<path>`` header (note the
-    trailing space) is distinguished from a content line that merely begins with
-    ``++``; a trailing TAB (git's quoting for space-containing paths) is stripped.
+    Only ``+`` ADDED content lines are kept. Header detection is gated on diff-section
+    CONTEXT: ``+++ ``/``--- `` count as file headers ONLY outside a hunk — a ``+`` line
+    *inside* a hunk is always added content, even when its body reconstructs a
+    ``+++ `` header (e.g. a changelog/test line that is itself a raw diff fragment:
+    a body ``++ /dev/null`` reaches the diff as ``+++ /dev/null``). A trailing TAB
+    (git's quoting for space-containing paths) is stripped from the path.
     """
     files: dict[str, list[str]] = {}
     cur: str | None = None
+    in_hunk = False
     for line in diff_text.splitlines():
-        if line.startswith("+++ b/"):
+        if line.startswith("diff --git "):
+            cur, in_hunk = None, False
+        elif line.startswith("@@"):
+            in_hunk = True
+        elif not in_hunk and line.startswith("+++ b/"):
             cur = line[6:].rstrip("\t")
             files.setdefault(cur, [])
-        elif line.startswith("+++ "):  # +++ /dev/null (deletion side)
+        elif not in_hunk and line.startswith("+++ "):  # +++ /dev/null (deletion side)
             cur = None
-        elif cur is not None and line.startswith("+") and not line.startswith("+++ "):
+        elif in_hunk and cur is not None and line.startswith("+"):
             files[cur].append(line[1:])
     return [(p, "\n".join(v)) for p, v in files.items() if v]
 
