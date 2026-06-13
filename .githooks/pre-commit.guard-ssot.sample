@@ -26,10 +26,14 @@ if [[ -f "$CREDENTIAL_SCANNER" ]]; then
   command -v python >/dev/null 2>&1 && CRED_PY=python
   [[ -z "$CRED_PY" ]] && command -v python3 >/dev/null 2>&1 && CRED_PY=python3
   if [[ -n "$CRED_PY" ]]; then
-    if ! "$CRED_PY" "$CREDENTIAL_SCANNER" --staged; then
+    "$CRED_PY" "$CREDENTIAL_SCANNER" --staged
+    cred_rc=$?
+    if [[ "$cred_rc" -eq 1 ]]; then
       echo "ACX pre-commit: credential pattern detected in staged changes; commit blocked."
       echo "   Rotate the exposed secret, remove it from the change, then re-commit."
       exit 1
+    elif [[ "$cred_rc" -ne 0 ]]; then
+      echo "ACX pre-commit: credential pre-screen could not run (exit $cred_rc); continuing (CI TruffleHog backstops)."
     fi
   else
     echo "ACX pre-commit: python unavailable; skipping credential pre-screen (CI TruffleHog backstops)."

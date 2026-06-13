@@ -1,22 +1,35 @@
 #!/usr/bin/env python3
-"""Credential pattern scanner — T1 pre-commit machine layer for the AGENTS.md
+"""Credential pattern scanner — high-confidence pre-commit catch for the AGENTS.md
 Secrets Prohibition invariant (backlog #71 / issue #225).
 
-Reports content that matches common credential SHAPES WITHOUT echoing the secret
-value (redacted: ``path:line: pattern-name`` only). CI TruffleHog remains the
-post-commit backstop; this is the pre-commit fast-catch so a secret never enters
-object history (where rotation, not deletion, becomes the remedy).
+Developer-convenience pre-commit screen that flags DISTINCTIVE, high-confidence
+credential shapes BEFORE they enter object history (once committed, rotation — not
+deletion — is the remedy). Reports ``path:line: pattern-name`` only, never the value.
+
+Enforcement model (stated honestly — NOT a machine-enforced gate by itself): this
+hook is OPT-IN (a ``.sample`` you install) and bypassable with ``git commit
+--no-verify``. The regex CORRECTNESS is CI-tested (tests/ci/test_scan_credentials.py),
+but the ENFORCED control is CI TruffleHog (verified-secret detection). This screen
+only adds a fast local catch for the unambiguous shapes.
+
+Does NOT catch (by design — left to TruffleHog, or omitted to avoid false positives
+that would get a commit-blocking hook disabled):
+  * AWS *secret* access keys (40-char, no distinctive prefix).
+  * Secrets split across lines, base64-wrapped, or referenced via env vars.
+  * Binary files (the diff carries no text hunk).
+  * Ambiguous shapes — connection strings and JWTs — where a benign value and a
+    real secret share the exact shape (a doc ``proto://user:pass@host``, an env
+    placeholder ``${VAR}``, or a non-secret JWT would all false-positive).
 
 Modes:
-  --staged              scan only newly-ADDED lines of the git staged diff
-                        (``git diff --cached -U0``) — the pre-commit use case.
+  --staged              scan newly-ADDED lines of the git staged diff.
   <file> [<file> ...]   scan the given files.
   (stdin)               scan stdin when no files and not --staged.
 
-Exit: 1 if any credential pattern matches, 0 if clean, 2 on usage error.
+Exit: 0 clean · 1 credential pattern found · 2 usage error · 3 scan could not run
+(git/tooling error — the caller should WARN, not silently pass).
 
-Self-exclusion: this scanner's own source and the test fixture file are skipped —
-their pattern definitions / runtime-assembled fakes are not secrets.
+Self-exclusion: this scanner's own source and the test fixture file are skipped.
 """
 
 from __future__ import annotations
@@ -27,24 +40,30 @@ import subprocess
 import sys
 from pathlib import Path
 
-# (name, compiled regex). Deliberately tight, distinctive-prefix shapes to keep the
-# false-positive surface low; the no-false-positive fixtures guard precision.
+# (name, compiled regex). DISTINCTIVE-PREFIX, high-confidence shapes only — a match
+# is almost certainly a real secret. Ambiguous shapes (connection strings, JWTs) are
+# deliberately omitted (see module docstring) so a commit-BLOCKING hook stays free of
+# false positives. The no-false-positive fixtures guard this.
 _PATTERNS: list[tuple[str, "re.Pattern[str]"]] = [
     ("aws-access-key-id", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
     ("pem-private-key",
-     re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----")),
+     re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP |ENCRYPTED )?PRIVATE KEY-----")),
     ("github-token", re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36}\b")),
     ("github-pat", re.compile(r"\bgithub_pat_[A-Za-z0-9_]{22,}\b")),
-    ("openai-key", re.compile(r"\bsk-[A-Za-z0-9]{32,}\b")),
-    ("slack-token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b")),
+    # Real OpenAI keys: legacy sk-+48, or the sk-proj-/sk-svcacct-/sk-admin- families
+    # (which carry _ and -). >=40 on the bare form avoids matching short kebab ids.
+    ("openai-key",
+     re.compile(r"\bsk-(?:proj|svcacct|admin)-[A-Za-z0-9_\-]{20,}|\bsk-[A-Za-z0-9]{40,}\b")),
+    # Slack tokens carry a long contiguous hash tail; require >=24 to skip word-salad.
+    ("slack-token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]*[A-Za-z0-9]{24,}\b")),
     ("google-api-key", re.compile(r"\bAIza[0-9A-Za-z_\-]{35}\b")),
-    ("jwt", re.compile(r"\beyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}")),
-    ("connection-string-password",
-     re.compile(r"\b[a-z][a-z0-9+.\-]{1,15}://[^\s:@/]{1,64}:[^\s:@/]{6,64}@[a-zA-Z0-9._\-]+")),
 ]
 
-# Files whose matches are definitions/fixtures, not real secrets.
 _SELF_SKIP = ("scan_credentials.py", "test_scan_credentials.py")
+
+
+class ScanError(Exception):
+    """The scan could not run (git/tooling failure) — caller should WARN, not pass."""
 
 
 def _is_self(path: str) -> bool:
@@ -62,35 +81,43 @@ def scan_text(text: str, label: str) -> list[tuple[str, int, str]]:
     return findings
 
 
-def _staged_added_lines() -> list[tuple[str, str]]:
-    """Return ``(path, added-content)`` per staged file from ``git diff --cached -U0``.
+def parse_staged_diff(diff_text: str) -> list[tuple[str, str]]:
+    """Parse ``git diff --cached -U0`` text → ``(path, added-content)`` per file.
 
-    Only ``+`` added lines are scanned (not context/removed) so the scan targets
-    NEW content entering the commit.
+    Only ``+`` ADDED content lines are kept. The ``+++ b/<path>`` header (note the
+    trailing space) is distinguished from a content line that merely begins with
+    ``++``; a trailing TAB (git's quoting for space-containing paths) is stripped.
     """
-    try:
-        out = subprocess.run(
-            ["git", "diff", "--cached", "-U0", "--no-color"],
-            capture_output=True, text=True, encoding="utf-8", errors="replace",
-        ).stdout
-    except (OSError, subprocess.SubprocessError):
-        return []
     files: dict[str, list[str]] = {}
     cur: str | None = None
-    for line in out.splitlines():
+    for line in diff_text.splitlines():
         if line.startswith("+++ b/"):
-            cur = line[6:]
+            cur = line[6:].rstrip("\t")
             files.setdefault(cur, [])
-        elif line.startswith("+++ "):
+        elif line.startswith("+++ "):  # +++ /dev/null (deletion side)
             cur = None
-        elif cur is not None and line.startswith("+") and not line.startswith("+++"):
+        elif cur is not None and line.startswith("+") and not line.startswith("+++ "):
             files[cur].append(line[1:])
     return [(p, "\n".join(v)) for p, v in files.items() if v]
 
 
+def _staged_added_lines() -> list[tuple[str, str]]:
+    """Run ``git diff --cached -U0`` and parse it. Raise ScanError if git fails."""
+    try:
+        proc = subprocess.run(
+            ["git", "diff", "--cached", "-U0", "--no-color"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise ScanError(f"git unavailable: {exc}") from exc
+    if proc.returncode != 0:
+        raise ScanError(f"git diff exited {proc.returncode}")
+    return parse_staged_diff(proc.stdout)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
-        description="Scan for credential patterns (redacted output)")
+        description="Scan for high-confidence credential patterns (redacted output)")
     ap.add_argument("--staged", action="store_true",
                     help="scan git staged-diff added lines")
     ap.add_argument("files", nargs="*", help="files to scan")
@@ -98,7 +125,12 @@ def main() -> int:
 
     findings: list[tuple[str, int, str]] = []
     if args.staged:
-        for path, content in _staged_added_lines():
+        try:
+            staged = _staged_added_lines()
+        except ScanError as exc:
+            print(f"credential pre-screen could not run ({exc})", file=sys.stderr)
+            return 3
+        for path, content in staged:
             if not _is_self(path):
                 findings += scan_text(content, path)
     elif args.files:
