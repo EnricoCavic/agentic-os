@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.5.3] - 2026-06-13
+
+Patch release: two additive governance/security guards (zero always-loaded prompt cost) plus CI and discoverability improvements. PRs #233 (issue #157), #234 (issue #225), #230, #231.
+
+**Governance / CI**
+- **Token-lifecycle baseline + drift detector** (#157): `update_lifecycle_baseline.py` stores a per-scenario governance token-cost baseline around the existing `analyze_token_lifecycle.py`, with a `--dry-run` drift check — growth beyond a 10% slack is flagged (advisory WARN in `validate.sh`/`.ps1`, hard teeth in a pytest ratchet); shrink is never punished. Catches slow per-PR governance-token creep that no existing test covered. ADR-006 native-baseline bumped with justification.
+- **Pre-commit credential scanner** (#225): `scan_credentials.py` flags distinctive-prefix credential shapes (AWS AKIA, PEM key headers, GitHub `ghp_`/`github_pat_`, OpenAI `sk-`, Slack `xox`, Google `AIza`) on the staged diff with redacted output, wired into the opt-in `.githooks` pre-commit hook (blocks on match, warns+continues on a git error). Honest framing: opt-in + `--no-verify`-bypassable, so CI TruffleHog remains the enforced control. A 4-expert review + dev-flow simulation hardened it — precise-only patterns (zero false positives on real code) and a hunk-context diff parser that closed a secret-dropping false negative.
+
+**Docs / discoverability**
+- Repo discoverability pass (#230): README `## FAQ`, root `llms.txt` (llmstxt.org convention), friendlier GitHub description + topics.
+- CI wall-clock (#231): docs-only PRs skip the heavy job matrix via a dependency-free scope detector; required checks and branch protection unchanged.
+
 ## [1.5.2] - 2026-06-11
 
 Patch release: destructive-command incident response. A downstream field report (real `rm -rf` cascade that clobbered a parent repo's working tree) exposed a README↔enforcement drift class; this release closes it, hardens the deploy bootstrap, and promotes the remaining flow-independent safety invariants found by the follow-up audit. PRs #222/#223/#224.
