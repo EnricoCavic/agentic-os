@@ -16,6 +16,26 @@ fi
 
 cd "$ROOT" || exit 1
 
+# Credential pattern pre-screen (issue #225): block secrets BEFORE they enter
+# object history — CI TruffleHog only fires post-commit, by which point rotation
+# (not deletion) is the remedy. Scans the staged diff's added lines. Opt-in hook;
+# bypassable with --no-verify; TruffleHog is the CI backstop either way.
+CREDENTIAL_SCANNER=".agentcortex/tools/scan_credentials.py"
+if [[ -f "$CREDENTIAL_SCANNER" ]]; then
+  CRED_PY=""
+  command -v python >/dev/null 2>&1 && CRED_PY=python
+  [[ -z "$CRED_PY" ]] && command -v python3 >/dev/null 2>&1 && CRED_PY=python3
+  if [[ -n "$CRED_PY" ]]; then
+    if ! "$CRED_PY" "$CREDENTIAL_SCANNER" --staged; then
+      echo "ACX pre-commit: credential pattern detected in staged changes; commit blocked."
+      echo "   Rotate the exposed secret, remove it from the change, then re-commit."
+      exit 1
+    fi
+  else
+    echo "ACX pre-commit: python unavailable; skipping credential pre-screen (CI TruffleHog backstops)."
+  fi
+fi
+
 GUARD_RECEIPT=".agentcortex/context/.guard_receipts"
 GUARDED_PATHS=(
   ".agentcortex/context/current_state.md"
