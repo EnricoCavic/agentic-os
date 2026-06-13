@@ -34,5 +34,5 @@ Security issues in Agentic OS may include:
 
 | Version | Supported |
 |---------|-----------|
-| 1.2.x   | Yes       |
-| < 1.2   | No        |
+| 1.5.x   | Yes       |
+| < 1.5   | No        |
