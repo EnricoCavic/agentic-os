@@ -100,6 +100,32 @@ jobs:
         with:
           extra_args: --only-verified
 
+  credential-scan:
+    name: Credential Pattern Scan (PR diff)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      # Pattern-based catch on the PR diff only — complements TruffleHog's
+      # `--only-verified` (which misses revoked / unverifiable but real-shaped
+      # credentials). Precise distinctive-prefix patterns keep false positives low.
+      # Backlog #73 (the cross-contributor T1; the .githooks pre-commit hook is opt-in).
+      - name: Scan PR diff for credential patterns
+        shell: bash
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          echo "Scanning credential patterns in ${base}..${head}"
+          python .agentcortex/tools/scan_credentials.py --range "${base}..${head}"
+
   dependency-audit:
     name: Dependency Audit (pip-audit)
     runs-on: ubuntu-latest

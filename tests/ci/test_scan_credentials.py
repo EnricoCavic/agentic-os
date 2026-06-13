@@ -153,6 +153,27 @@ def test_parse_diff_content_line_looks_like_header():
     assert "secret on the next line" in parsed["changelog.md"]
 
 
+def test_range_mode(tmp_path):
+    """--range A..B scans added lines of `git diff A..B` — the CI PR-diff use case
+    (backlog #73). Shares the _diff_added_lines/parse_staged_diff path with --staged,
+    so this just confirms CLI wiring + range diff end to end in an isolated repo."""
+    def git(*a):
+        subprocess.run(["git", *a], cwd=tmp_path, capture_output=True, text=True, check=True)
+    git("init", "-q")
+    git("config", "user.email", "t@example.com")
+    git("config", "user.name", "t")
+    (tmp_path / "a.txt").write_text("clean base\n", encoding="utf-8")
+    git("add", "."), git("commit", "-qm", "base")
+    (tmp_path / "b.txt").write_text("key = " + "ghp_" + "A" * 36 + "\n", encoding="utf-8")
+    git("add", "."), git("commit", "-qm", "head")
+    dirty = subprocess.run([sys.executable, str(TOOL), "--range", "HEAD~1..HEAD"],
+                           cwd=tmp_path, capture_output=True, text=True)
+    clean = subprocess.run([sys.executable, str(TOOL), "--range", "HEAD..HEAD"],
+                           cwd=tmp_path, capture_output=True, text=True)
+    assert dirty.returncode == 1 and "github-token" in dirty.stderr
+    assert clean.returncode == 0
+
+
 def test_staged_git_failure_returns_3(tmp_path):
     """A git failure must fail-CLOSED with exit 3 (warn), never 0 (silent 'clean')."""
     r = subprocess.run([sys.executable, str(TOOL), "--staged"],

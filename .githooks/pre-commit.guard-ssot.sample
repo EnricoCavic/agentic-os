@@ -81,7 +81,6 @@ if ! run_validator; then
 fi
 echo "ACX pre-commit: validator passed."
 
-warn=0
 for path in "${GUARDED_PATHS[@]}"; do
   if git diff --cached --name-only | grep -qxF "$path"; then
     # Check for a recent receipt (written in last 60 minutes)
@@ -89,7 +88,6 @@ for path in "${GUARDED_PATHS[@]}"; do
       echo "GUARD WARN: $path staged without a recent guard receipt."
       echo "   Run guard_context_write.py or use the /ship workflow to update SSoT."
       echo "   (Advisory only - commit not blocked)"
-      warn=1
     fi
   fi
 done
