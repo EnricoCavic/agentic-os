@@ -2402,6 +2402,29 @@ if [[ -f "$ACX_EVAL_YAML" ]]; then
   fi
 fi
 
+# Token lifecycle drift advisory (backlog #51 / issue #157): capability-by-presence.
+# If the baseline exists AND python is available, run update_lifecycle_baseline.py
+# --dry-run and WARN when any scenario/aggregate GREW beyond slack (advisory, never
+# FAIL). Baseline absent -> WARN to seed. Shrink is intentionally not flagged
+# (trimming token cost is good). Teeth live in tests/ci/test_lifecycle_baseline_drift.py.
+ACX_LIFECYCLE_BASELINE="$ROOT/.agentcortex/metadata/lifecycle-baseline.json"
+ACX_LIFECYCLE_UPDATER="$ROOT/.agentcortex/tools/update_lifecycle_baseline.py"
+if [[ ! -f "$ACX_LIFECYCLE_BASELINE" ]]; then
+  record_result WARN "token lifecycle baseline absent (.agentcortex/metadata/lifecycle-baseline.json); seed with update_lifecycle_baseline.py --init" || true
+elif [[ -z "${PYTHON_BIN:-}" ]]; then
+  record_result SKIP "token lifecycle drift -- python unavailable or disabled (--no-python)" || true
+elif [[ ! -f "$ACX_LIFECYCLE_UPDATER" ]]; then
+  record_result SKIP "token lifecycle drift -- updater not present (update_lifecycle_baseline.py missing)" || true
+else
+  _acx_drift_out="$("$PYTHON_BIN" "$ACX_LIFECYCLE_UPDATER" --root "$ROOT" --dry-run 2>&1)" && _acx_drift_status=0 || _acx_drift_status=$?
+  if [[ "$_acx_drift_status" -eq 0 ]]; then
+    record_result PASS "token lifecycle drift: within slack" || true
+  else
+    record_result WARN "token lifecycle drift or detector error (advisory, never FAIL); see output. If drift is intended, re-baseline: update_lifecycle_baseline.py --apply" || true
+    print_indented_output "$_acx_drift_out" || true
+  fi
+fi
+
 # AC-6: governance specs missing signal_tier frontmatter (guardrails §13 ADD-Gate).
 # Advisory WARN only — never FAIL. Checks docs/specs/*.md (skips _* meta/index
 # files). Conditions to WARN (ALL must hold):
