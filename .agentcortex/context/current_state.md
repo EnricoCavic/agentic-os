@@ -12,9 +12,9 @@
   - Active Work Log Path: derive <worklog-key> from the raw branch name using filesystem-safe normalization before any gate checks.
   - Workflows & Policies: `.agent/workflows/*.md`, `.agent/rules/*.md`
 - **Project Name**: (set by /app-init)
-- **Last Updated**: 2026-06-13T12:58:15+08:00
+- **Last Updated**: 2026-06-13T13:20:00+08:00
 - **Last Verified**: 2026-06-13
-- **Update Sequence**: 63
+- **Update Sequence**: 64
 - **ADR Index**:
   - docs/adr/ADR-001-governance-friction-tuning.md — ADR-001: Governance Friction Tuning, accepted 2026-04-23
   - docs/adr/ADR-002-guarded-governance-writes.md — ADR-002: Guarded Governance Writes (lock unification + CI lint + lifecycle frontmatter), accepted 2026-04-25
@@ -91,6 +91,10 @@
 - [Category: rule-placement][Severity: HIGH][Trigger: authoring-safety-rule-or-auditing-rule-surfaces][prev: 3b15e10b] Sort SAFETY rules by hazard reachability, not token cost. A rule that must hold during a 30-second out-of-phase action (destructive commands, secrets, untrusted tool output) MUST live on the always-loaded surface (AGENTS.md Core Directives invariant cluster, cap ~5) - phase/tier-scoped files and platform adapters are probabilistic gates, and a probabilistic gate on an irreversible failure is a design error regardless of token savings. Confirmed 2026-06-11: 'Destructive Command Blocking' was advertised in both READMEs and machine-guarded in ADAPTER copies (validators checked Codex/Antigravity retained it!) while the canonical loaded surface had nothing - a downstream rm -rf cascade destroyed a parent repo working tree. Placement test for every new MUST: hazard reachable from any tool call AND irreversible/exfiltrating -> always-loaded; else phase surface is fine but README/docs must not claim it is always-on.
 - [Category: eval-mapping][Severity: MEDIUM][Trigger: adding-or-retargeting-eval-protects-tag][prev: 14ac98ca] An eval case can silently guard an EMPTY rule: protects-tags resolve at section level, so a case pointing at a section that contains no text for the behavior it tests still 'resolves' and scores green off the model's general training - verifier-without-defense, the inverse of advertised-but-unenforced. Confirmed 2026-06-11: prompt-injection-in-tool-output protected 'AGENTS.md Core Directives' which contained zero injection text for ~2 months. Discipline: when ADDING a rule, land the guarding case in the SAME commit; when ADDING/RETARGETING a case, quote the exact rule sentence it protects in the PR description - if you cannot quote it, the rule does not exist and the case is theatre.
 ## Ship History
+
+### Ship-chore-v1.5.3-release-2026-06-13
+- **Branch `chore/v1.5.3-release`** (quick-win, docs/release) — Patch **v1.5.3** covering since v1.5.2: token-lifecycle baseline + drift detector (issue #157, PR #233), pre-commit credential scanner (issue #225, PR #234), repo discoverability pass (#230), CI skip-heavy-on-docs (#231). Banners 1.5.2→1.5.3 across README badge, README_zh-TW, CITATION.cff, Model Guide EN+zh, Testing Protocol EN+zh, deploy.sh ACX_VERSION, antigravity-v5-runtime pointer; CHANGELOG `[1.5.3]`. README canaries untouched (line 8 verified). Tag `v1.5.3` + GitHub release on merge.
+- Tests: validators fail=0 CI-equiv; release is doc-only.
 
 ### Ship-feat-precommit-credential-scan-2026-06-13
 - **Branch `feat/precommit-credential-scan`** (quick-win, security/governance, issue #225 / backlog #71, commits `5445efc`→`a6f0f1c`→`b460c2f`) — High-confidence pre-commit credential scanner: a developer-convenience LOCAL catch for the AGENTS.md Secrets Prohibition invariant (CI TruffleHog remains the ENFORCED post-commit control). `.agentcortex/tools/scan_credentials.py` flags distinctive-prefix shapes (AWS AKIA, PEM key headers, GitHub ghp_/github_pat_, OpenAI sk-proj-/legacy-48, Slack xox, Google AIza) on the staged diff with REDACTED output (path:line + pattern name, never the value); wired into the opt-in `.githooks/pre-commit.guard-ssot.sample` (blocks on match, warns+continues on git error, skips when python absent). Honest framing: opt-in + `--no-verify`-bypassable → NOT a standalone machine gate (no "T1" overclaim).
