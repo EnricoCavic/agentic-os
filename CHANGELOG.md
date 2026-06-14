@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.5.4] - 2026-06-14
+
+Patch release: downstream adaptability for heterogeneous flows/architectures (many custom skills, harness/subagent fan-out, other work-management flows), plus the cross-contributor credential CI hardening and a security-policy refresh. PRs #238 (ADR-007/008), #236 (#73/#74/#75), #237.
+
+**Governance / downstream adaptability** (#238 — ADR-007 + ADR-008)
+- **Downstream Capability Declaration Seam** (ADR-007): a present-only, opt-in, gate-capped `downstream-capabilities.yaml` (loaded at bootstrap §1b) lets a downstream register `custom-*` skills into auto-activation, declare a `subagent_policy`, and declare advisory `trackers`. Gate-relaxation is **structurally unrepresentable** — a denylist + allowlist schema validator (`validate_downstream_capabilities.py`) rejects, never clamps. Absent file = zero behavior change; the same-owner lock short-circuit was deferred as a Non-goal (`recover_worklog_lock.py` untouched).
+- **Portable Safety Floor** (ADR-008): the three always-loaded `AGENTS.md` safety invariants are fenced into a committed generated `.agentcortex/AGENTS.safety.md` nucleus (+ a validator freshness check) that any non-shim harness (Codex/Gemini/custom) can inject into every dispatched subagent. A **no-Python credential floor** (`credential_floor.sh`/`.ps1` — narrow FP-free AKIA/PEM/`ghp_` subset, redacted) is wired into the pre-commit hook so the "block secrets before object history" control works without Python; `scan_credentials.py` — previously absent from the deploy whitelist, a dead control downstream — is added as the richer python path.
+- Reviewed by 4 independent fresh-context agents (initial NOT READY → 4 fixes: dead `FAIL` arg → WARN honesty, denylist → allowlist, stale SSoT summaries, docstring → PASS). 30 new tests; full fast suite 307 passed; validators sh↔ps1 parity; ratchet 194/195. All additive + present-only.
+
+**Security / CI** (#236 — #73/#74/#75; #237)
+- **CI PR-diff credential scan** (#73): `scan_credentials.py --range base...head` in a `pull_request` job so contributors who never install the opt-in hook still get pre-merge secret protection (complements TruffleHog `--only-verified`), with a `# pragma: allowlist secret` escape + zero-sha/exit-3 fail-safe.
+- ShellCheck now lints `.githooks/*.sample` (#74); the opt-in hook's gitignored worklog-count check is WARN, not a hard FAIL that blocked every commit (#75).
+- `SECURITY.md` supported-versions refreshed to 1.5.x (#237); TruffleHog action bumped 3.95.3 → 3.95.5 (#174).
+
 ## [1.5.3] - 2026-06-13
 
 Patch release: two additive governance/security guards (zero always-loaded prompt cost) plus CI and discoverability improvements. PRs #233 (issue #157), #234 (issue #225), #230, #231.
