@@ -44,6 +44,11 @@ def test_gate_safe_file_passes(tmp_path):
     assert r.returncode == 0, f"gate-safe file must pass: {r.stderr!r}"
 
 
+def test_default_load_policy_is_gate_safe(tmp_path):
+    r = _check(tmp_path, "skills:\n  - id: custom-default\n")
+    assert r.returncode == 0, f"omitted load_policy should default to on-match: {r.stderr!r}"
+
+
 def test_absent_file_is_safe(tmp_path):
     r = subprocess.run([sys.executable, str(VALIDATOR), str(tmp_path / "nope.yaml")],
                        capture_output=True, encoding="utf-8", errors="replace")
@@ -56,6 +61,8 @@ def test_empty_file_is_safe(tmp_path):
 
 @pytest.mark.parametrize("body,needle", [
     ("skills:\n  - id: red-team-adversarial\n    load_policy: on-match\n", "custom-"),
+    ("skills:\n  - id: custom-x\n    load_policy: phase-entry\n", "on-match"),
+    ("skills:\n  - id: custom-x\n    load_policy: on-failure\n", "on-match"),
     ("skills:\n  - id: custom-x\n    load_policy: always\n", "ceiling"),
     ("skills:\n  - id: custom-x\n    block_if_missed: true\n", "block_if_missed"),
     ("skills:\n  - id: custom-x\n    gate: ship\n", "gate"),
