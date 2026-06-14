@@ -287,6 +287,42 @@ def test_deployed_governance_referenced_tools_are_deployed() -> None:
 
 
 @requires_bash
+def test_downstream_adaptability_files_deploy_at_correct_tier() -> None:
+    """PR #238 (ADR-007/008): the new safety-floor + credential tools ship core
+    (force-update, reach all downstream); the committed AGENTS.safety.md nucleus
+    ships core; the present-only downstream-capabilities.yaml is NEVER shipped."""
+    deploy_sh = (ROOT / ".agentcortex" / "bin" / "deploy.sh").read_text(encoding="utf-8")
+    # AC-S5: scan_credentials.py in BOTH whitelist spots (the L725 string + the array)
+    assert deploy_sh.count("scan_credentials.py") >= 2, "scan_credentials.py must be in both deploy.sh whitelist spots"
+    for tool in ("credential_floor.sh", "credential_floor.ps1",
+                 "generate_safety_nucleus.py", "validate_downstream_capabilities.py"):
+        assert tool in deploy_sh, f"{tool} missing from deploy.sh runtime whitelist"
+
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "proj"
+        target.mkdir()
+        assert _deploy(target).returncode == 0, "deploy failed"
+        tools = target / ".agentcortex" / "tools"
+        # AC-S5: scanner + floors + generators are deployed
+        for tool in ("scan_credentials.py", "credential_floor.sh", "credential_floor.ps1",
+                     "generate_safety_nucleus.py", "validate_downstream_capabilities.py"):
+            assert (tools / tool).exists(), f"{tool} not deployed (AC-S5)"
+        # AC-S2: the committed safety nucleus ships as a core file
+        assert (target / ".agentcortex" / "AGENTS.safety.md").exists(), "AGENTS.safety.md not deployed (AC-S2)"
+        # AC-D12: the present-only capabilities file is NEVER shipped
+        assert not (target / ".agentcortex" / "context" / "private" / "downstream-capabilities.yaml").exists(), \
+            "downstream-capabilities.yaml must never be shipped (AC-D12)"
+
+
+def test_downstream_capabilities_yaml_is_gitignored() -> None:
+    """AC-D12 (inherent): downstream-capabilities.yaml lives under the gitignored
+    .agentcortex/context/private/ tree, so deploy/commit never touch it."""
+    gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
+    assert ".agentcortex/context/private/" in gitignore, \
+        "context/private/ must be gitignored so downstream-capabilities.yaml is never committed/shipped"
+
+
+@requires_bash
 def test_deploy_does_not_scaffold_docs_architecture() -> None:
     """`docs/architecture/` is intentionally capability-by-presence, NOT a fixed
     anchor like docs/adr/ + docs/specs/. It is created on demand by /app-init;

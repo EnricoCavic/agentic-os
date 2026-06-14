@@ -148,7 +148,12 @@ wrapper gates it). The shell/PS regex floor is a curated **subset** of
 `scan_credentials.py`'s detection (a pre-commit floor, not full entropy
 analysis) — accepted; TruffleHog CI remains the post-commit backstop. A harness
 that injects **neither** AGENTS.md **nor** the nucleus is unreachable by any
-instruction (only an operator-owned wrapper helps).
+instruction (only an operator-owned wrapper helps). The committed nucleus is downstream-MUTABLE: a
+downstream may edit their own `AGENTS.md` / nucleus, and the freshness `--check` then WARNs
+(not FAILs) downstream — the documented override-tolerance stance. An intentional-override-
+vs-accidental-drift marker (a security-review suggestion) is DEFERRED to the general
+validator-content-tolerance principle (#6), per evidence-before-adding: the WARN already
+surfaces drift, and overriding one's own always-loaded floor is an allowed, documented choice.
 
 **Out of scope (honest boundaries)**: enforcing per-subagent that the floor was
 injected (honor-system at the harness boundary; the validator only proves the

@@ -758,6 +758,15 @@ if $DRY_RUN; then
             echo "  [NEW]    $_bname"
         fi
     done
+    # ADR-008 portable safety nucleus (core tier; deployed to .agentcortex/AGENTS.safety.md)
+    if [ -f "$REPO_ROOT/.agentcortex/AGENTS.safety.md" ]; then
+        _dry_count=$((_dry_count + 1))
+        if [ -f "$TARGET/.agentcortex/AGENTS.safety.md" ]; then
+            echo "  [UPDATE] AGENTS.safety.md"
+        else
+            echo "  [NEW]    AGENTS.safety.md"
+        fi
+    fi
     # Skills (summarise counts instead of listing every file)
     _skill_count=0
     for skill_dir in "$REPO_ROOT/.agents/skills"/*/; do
