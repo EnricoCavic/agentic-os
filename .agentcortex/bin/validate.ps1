@@ -671,6 +671,25 @@ else {
 Test-ContainsLiteral -Path (Join-NormalPath $workflowsDir 'bootstrap.md') -Pattern 'Recommended Skills' -SuccessMessage 'bootstrap includes Recommended Skills contract' -FailureMessage 'bootstrap missing Recommended Skills contract'
 # ADR-004: bootstrap MUST ship the override-layer load step (structural enforcement only; per-agent compliance is honor-system, not falsely test-enforced).
 Test-ContainsLiteral -Path (Join-NormalPath $workflowsDir 'bootstrap.md') -Pattern 'Load Override Layer' -SuccessMessage 'bootstrap ships override-layer load step (ADR-004 §1a)' -FailureMessage 'bootstrap missing override-layer load step (ADR-004 §1a)'
+# ADR-007: bootstrap MUST ship the downstream-capabilities load step (§1b).
+Test-ContainsLiteral -Path (Join-NormalPath $workflowsDir 'bootstrap.md') -Pattern 'Load Downstream Capabilities' -SuccessMessage 'bootstrap ships downstream-capabilities load step (ADR-007 §1b)' -FailureMessage 'bootstrap missing downstream-capabilities load step (ADR-007 §1b)'
+# ADR-007: a present downstream-capabilities.yaml MUST be schema gate-safe (rejected, not clamped).
+$capValidator = Join-NormalPath $root '.agentcortex/tools/validate_downstream_capabilities.py'
+$capFile = Join-NormalPath $root '.agentcortex/context/private/downstream-capabilities.yaml'
+if (Test-Path $capValidator) {
+    # python-present + gate-unsafe -> FAIL (CI always has python); no-python -> WARN
+    # (advisory; bootstrap §1b agent-discipline is the runtime guarantee there).
+    Invoke-PythonCheck -Label 'downstream-capabilities gate-safety' -MissingPythonLevel 'WARN' -ScriptPath $capValidator -Arguments @($capFile)
+} else {
+    Add-Result -Level 'SKIP' -Message 'downstream-capabilities gate-safety -- validator not deployed (safe to ignore)'
+}
+# ADR-008: the committed safety nucleus MUST match the AGENTS.md fenced span (CR-normalized).
+$safetyNucleusGen = Join-NormalPath $root '.agentcortex/tools/generate_safety_nucleus.py'
+if (Test-Path $safetyNucleusGen) {
+    Invoke-PythonCheck -Label 'safety nucleus freshness' -MissingPythonLevel 'WARN' -ScriptPath $safetyNucleusGen -Arguments @('--check')
+} else {
+    Add-Result -Level 'SKIP' -Message 'safety nucleus freshness -- generator not deployed (safe to ignore)'
+}
 $phaseSkillFiles = @(
     (Join-NormalPath $workflowsDir 'plan.md'),
     (Join-NormalPath $workflowsDir 'implement.md'),

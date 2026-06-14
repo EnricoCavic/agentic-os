@@ -422,16 +422,18 @@ class TestTokenBudgetBounds(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.results = {r["id"]: r for r in json.loads(result.stdout)["results"]}
 
-    def test_quick_win_current_total_under_28k(self) -> None:
-        """Quick-win should not exceed 28k tokens total.
+    def test_quick_win_current_total_under_29k(self) -> None:
+        """Quick-win should not exceed 29k tokens total.
 
-        Threshold updated from 26k → 28k to account for Design-First gate
-        chain and document-state-growth-governance additions. These sections
-        are no-ops for quick-win tasks (capability-by-presence) but count
-        toward file size.
+        Threshold history: 26k → 28k (Design-First gate chain + document-state-growth
+        governance); 28k → 29k (ADR-007/008: the present-only downstream-capability
+        loader at bootstrap §1b + the AGENTS.md safety-floor fence/delegation + the
+        config block). Like the prior additions, these are no-ops for quick-win tasks
+        (capability-by-presence: absent file = zero reads) but count toward governance
+        file size.
         """
         qw = self.results["quick-win-single-module"]
-        self.assertLess(qw["current_total_tokens"], 28000)
+        self.assertLess(qw["current_total_tokens"], 29000)
 
     def test_feature_current_total_under_80k(self) -> None:
         """Even the heaviest feature scenario should stay under 80k tokens."""
