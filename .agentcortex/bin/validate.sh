@@ -531,6 +531,35 @@ check_contains_literal \
   "bootstrap ships override-layer load step (ADR-004 §1a)" \
   "bootstrap missing override-layer load step (ADR-004 §1a)"
 
+# ADR-007: bootstrap MUST ship the downstream-capabilities load step (§1b).
+# Structural only — per-agent compliance is honor-system (like the override read).
+check_contains_literal \
+  "$WORKFLOWS_DIR/bootstrap.md" \
+  'Load Downstream Capabilities' \
+  "bootstrap ships downstream-capabilities load step (ADR-007 §1b)" \
+  "bootstrap missing downstream-capabilities load step (ADR-007 §1b)"
+
+# ADR-007: a present downstream-capabilities.yaml MUST be schema gate-safe
+# (gate-relaxation is REJECTED, never clamped). Absent file -> validator exits 0.
+CAP_VALIDATOR="$ROOT/.agentcortex/tools/validate_downstream_capabilities.py"
+CAP_FILE="$ROOT/.agentcortex/context/private/downstream-capabilities.yaml"
+if [[ -f "$CAP_VALIDATOR" ]]; then
+  # python-present + gate-unsafe file -> FAIL (CI always has python). No-python host ->
+  # WARN (advisory): the runtime guarantee there is bootstrap §1b agent-discipline, honest
+  # per the framework no-python doctrine. (MissingPythonLevel is WARN, not a fake FAIL.)
+  run_python_check "downstream-capabilities gate-safety" WARN "$CAP_VALIDATOR" "$CAP_FILE"
+else
+  record_result SKIP "downstream-capabilities gate-safety -- validator not deployed (safe to ignore)"
+fi
+
+# ADR-008: the committed safety nucleus MUST match the AGENTS.md fenced span (CR-normalized).
+SAFETY_NUCLEUS_GEN="$ROOT/.agentcortex/tools/generate_safety_nucleus.py"
+if [[ -f "$SAFETY_NUCLEUS_GEN" ]]; then
+  run_python_check "safety nucleus freshness" WARN "$SAFETY_NUCLEUS_GEN" --check
+else
+  record_result SKIP "safety nucleus freshness -- generator not deployed (safe to ignore)"
+fi
+
 ACTIVE_CODEX_RULES="$ROOT/codex/rules/default.rules"
 [[ -f "$ACTIVE_CODEX_RULES" ]] || ACTIVE_CODEX_RULES="$CODEX_RULES"
 if [[ -f "$ACTIVE_CODEX_RULES" ]]; then

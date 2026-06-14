@@ -22,6 +22,8 @@
   - docs/adr/ADR-004-override-layer-activation.md — ADR-004: Override Layer Activation (lazy per-fork/per-user governance override), accepted 2026-06-03 · applies_to: AGENTS.md, bootstrap.md, doc-governance.md, platform entries
   - docs/adr/ADR-005-downstream-file-preservation-tiering.md — ADR-005: Downstream File-Preservation Tiering (skills→sidecar, framework-authoritative→force-update, custom/* namespace), accepted 2026-06-03 · applies_to: deploy.sh, deploy.ps1, tests/deploy
   - docs/adr/ADR-006-validator-python-core-strangler.md — ADR-006: Validator Python-Core Strangler (new checks = Python tools behind run_python_check; justified-native escape hatch; bidirectional ratchet), accepted 2026-06-10 · applies_to: validate.sh, validate.ps1, tools/*.py
+  - docs/adr/ADR-007-downstream-capability-declaration-seam.md — ADR-007: Downstream Capability Declaration Seam (present-only opt-in gate-capped downstream-capabilities.yaml: custom-skill registration + subagent_policy DECLARATION + advisory trackers; the same-owner lock short-circuit is DEFERRED, a Non-goal — recover_worklog_lock.py untouched), accepted 2026-06-14 · applies_to: bootstrap.md, config.yaml, routing.md
+  - docs/adr/ADR-008-portable-safety-floor.md — ADR-008: Portable Safety Floor (fence AGENTS.md safety invariants + COMMITTED-generated AGENTS.safety.md nucleus + freshness check for non-shim harnesses + no-python shell/PS credential floor; NOT a deploy-time slice), accepted 2026-06-14 · applies_to: AGENTS.md, deploy.sh, deploy.ps1, pre-commit.guard-ssot.sample, scan_credentials.py
 - **Active Backlog**: `docs/specs/_product-backlog.md` (18 active items; Kind/Labels/Priority columns active 2026-05-06)
 - **Spec Index** (shipped specs at `docs/specs/`; drafts/research tracked in `_product-backlog.md`):
   - docs/specs/lock-unification.md — Guarded Governance Writes implementation spec, [Shipped 2026-04-25] (ADR-002)
@@ -37,6 +39,7 @@
   - docs/specs/governance-eval-harness.md — Governance Behavioral Eval Harness + DELETE-bias Diff, [Shipped 2026-06-10] (backlog #45, issue #151)
   - docs/specs/deletion-first-add-gate.md — Deletion-First Norm + ADD-Gate Signal Tiering, [Shipped 2026-06-10] (backlog #65, issue #166)
   - docs/specs/validator-strangler-policy.md — Validator Python-Core Strangler Policy, [Shipped 2026-06-11] (ADR-006)
+  - docs/specs/downstream-adaptability-optimization.md — Downstream Adaptability Optimization (capability declaration seam + portable safety floor), [Frozen] (ADR-007 + ADR-008)
 - **Canonical Commands**:
   - `/spec-intake`: Import external specs (from other LLMs, documents, or natural language). Handles large product specs via decomposition. Runs before `/bootstrap`.
   - `/bootstrap`: Task initialization & classification freeze.

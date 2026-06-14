@@ -722,7 +722,7 @@ if $DRY_RUN; then
     _dry_count=0
     # Enumerate only the files that are actually deployed (mirrors real deploy logic).
     # Runtime Python tools are a whitelist — NOT all *.py in tools/.
-    _runtime_tools="guard_context_write.py _yaml_loader.py check_command_sync.py check_text_integrity.py check_text_integrity.ps1 text_integrity_baseline.txt sync_skills.sh lint_governed_writes.py check_lifecycle_frontmatter.py check_lesson_chain.py check_adr_coverage.py append_chain_entry.py append_lesson.py recover_worklog_lock.py lint_spec_drift.py run_governance_eval.py"
+    _runtime_tools="guard_context_write.py _yaml_loader.py check_command_sync.py check_text_integrity.py check_text_integrity.ps1 text_integrity_baseline.txt sync_skills.sh lint_governed_writes.py check_lifecycle_frontmatter.py check_lesson_chain.py check_adr_coverage.py append_chain_entry.py append_lesson.py recover_worklog_lock.py lint_spec_drift.py run_governance_eval.py scan_credentials.py credential_floor.sh credential_floor.ps1 generate_safety_nucleus.py validate_downstream_capabilities.py"
     for f in "$REPO_ROOT"/AGENTS.md "$REPO_ROOT"/CLAUDE.md "$REPO_ROOT"/GEMINI.md \
              "$REPO_ROOT"/.gitattributes \
              "$REPO_ROOT"/installers/deploy_brain.sh "$REPO_ROOT"/installers/deploy_brain.ps1 "$REPO_ROOT"/installers/deploy_brain.cmd \
@@ -924,6 +924,11 @@ runtime_tools=(
   recover_worklog_lock.py
   lint_spec_drift.py
   run_governance_eval.py
+  scan_credentials.py
+  credential_floor.sh
+  credential_floor.ps1
+  generate_safety_nucleus.py
+  validate_downstream_capabilities.py
 )
 for bname in "${runtime_tools[@]}"; do
     f="$REPO_ROOT/.agentcortex/tools/$bname"
@@ -932,6 +937,13 @@ for bname in "${runtime_tools[@]}"; do
     case "$bname" in *.sh) chmod_flag="+x" ;; esac
     deploy_file "$f" ".agentcortex/tools/$bname" "$chmod_flag"
 done
+
+# --- Deploy: .agentcortex/AGENTS.safety.md (core - portable safety nucleus, ADR-008) ---
+# Committed generated file (generate_safety_nucleus.py); a non-shim harness injects it
+# into every dispatched subagent. Core tier -> reaches all downstream on update.
+if [ -f "$REPO_ROOT/.agentcortex/AGENTS.safety.md" ]; then
+    deploy_file "$REPO_ROOT/.agentcortex/AGENTS.safety.md" ".agentcortex/AGENTS.safety.md"
+fi
 
 # --- Deploy: .agentcortex/context/current_state.md (scaffold) ---
 # Use the downstream template (generic placeholders) instead of the
