@@ -84,6 +84,11 @@ def test_hook_blocks_without_python_via_floor(tmp_path):
     repo = _install(tmp_path)
     _stage_secret(repo)
     env = {**os.environ, "PATH": _path_without_python()}
+    # On systems where python shares a dir with git (e.g. /usr/bin on Linux CI),
+    # stripping python's dir also removes git -> this simulation can't run cleanly.
+    # The floor's no-python behavior is covered by test_credential_floor_shell.py.
+    if shutil.which("git", path=env["PATH"]) is None:
+        pytest.skip("git is co-located with python in PATH; no-python sim unavailable here")
     r = _git(repo, "commit", "-m", "x", env=env)
     assert r.returncode != 0, "no-python floor path: secret commit must be BLOCKED"
     assert FAKE not in (r.stdout + r.stderr), "value leaked into hook output"
