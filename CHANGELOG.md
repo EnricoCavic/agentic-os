@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.6.0] - 2026-06-15
+
+Minor release: an upfront plan-time change-sizing advisory plus a security fix closing an ADR-007 capability-gate fail-open, packaging the since-v1.5.4 merges. PRs #241 (#145), #244, plus backlog / work-log hygiene (#240/#242/#243/#245/#246/#247).
+
+**Governance** (#241 — issue #145)
+- **Upfront change-sizing advisory**: a single advisory trigger added to `/plan`'s existing Pre-Plan Advisory block citing `engineering_guardrails.md §10.1`, front-running the previously *reactive* implement-time blast-radius / frozen-tier catch — no copied thresholds, no new MUST/gate. Closes the lone residual of the Change Sizing issue (#145).
+- Enforce the downstream capability load-policy ceiling (`fix`).
+
+**Security** (#244)
+- **ADR-007 capability-gate fail-open closed**: `downstream-capabilities.yaml` is now read by a strict, fail-closed mini-parser instead of the lenient shared YAML path, so a malformed or hostile capability file can no longer silently relax gates.
+
+**Housekeeping**
+- v1.5.4 release-ledger backfill (#240); backlog archival + redundant-row cancellation (#242/#243); bulk archival of previously-shipped and catch-all work logs (#245/#246/#247) + an archived gate-receipt schema fix.
+
 ## [1.5.4] - 2026-06-14
 
 Patch release: downstream adaptability for heterogeneous flows/architectures (many custom skills, harness/subagent fan-out, other work-management flows), plus the cross-contributor credential CI hardening and a security-policy refresh. PRs #238 (ADR-007/008), #236 (#73/#74/#75), #237.
