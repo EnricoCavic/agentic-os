@@ -3,7 +3,7 @@ status: living
 title: Product Backlog
 source: governance-bloat-review-2026-04-12 + optimization-round-2026-05-04 + optimization-research-2026-06-02
 created: 2026-04-12
-last_updated: 2026-06-13
+last_updated: 2026-06-15
 ---
 
 # Product Backlog
@@ -36,7 +36,7 @@ Governance file bloat review (2026-04-12) identified 10 findings across P0–P2:
 | 7 | Domain Doc L2 superseded entry archival | framework | lifecycle | P2 | — | quick-win | Pending | [#142](https://github.com/KbWen/agentic-os/issues/142) | — |
 | 11 | Shipped specs accumulation — status-driven filtering | framework | lifecycle | P2 | — | quick-win | Pending | [#143](https://github.com/KbWen/agentic-os/issues/143) | #1 |
 | 13 | Warm→Cold LLM summarization pass in /ship | framework | lifecycle | P2 | — | feature | Pending | [#144](https://github.com/KbWen/agentic-os/issues/144) | #1, #3 |
-| 14 | External Skill Research & Integration (Phase A: 3 core skills) | framework | skills | P2 | docs/specs/skill-research-integration.md | feature | Pending | [#145](https://github.com/KbWen/agentic-os/issues/145) | — |
+| 14 | External Skill Research & Integration (Phase A: 3 core skills) | framework | skills | P2 | docs/specs/skill-research-integration.md | feature | Shipped | [#145](https://github.com/KbWen/agentic-os/issues/145) | — |
 | 16 | Skill Validation Pipeline (meta-governance) | framework | skills | P2 | docs/specs/skill-research-integration.md | feature | Pending | [#146](https://github.com/KbWen/agentic-os/issues/146) | #14 |
 | 18 | Lightweight routing heuristics (decision tree in config.yaml, not a DSL) | framework | routing | P2 | — | quick-win | Pending | [#148](https://github.com/KbWen/agentic-os/issues/148) | — |
 | 21 | Skill cache timestamp + staleness invalidation | framework | skills | P2 | — | quick-win | Pending | [#149](https://github.com/KbWen/agentic-os/issues/149) | — |
