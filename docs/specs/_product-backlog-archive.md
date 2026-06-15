@@ -3,7 +3,7 @@ status: archive
 title: Product Backlog — Completed Archive
 source: split out of _product-backlog.md (backlog item #8)
 created: 2026-06-02
-last_updated: 2026-06-09
+last_updated: 2026-06-15
 ---
 
 # Product Backlog — Completed Archive
@@ -59,3 +59,9 @@ living backlog still resolve here. Ship details: see Ship History in
 | 65 | Deletion-First Norm + ADD-gate signal tiering | framework | governance | P1 | docs/specs/deletion-first-add-gate.md | feature | Shipped | [#166](https://github.com/KbWen/agentic-os/issues/166) | #45 |
 | 48 | ~~Skill discovery linter + skill-cards.json index~~ — Cancelled (verified already-implemented: trigger-registry.yaml + trigger-compact-index.json + validate_trigger_metadata.py; issue #154 closure 2026-06-02; row desynced until 2026-06-10) | framework | skills | P2 | — | quick-win | Cancelled | [#154](https://github.com/KbWen/agentic-os/issues/154) | — |
 | 58 | ~~Downstream local_guardrails.md extension point~~ — Cancelled (redundant: ADR-004 override layer already provides the surface; issue #164 closed 2026-06-10 after expert verification; zero downstream demand signal) | framework | governance | P2 | — | quick-win | Cancelled | [#164](https://github.com/KbWen/agentic-os/issues/164) | — |
+| 14 | External Skill Research & Integration (Phase A: 3 core skills) | framework | skills | P2 | docs/specs/skill-research-integration.md | feature | Shipped | [#145](https://github.com/KbWen/agentic-os/issues/145) | — |
+| 51 | Token lifecycle baseline + drift detector | framework | ci | P2 | — | quick-win | Shipped | [#157](https://github.com/KbWen/agentic-os/issues/157) | — |
+| 71 | T1 pre-commit credential regex (secrets L2 machine layer; CI TruffleHog is post-commit backstop) | framework | governance | P2 | — | quick-win | Shipped | [#225](https://github.com/KbWen/agentic-os/issues/225) | — |
+| 73 | CI PR-diff credential scan (extend scan_credentials.py --staged to a --range base..head mode in a pull_request job → contributors who never install the opt-in hook still get pre-merge protection; the real cross-contributor T1) | review-finding | governance | P2 | — | quick-win | Shipped | — | #71 |
+| 74 | ShellCheck CI lints only `**/*.sh` so `.githooks/*.sample` is never linted; fix the glob to cover the hook samples | review-finding | ci | P2 | — | quick-win | Shipped | — | #71 |
+| 75 | Pre-commit hook dev-friendliness — the #192 hook gates every commit on the full validator; a gitignored, CI-invisible worklog-count FAIL blocked all commits. Shipped: worklog-count FAIL→WARN. Future dev-UX option: changed-files-scoped / advisory validator step in the hook (keep the #225 credential block hard) | review-finding | dx | P2 | — | quick-win | Shipped | — | #71 |
