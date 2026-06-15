@@ -77,3 +77,87 @@ def test_unsafe_file_is_rejected_not_clamped(tmp_path, body, needle):
     r = _check(tmp_path, body)
     assert r.returncode == 1, f"must REJECT (not clamp) {body!r} -> rc={r.returncode}, err={r.stderr!r}"
     assert needle in r.stderr, f"reason must name {needle!r}: {r.stderr!r}"
+
+
+# --- Strict capabilities grammar (parse_strict) -------------------------------
+# The validator parses with a dedicated STRICT allowlist mini-parser, NOT the shared
+# lenient _yaml_loader and NOT PyYAML -- so behaviour is identical with or without
+# PyYAML installed (no shadow harness needed). The security argument is an ALLOWLIST of
+# syntax: a forbidden key in plain/simple-quoted form is RESOLVED and caught by the
+# denylist (rc 1); a forbidden key hidden behind ANY exotic syntax the grammar refuses
+# to interpret is a hard syntax error (rc 2, fail-closed) and can never reach a gate-safe
+# verdict. Three review rounds found flow-map / quoted-key / flow-seq-k:v / mismatched-
+# quote / double-quoted-escape / silent-drop-misindent fail-opens; the strict grammar
+# closes all of them by construction.
+
+_RICH_SAFE = """\
+version: 1
+skills:
+  - id: custom-tf
+    load_policy: on-match
+    phase_scope: [implement, review]
+    detect_by:
+      classification: [feature]
+    description: "validates, formats: and lints"
+subagent_policy: governed
+trackers:
+  - id: custom-jira
+    skill: custom-jira-sync
+"""
+
+
+def test_strict_parser_accepts_rich_safe_file(tmp_path):
+    # Nested detect_by mapping, a flow-sequence, and a quoted value CONTAINING ':' and
+    # ',' must all parse and be gate-safe (no false positive).
+    r = _check(tmp_path, _RICH_SAFE)
+    assert r.returncode == 0, f"rich safe file must pass: {r.stderr!r}"
+
+
+@pytest.mark.parametrize("body,needle", [
+    ("trackers:\n  - id: custom-j\n    blocking: true\n", "blocking"),                  # plain block
+    ("version: 1\ntrackers:\n  - 'blocking': true\n", "blocking"),                      # simple single-quote key
+    ('version: 1\ntrackers:\n  - "gate": ship\n', "gate"),                              # simple double-quote key
+    ("skills:\n  - id: custom-x\n    detect_by:\n      ship_edge: x\n", "ship_edge"),   # nested key
+    ("trigger_priority: hard\n", "trigger_priority"),                                   # top-level
+])
+def test_forbidden_key_in_clean_syntax_rejected(tmp_path, body, needle):
+    # Cleanly-parseable forbidden key -> RESOLVED -> denylist -> rc 1 naming the key.
+    r = _check(tmp_path, body)
+    assert r.returncode == 1, f"forbidden key must reject: rc={r.returncode}, err={r.stderr!r}"
+    assert needle in r.stderr, f"reason must name {needle!r}: {r.stderr!r}"
+
+
+@pytest.mark.parametrize("body", [
+    "version: 1\ntrackers:\n  - {id: x, blocking: true}\n",                             # flow mapping
+    "version: 1\ntrackers:\n  - {worklog_writers: all}\n",                              # flow mapping
+    'version: 1\ntrackers:\n  - "\\x62\\x6c\\x6f\\x63\\x6b\\x69\\x6e\\x67": true\n',     # \\x escape -> blocking
+    'version: 1\ntrackers:\n  - "\\u0067ate": ship\n',                                  # \\u escape -> gate
+    "version: 1\ntrackers:\n  - phase_scope: [blocking: true]\n",                       # flow-seq k:v
+    "version: 1\ntrackers:\n  - 'blocking: true\n",                                     # unterminated quote
+    "version: 1\ntrackers:\n  - id: custom-x\n     blocking: true\n",                   # silent-drop misindent (5sp)
+    "version: 1\ntrackers:\n  - id: &a custom-x\n",                                     # anchor
+    "version: 1\ntrackers:\n  - !!str gate: ship\n",                                    # tag
+    "version: 1\ntrackers:\n  - <<: x\n",                                               # merge key
+    "version: 1\ntrackers:\n  - ? blocking\n    : true\n",                              # explicit key
+    "version: 1\nskills:\n  - id: custom-x\n    description: >\n      blocking: true\n", # block scalar
+    "version: 1\ntrackers:\n\t- blocking: true\n",                                      # tab indentation
+])
+def test_unsupported_syntax_fails_closed(tmp_path, body):
+    # Any syntax outside the minimal grammar -> hard syntax error (rc 2). A forbidden key
+    # can never reach a gate-safe verdict by hiding behind exotic syntax.
+    r = _check(tmp_path, body)
+    assert r.returncode == 2, (
+        f"unsupported syntax must fail-closed (rc 2): rc={r.returncode}, "
+        f"out={r.stdout!r}, err={r.stderr!r}")
+
+
+@pytest.mark.parametrize("body", [
+    'skills:\n  - id: custom-x\n    description: "first, gate: second"\n',
+    'skills:\n  - id: custom-x\n    description: "a hard: limit, gates: ok"\n',
+    'trackers:\n  - id: custom-x\n    note: "blocking: only in prose"\n',
+])
+def test_forbidden_token_inside_value_is_not_false_positive(tmp_path, body):
+    # A forbidden WORD inside a quoted VALUE (not a key) is gate-safe. The old raw-text
+    # scan false-rejected these; the strict parser resolves them correctly -> no FP.
+    r = _check(tmp_path, body)
+    assert r.returncode == 0, f"forbidden token in a value must NOT false-reject: {r.stderr!r}"
