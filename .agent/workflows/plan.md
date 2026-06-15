@@ -63,6 +63,7 @@ Trigger conditions (check silently; emit only matches):
 - Classification `feature` or `architecture-change` + no `/brainstorm` or `/research` phase in Work Log → `/brainstorm (no exploration)`
 - Plan step selects a tech stack component (language, framework, database, infrastructure) → `/adr (tech choice)`
 - Plan step reveals a design fork (two valid approaches, OR/Either in step descriptions) → `/decide (design fork)`
+- Plan's declared Blast Radius / Target Files exceeds the frozen classification's size ceiling (Ref: `engineering_guardrails.md` §10.1) → `re-tier before locking (size vs frozen tier)`
 
 Skip → record reason in `## Drift Log` as `Skipped: <advisory> — <1-line reason>`. No reason required beyond 1 line.
 
