@@ -28,7 +28,7 @@ except Exception as exc:  # pragma: no cover - deployed alongside in runtime_too
     sys.stderr.write("ERROR: _yaml_loader unavailable (%s)\n" % exc)
     sys.exit(2)
 
-ALLOWED_LOAD_POLICY = {"on-match", "phase-entry", "on-failure"}  # 'always' is ABOVE the ceiling
+ALLOWED_LOAD_POLICY = {"on-match"}
 ALLOWED_SUBAGENT_POLICY = {"read-only", "governed"}
 # keys that could relax / escalate a gate anywhere in the doc -> hard reject (fail-closed)
 FORBIDDEN_KEYS = {"gate", "gates", "ship_edge", "ship_edges", "block_if_missed",
@@ -74,7 +74,7 @@ def validate(data):
             return "skills[%d].id %r is not custom-* (downstream skills MUST be custom-*)" % (i, sid)
         lp = sk.get("load_policy", "on-match")
         if lp not in ALLOWED_LOAD_POLICY:
-            return "skills[%d].load_policy %r exceeds the on-match ceiling" % (i, lp)
+            return "skills[%d].load_policy %r must be on-match (the downstream capability ceiling)" % (i, lp)
         ps = sk.get("phase_scope")
         if ps is not None and not isinstance(ps, list):
             return "skills[%d].phase_scope must be a list" % i

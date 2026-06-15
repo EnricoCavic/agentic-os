@@ -21,8 +21,8 @@ folded into workflows.
 
 | Gap | Severity | Description |
 |---|---|---|
-| Anti-Rationalization | HIGH | No mechanism to counter agent excuses ("I'll add tests later") |
-| Change Sizing | HIGH | No upfront scope-estimation gate — agents underestimate then sprawl |
+| Anti-Rationalization | RESOLVED (Phase A) | Closed by the "Common Rationalizations" tables integrated into doc-lookup (SKILL.md:118) + karpathy-principles (SKILL.md:118) — see §5 Phase A. |
+| Change Sizing | MEDIUM | Reactive sizing exists (implement.md hard-block >200 lines / >2 modules; §10.1 escalation; review.md 100-line split); residual is the lack of an *upfront* plan-time reconciliation of blast radius vs the frozen tier — addressed by a `/plan` advisory citing §10.1 (issue #145). |
 | Code Review Depth | MEDIUM | Request/receive skills exist, but no *quality standard* for conducting reviews |
 | Performance Awareness | MEDIUM | No measure-first mindset; production-readiness covers logging but not perf |
 | Source-Grounded Decisions | MEDIUM | Agents hallucinate API usage instead of checking official docs first |
@@ -116,8 +116,9 @@ evaluating.
 - [x] Code simplification checklist integrated into karpathy-principles
 - [x] 5-axis quality standard integrated into the `/review` workflow
 - [x] Conflict detection template integrated into doc-lookup
-- [ ] `validate.sh` passes with all changes
-- [ ] Zero governance gaps rated HIGH remaining
+- [x] `validate.sh` passes with all changes (CI-equiv fail=0; sole local FAIL = pre-existing gitignored work-log compaction, unrelated)
+- [x] Change-Sizing residual closed via `/plan` advisory (upfront blast-radius vs §10.1 tier reconciliation; severity re-rated HIGH→MEDIUM with evidence)
+- [x] Zero governance gaps rated HIGH remaining
 
 ## 8. References
 
