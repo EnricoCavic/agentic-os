@@ -36,20 +36,16 @@ Governance file bloat review (2026-04-12) identified 10 findings across P0–P2:
 | 7 | Domain Doc L2 superseded entry archival | framework | lifecycle | P2 | — | quick-win | Pending | [#142](https://github.com/KbWen/agentic-os/issues/142) | — |
 | 11 | Shipped specs accumulation — status-driven filtering | framework | lifecycle | P2 | — | quick-win | Pending | [#143](https://github.com/KbWen/agentic-os/issues/143) | #1 |
 | 13 | Warm→Cold LLM summarization pass in /ship | framework | lifecycle | P2 | — | feature | Pending | [#144](https://github.com/KbWen/agentic-os/issues/144) | #1, #3 |
-| 16 | Skill Validation Pipeline (meta-governance) | framework | skills | P2 | docs/specs/skill-research-integration.md | feature | Pending | [#146](https://github.com/KbWen/agentic-os/issues/146) | #14 |
 | 18 | Lightweight routing heuristics (decision tree in config.yaml, not a DSL) | framework | routing | P2 | — | quick-win | Pending | [#148](https://github.com/KbWen/agentic-os/issues/148) | — |
 | 21 | Skill cache timestamp + staleness invalidation | framework | skills | P2 | — | quick-win | Pending | [#149](https://github.com/KbWen/agentic-os/issues/149) | — |
 | 33 | Claude Code plugin packaging (.claude-plugin/plugin.json + bin/ + commands/agents/hooks bundling, no monitors) | dx | packaging | P2 | — | feature | Pending | [#150](https://github.com/KbWen/agentic-os/issues/150) | #30, #31 |
 | 70 | Export structured JSON Drift Log on ship for CI/CD audit trails | framework | governance | P2 | — | feature | Pending | [#193](https://github.com/KbWen/agentic-os/issues/193) | — |
-| 66 | Recommended-workflows advisory layer | framework | routing | P2 | — | feature | Pending | [#167](https://github.com/KbWen/agentic-os/issues/167) | — |
-| 67 | Canonical-doc-path gate + research-wiki sidecar | framework | governance | P2 | — | quick-win | Pending | [#168](https://github.com/KbWen/agentic-os/issues/168) | — |
-| 68 | Authority-map metadata (read-this-not-that resolver) | framework | governance | P2 | — | quick-win | Pending | [#169](https://github.com/KbWen/agentic-os/issues/169) | — |
 | 69 | RPI→QRSPI flow-adaptation study (alignment-side Q/D/S decomposition before Plan; strands A–E incl. governance load) | framework | governance | P1 | docs/specs/_research-rpi-qrspi-corroboration.md | feature | Pending | [#176](https://github.com/KbWen/agentic-os/issues/176) | #45, #65 |
 | 72 | zh-TW README FAQ mirror (parity with EN discoverability FAQ added in PR #230) | docs | i18n | P3 | — | quick-win | Pending | — | — |
 
 > Rows whose GH issue is CLOSED-premature (#7, #13, #18, #21, #33) are kept deliberately as
 > future directions — reopen the issue when a concrete signal appears (2026-06-02 curation).
-> Completed entries (#2, 4–6, 8–10, 12, 14, 15, 19–20, 22–32, 34–44, 51, 71, 73–75) are in [`_product-backlog-archive.md`](./_product-backlog-archive.md).
+> Completed entries (#2, 4–6, 8–10, 12, 14–16, 19–20, 22–32, 34–44, 51, 66–68, 71, 73–75) are in [`_product-backlog-archive.md`](./_product-backlog-archive.md).
 
 ## Status Key
 
