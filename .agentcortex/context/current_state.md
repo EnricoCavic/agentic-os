@@ -96,7 +96,7 @@
 ## Ship History
 
 ### Ship-chore-v1.6.0-release-2026-06-15
-- **Branch `chore/v1.6.0-release`** (quick-win, docs/release, **PR #<pending>**, tag `v1.6.0`) — Minor **v1.6.0** packaging the since-v1.5.4 merges: upfront plan-time change-sizing advisory + downstream capability load-policy ceiling fix (#145, PR #241), ADR-007 capability-gate fail-open closed via a strict fail-closed mini-parser (PR #244), plus backlog/work-log hygiene (#240/#242/#243/#245/#246/#247). Banners 1.5.4→1.6.0 across README badge, README_zh-TW, CITATION.cff (+date-released 2026-06-15), Model Guide EN+zh, Testing Protocol EN+zh, deploy.sh ACX_VERSION, antigravity-v5-runtime pointer; SECURITY.md supported-versions adds 1.6.x (keeps 1.5.x); CHANGELOG `[1.6.0]`. README canaries untouched (line 8 verified). Tag `v1.6.0` + GitHub release on merge.
+- **Branch `chore/v1.6.0-release`** (quick-win, docs/release, **PR #249**, tag `v1.6.0`) — Minor **v1.6.0** packaging the since-v1.5.4 merges: upfront plan-time change-sizing advisory + downstream capability load-policy ceiling fix (#145, PR #241), ADR-007 capability-gate fail-open closed via a strict fail-closed mini-parser (PR #244), plus backlog/work-log hygiene (#240/#242/#243/#245/#246/#247). Banners 1.5.4→1.6.0 across README badge, README_zh-TW, CITATION.cff (+date-released 2026-06-15), Model Guide EN+zh, Testing Protocol EN+zh, deploy.sh ACX_VERSION, antigravity-v5-runtime pointer; SECURITY.md supported-versions adds 1.6.x (keeps 1.5.x); CHANGELOG `[1.6.0]`. README canaries untouched (line 8 verified). Tag `v1.6.0` + GitHub release on merge.
 - Tests: validators fail=0 CI-equiv; release is doc-only.
 
 ### Ship-feat-change-sizing-scope-prompt-2026-06-15
