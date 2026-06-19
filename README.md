@@ -1,16 +1,13 @@
-<p align="center">
-  <img src="https://img.shields.io/badge/Agentic%20OS-v1.6.0-blueviolet?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJ3aGl0ZSI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTAgMThjLTQuNDEgMC04LTMuNTktOC04czMuNTktOCA4LTggOCAzLjU5IDggOC0zLjU5IDgtOCA4eiIvPjwvc3ZnPg==" alt="Agentic OS v1.6.0"/>
-</p>
-
 <h1 align="center">Agentic OS</h1>
 
 <p align="center">
-  <strong>A governance-first layer for AI coding agents.</strong><br/>
-  Portable workflows, delivery gates, engineering guardrails, and 14 professional skills<br/>
-  for Claude Code, OpenAI Codex, Google Antigravity, Cursor, GitHub Copilot, and other coding agents.
+  <strong>A governance-first layer for AI coding agents</strong> — Claude Code, Codex, Antigravity, Cursor, Copilot.<br/>
+  Your agent can still cut a corner; the ones that burn you — leaked secrets, missing tests, skipped gates —<br/>
+  get caught by machine checks, not by trusting it to self-report.
 </p>
 
 <p align="center">
+  <a href="https://github.com/KbWen/agentic-os/releases"><img src="https://img.shields.io/github/v/release/KbWen/agentic-os?style=flat-square&label=release" alt="Release"/></a>
   <a href="https://github.com/KbWen/agentic-os/actions/workflows/validate.yml"><img src="https://img.shields.io/github/actions/workflow/status/KbWen/agentic-os/validate.yml?branch=main&style=flat-square&label=CI" alt="CI Status"/></a>
   <a href="https://github.com/KbWen/agentic-os/actions/workflows/security.yml"><img src="https://img.shields.io/github/actions/workflow/status/KbWen/agentic-os/security.yml?branch=main&style=flat-square&label=Security" alt="Security Scan"/></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-22c55e?style=flat-square" alt="MIT License"/></a>
@@ -24,39 +21,49 @@
 
 ---
 
-## The Problem
+## See it catch a cut corner
 
-AI coding agents are powerful, but they need shared operating rules. Without structure, they can:
+No install, a couple of seconds:
 
-- **Skip steps** — jump straight to code without planning or reviewing
-- **Hallucinate completion** — claim "done" without verifiable evidence
-- **Drift from scope** — refactor code nobody asked them to touch
-- **Lose context** — forget decisions across conversations, forcing re-derivation
-- **Break things silently** — no safety gates between "idea" and "production"
-
-## The Solution
-
-**Agentic OS** is a portable governance framework that gives AI agents a repeatable engineering workflow. Install it into your project, and your AI agents gain:
-
-```mermaid
-flowchart LR
-    U["User<br/>says"] --> G{"Gate<br/>Engine"}
-    G -->|PASS| W["Workflow<br/>+ Skills"]
-    W --> E{"Evidence<br/>Required"}
-    E -->|PASS| S["Ship<br/>→ SSoT"]
-    G -->|FAIL| X1["⛔ STOP"]
-    E -->|FAIL| X2["⛔ STOP"]
-
-    style U fill:#8b5cf6,color:#fff,stroke:none
-    style G fill:#f59e0b,color:#fff,stroke:none
-    style W fill:#3b82f6,color:#fff,stroke:none
-    style E fill:#22c55e,color:#fff,stroke:none
-    style S fill:#06b6d4,color:#fff,stroke:none
-    style X1 fill:#ef4444,color:#fff,stroke:none
-    style X2 fill:#ef4444,color:#fff,stroke:none
+```sh
+bash demo/run.sh          # Windows (PowerShell): pwsh demo/run.ps1
 ```
 
-The idea behind every phase is the same: if there's no verifiable evidence, the task isn't done — and the gates enforce that, instead of trusting the agent to self-report honestly.
+An agent writes a config file, reports "done," and the credential check that runs before the commit disagrees:
+
+```text
+  An AI agent wrote this file and reported: "Done — config added."
+  ----------------------------------------------------------------
+    DB_HOST=prod.internal
+    aws_access_key_id = AKIA****************
+  ----------------------------------------------------------------
+
+  Without a gate, that commit lands and the key is in git history forever.
+  Agentic OS runs this before the commit is allowed:
+
+    $ scan_credentials.py config.env
+
+CREDENTIAL PATTERN(S) DETECTED (values redacted):
+  config.env:2: aws-access-key-id
+Rotate the exposed secret, remove it from the change, then retry.
+
+  Commit BLOCKED. The agent said "done"; the machine said no — and it
+  redacted the value instead of echoing your secret back at you.
+```
+
+The key is generated at runtime and redacted on output — the demo never stores or prints a real secret. It's one check of several.
+
+## Rules vs. enforcement
+
+Most of the framework is *rules* — plan before coding, don't refactor what nobody asked for, declare your confidence. An agent can ignore those, and sometimes will. The part it can't ignore is underneath:
+
+| The failure that burns you | What catches it | When |
+|:---|:---|:---|
+| A secret committed to history | `scan_credentials.py` (above) | pre-commit hook + CI |
+| "Tests pass" with no tests | CI runs the real suite | pull request |
+| A phase skipped with no evidence | `validate.sh` reads the work trail | pre-commit (local) |
+
+A passing run is a receipt you can check, not a promise you take on faith.
 
 ---
 
@@ -64,22 +71,11 @@ The idea behind every phase is the same: if there's no verifiable evidence, the 
 
 ### Gate Engine & Phase System
 
-Every task flows through mandatory phases. The AI cannot skip ahead.
+Every task runs through mandatory phases, recorded as gate receipts in the work log; the local pre-commit validator flags a skipped phase before it lands.
 
 ```mermaid
 flowchart LR
-    B["/bootstrap"] --> P["/plan"]
-    P --> I["/implement"]
-    I --> R["/review"]
-    R --> T["/test"]
-    T --> S["/ship"]
-
-    style B fill:#8b5cf6,color:#fff,stroke:none
-    style P fill:#3b82f6,color:#fff,stroke:none
-    style I fill:#22c55e,color:#fff,stroke:none
-    style R fill:#f59e0b,color:#fff,stroke:none
-    style T fill:#ef4444,color:#fff,stroke:none
-    style S fill:#06b6d4,color:#fff,stroke:none
+    B["/bootstrap"] --> P["/plan"] --> I["/implement"] --> R["/review"] --> T["/test"] --> S["/ship"]
 ```
 
 | Classification | Required Phases |
@@ -100,7 +96,7 @@ A constitution for AI behavior — safety invariants always loaded (`AGENTS.md`)
 - **OWASP Top 10 Auto-Scan** — security checks run during `/implement` and `/review`
 - **Confidence Gate** — AI must declare confidence at plan/implement; low confidence triggers escalation
 
-### 14 Professional Skills
+### Built-in Skills
 
 Skills auto-activate based on task classification and workflow phase:
 
