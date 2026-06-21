@@ -182,6 +182,53 @@ def test_172_governance_only_adrs_do_not_fire() -> None:
         )
 
 
+@pytest.mark.slow
+@requires_bash
+def test_active_capabilities_fail_closed_when_schema_validator_is_missing() -> None:
+    """An active private capability declaration must never become unchecked."""
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "proj"
+        target.mkdir()
+        deployed = subprocess.run(
+            [bash, str(DEPLOY_SH), str(target)],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            cwd=str(ROOT),
+        )
+        assert deployed.returncode == 0, f"deploy failed:\n{deployed.stderr}"
+
+        cap_validator = target / ".agentcortex" / "tools" / "validate_downstream_capabilities.py"
+        cap_validator.unlink()
+        cap_file = (
+            target / ".agentcortex" / "context" / "private"
+            / "downstream-capabilities.yaml"
+        )
+        cap_file.parent.mkdir(parents=True, exist_ok=True)
+
+        absent = _run_validate(target)
+        assert "validator not deployed (safe to ignore)" in absent
+        assert "active config cannot be verified" not in absent
+
+        for body in (
+            "knowledge_sources:\n  - path: ../knowledge-base\n    role: advisory\n",
+            "gate: true\n",
+        ):
+            cap_file.write_text(body, encoding="utf-8")
+            active = _run_validate(target)
+            assert (
+                "[FAIL] downstream-capabilities gate-safety -- "
+                "validator missing while active config cannot be verified"
+            ) in active
+            assert _summary_counts(active)["fail"] >= 1
+
+        if sys.platform == "win32" and powershell is not None:
+            ps_active = _run_validate_ps1(target)
+            assert (
+                "[FAIL] downstream-capabilities gate-safety -- "
+                "validator missing while active config cannot be verified"
+            ) in ps_active
+            assert _summary_counts(ps_active)["fail"] >= 1
+
+
 # ---------------------------------------------------------------------------
 # Structural — cross-platform parity (sh ↔ ps1) of each fix
 # ---------------------------------------------------------------------------
@@ -206,6 +253,12 @@ def test_fix_markers_present_in_both_validators() -> None:
 def test_172_pattern_parity() -> None:
     assert "*-project-architecture.md" in VALIDATE_SH.read_text(encoding="utf-8")
     assert "*-project-architecture.md" in VALIDATE_PS1.read_text(encoding="utf-8")
+
+
+def test_active_capabilities_missing_validator_fail_closed_parity() -> None:
+    marker = "validator missing while active config cannot be verified"
+    assert marker in VALIDATE_SH.read_text(encoding="utf-8")
+    assert marker in VALIDATE_PS1.read_text(encoding="utf-8")
 
 
 def test_171_ship_history_exclusion_parity() -> None:

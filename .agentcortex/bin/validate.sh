@@ -563,6 +563,9 @@ if [[ -f "$CAP_VALIDATOR" ]]; then
   # WARN (advisory): the runtime guarantee there is bootstrap §1b agent-discipline, honest
   # per the framework no-python doctrine. (MissingPythonLevel is WARN, not a fake FAIL.)
   run_python_check "downstream-capabilities gate-safety" WARN "$CAP_VALIDATOR" "$CAP_FILE"
+elif [[ -f "$CAP_FILE" ]]; then
+  record_result FAIL "downstream-capabilities gate-safety -- validator missing while active config cannot be verified"
+  echo "  fix: re-run deploy to restore .agentcortex/tools/validate_downstream_capabilities.py"
 else
   record_result SKIP "downstream-capabilities gate-safety -- validator not deployed (safe to ignore)"
 fi

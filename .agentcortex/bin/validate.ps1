@@ -1,4 +1,4 @@
-﻿param(
+param(
     [switch]$NoPython
 )
 
@@ -683,11 +683,16 @@ Test-ContainsLiteral -Path (Join-NormalPath $workflowsDir 'bootstrap.md') -Patte
 # ADR-007: a present downstream-capabilities.yaml MUST be schema gate-safe (rejected, not clamped).
 $capValidator = Join-NormalPath $root '.agentcortex/tools/validate_downstream_capabilities.py'
 $capFile = Join-NormalPath $root '.agentcortex/context/private/downstream-capabilities.yaml'
-if (Test-Path $capValidator) {
+if (Test-Path -Path $capValidator -PathType Leaf) {
     # python-present + gate-unsafe -> FAIL (CI always has python); no-python -> WARN
     # (advisory; bootstrap §1b agent-discipline is the runtime guarantee there).
     Invoke-PythonCheck -Label 'downstream-capabilities gate-safety' -MissingPythonLevel 'WARN' -ScriptPath $capValidator -Arguments @($capFile)
-} else {
+}
+elseif (Test-Path -Path $capFile -PathType Leaf) {
+    Add-Result -Level 'FAIL' -Message 'downstream-capabilities gate-safety -- validator missing while active config cannot be verified'
+    Write-Output '  fix: re-run deploy to restore .agentcortex/tools/validate_downstream_capabilities.py'
+}
+else {
     Add-Result -Level 'SKIP' -Message 'downstream-capabilities gate-safety -- validator not deployed (safe to ignore)'
 }
 # ADR-008: the committed safety nucleus MUST match the AGENTS.md fenced span (CR-normalized).
