@@ -110,6 +110,90 @@ def _deploy_ps1(target: Path) -> subprocess.CompletedProcess:
 # Behavioral (AC-5 / AC-6) — the core of ADR-005
 # ---------------------------------------------------------------------------
 
+@pytest.mark.parametrize(
+    ("rel_path", "setup_mode", "env"),
+    [
+        (".github/copilot-instructions.md", "update_missing_manifest", None),
+        ("installers/deploy_brain.sh", "fresh_preexisting", {"ACX_FORCE_PERFILE": "1"}),
+    ],
+    ids=["scaffold-update-missing-manifest", "wrapper-fresh-preexisting-perfile"],
+)
+@requires_bash
+def test_preexisting_sidecar_file_stays_preserved_across_repeated_deploys(
+    rel_path: str,
+    setup_mode: str,
+    env: dict[str, str] | None,
+) -> None:
+    """A missing manifest baseline must never turn user bytes into an overwrite grant."""
+    with tempfile.TemporaryDirectory() as td:
+        source_root = Path(td) / "source"
+        deploy_script = source_root / ".agentcortex" / "bin" / "deploy.sh"
+        deploy_script.parent.mkdir(parents=True)
+        shutil.copy2(DEPLOY_SH, deploy_script)
+
+        source = source_root / rel_path
+        source.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / rel_path, source)
+
+        target = Path(td) / "proj"
+        target.mkdir()
+
+        deployed = target / rel_path
+        sidecar = deployed.with_name(f"{deployed.name}.acx-incoming")
+        manifest = target / ".agentcortex-manifest"
+        user_bytes = b"# downstream-owned file\nkeep these exact bytes\n"
+
+        def deploy() -> subprocess.CompletedProcess:
+            run_env = {**os.environ, **env} if env else None
+            return subprocess.run(
+                [bash, str(deploy_script), str(target)],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                cwd=str(source_root),
+                env=run_env,
+            )
+
+        if setup_mode == "update_missing_manifest":
+            assert deploy().returncode == 0
+            manifest_lines = manifest.read_text(encoding="utf-8").splitlines()
+            manifest.write_text(
+                "\n".join(
+                    line
+                    for line in manifest_lines
+                    if not (
+                        len(parts := line.split()) >= 2
+                        and parts[1] == rel_path
+                    )
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+        deployed.parent.mkdir(parents=True, exist_ok=True)
+        deployed.write_bytes(user_bytes)
+
+        first = deploy()
+        assert first.returncode == 0, f"first preserving deploy failed:\n{first.stderr}"
+        assert deployed.read_bytes() == user_bytes
+        assert sidecar.read_bytes() == source.read_bytes()
+        first_manifest_hash = _manifest_hash(manifest, rel_path)
+
+        second = deploy()
+        assert second.returncode == 0, f"second preserving deploy failed:\n{second.stderr}"
+        assert deployed.read_bytes() == user_bytes, \
+            "the second deploy must not overwrite pre-existing user bytes"
+        assert sidecar.read_bytes() == source.read_bytes(), \
+            "each deploy must refresh the upstream version in .acx-incoming"
+
+        source_hash = _lf_sha256(source)
+        assert first_manifest_hash == source_hash, \
+            "the first preserving deploy must record the upstream baseline, not the user hash"
+        assert _manifest_hash(manifest, rel_path) == source_hash, \
+            "the preserved manifest baseline must keep later deploys from overwriting user bytes"
+
+
 @requires_bash
 def test_skill_edit_sidecars_and_core_rule_force_updates() -> None:
     with tempfile.TemporaryDirectory() as td:
