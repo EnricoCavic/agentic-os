@@ -3,7 +3,7 @@ status: living
 title: Product Backlog
 source: governance-bloat-review-2026-04-12 + optimization-round-2026-05-04 + optimization-research-2026-06-02
 created: 2026-04-12
-last_updated: 2026-06-20
+last_updated: 2026-06-24
 ---
 
 # Product Backlog
@@ -41,7 +41,7 @@ Governance file bloat review (2026-04-12) identified 10 findings across P0–P2:
 | 33 | Claude Code plugin packaging (.claude-plugin/plugin.json + bin/ + commands/agents/hooks bundling, no monitors) | dx | packaging | P2 | — | feature | Pending | [#150](https://github.com/KbWen/agentic-os/issues/150) | #30, #31 |
 | 70 | Export structured JSON Drift Log on ship for CI/CD audit trails | framework | governance | P2 | — | feature | Pending | [#193](https://github.com/KbWen/agentic-os/issues/193) | — |
 | 69 | RPI→QRSPI flow-adaptation study (alignment-side Q/D/S decomposition before Plan; strands A–E incl. governance load) | framework | governance | P1 | docs/specs/_research-rpi-qrspi-corroboration.md | feature | Pending | [#176](https://github.com/KbWen/agentic-os/issues/176) | #45, #65 |
-| 72 | zh-TW README FAQ mirror (parity with EN discoverability FAQ added in PR #230) | docs | i18n | P3 | — | quick-win | Pending | — | — |
+| 72 | zh-TW README FAQ mirror (parity with EN discoverability FAQ added in PR #230) | docs | i18n | P3 | — | quick-win | Shipped | — | — |
 | 76 | Research persist-before-browse note (lightweight `research.md` convention; capsule design retired per external prior-art) | framework | governance | P2 | — | quick-win | Shipped | [#251](https://github.com/KbWen/agentic-os/issues/251) | — |
 | 77 | D — Reviewable Task→Step hierarchy | framework | governance | P1 | — | architecture-change | Pending | [#252](https://github.com/KbWen/agentic-os/issues/252) | — |
 | 78 | B+C — Task capsule + one read-only reviewer (two verdicts) | framework | governance | P1 | — | feature | Pending | [#253](https://github.com/KbWen/agentic-os/issues/253) | #77 |
