@@ -155,7 +155,7 @@ Built for codebases where several AI sessions — or several people's agents —
 |:---|:---|:---|
 | **Claude Code** | Native | `CLAUDE.md` entrypoint + Claude platform guide |
 | **OpenAI Codex** | Native | `AGENTS.md`, Codex platform guide, CLI delegation workflow |
-| **Google Antigravity** | Native | Intent router + Antigravity runtime guidance |
+| **Google Antigravity** | Native | `GEMINI.md` entrypoint + Antigravity runtime guidance |
 | **Cursor** | Compatible | Reads `AGENTS.md` / project-rule style guidance — the slash-commands are plain prompts |
 | **GitHub Copilot** | Compatible | Uses repository instructions and guardrail docs |
 | **Any LLM agent** | Compatible | Model-agnostic Markdown workflows + evidence rules |
@@ -192,7 +192,7 @@ That's the core of it. The credential scan, the test suite, and the phase/eviden
 A rules file tells the agent how to behave, and the agent can ignore it. Agentic OS adds the workflow and the checks that hold it to that behavior: phase sequencing, evidence requirements, scope discipline, and a single source of truth that remembers decisions across sessions. The skills and discipline are still guidance the agent follows; what's *enforced* is the part that fails your commit or CI — leaked secrets, missing tests, a skipped phase.
 
 **Does it lock me into one AI vendor?**
-No. It's model-agnostic Markdown — native entry points for Claude Code (`CLAUDE.md`) and Codex / Antigravity (`AGENTS.md`), and it works with Cursor, Copilot, and any other LLM agent through the same workflow files.
+No. It's model-agnostic Markdown — native entry points for Claude Code (`CLAUDE.md`), Codex (`AGENTS.md`), and Gemini / Antigravity (`GEMINI.md`), and it works with Cursor, Copilot, and any other LLM agent through the same workflow files.
 
 **Is it free?**
 Yes — MIT licensed. Fork it and ship it.

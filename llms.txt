@@ -8,7 +8,7 @@ Agentic OS installs into any project as a set of Markdown governance files plus 
 
 - [README](https://raw.githubusercontent.com/KbWen/agentic-os/main/README.md): Overview, install, features, and FAQ
 - [Quick Start](https://github.com/KbWen/agentic-os/blob/main/README.md#quick-start): Install commands and first steps
-- [Commands](https://github.com/KbWen/agentic-os/blob/main/README.md#commands): The workflow command reference
+- [Commands](https://github.com/KbWen/agentic-os/blob/main/docs/reference.md#commands): The workflow command reference
 - [Agent Philosophy](https://raw.githubusercontent.com/KbWen/agentic-os/main/.agentcortex/docs/AGENT_PHILOSOPHY.md): The 10 core principles
 - [Model Selection Guide](https://raw.githubusercontent.com/KbWen/agentic-os/main/docs/AGENT_MODEL_GUIDE.md): Choosing an AI model
 - [Lifecycle Benchmark](https://raw.githubusercontent.com/KbWen/agentic-os/main/docs/LIFECYCLE_BENCHMARK.md): Real token-cost data across 6 scenarios
@@ -18,7 +18,7 @@ Agentic OS installs into any project as a set of Markdown governance files plus 
 
 - Claude Code — native, `CLAUDE.md` entry point
 - OpenAI Codex — native, `AGENTS.md` entry point
-- Google Antigravity — native, intent router
+- Google Antigravity — native, `GEMINI.md` entry point + intent router
 - Cursor — compatible, `AGENTS.md` / project rules
 - GitHub Copilot — compatible, repository instructions
 - Any LLM agent — compatible, model-agnostic Markdown workflows
