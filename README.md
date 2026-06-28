@@ -2,8 +2,7 @@
 
 <p align="center">
   <strong>"Done." — your AI coding agent, about code it didn't test.</strong><br/>
-  A rules file <em>asks</em> your agent to behave. Agentic OS <strong>checks that it did</strong> — it catches the agent
-  skipping tests, skipping review, or shipping a leaked secret, through your git hooks, a validator, and CI rather than the agent's own word.
+  A rules file <em>asks</em> your agent to behave. Agentic OS <strong>checks that it did</strong> — leaked secrets and a green check over zero tests fail your git hooks and CI; a skipped review or phase shows up when the validator reads the work trail. Backstops you control, not the agent's own word.
 </p>
 
 <p align="center">
@@ -38,6 +37,10 @@ Or run a gate yourself, no install — the credential scan that catches a leaked
 ```sh
 bash demo/run.sh          # Windows (PowerShell): pwsh demo/run.ps1
 ```
+
+<p align="center">
+  <img src="docs/assets/demo-gate.gif" alt="Terminal recording of the real credential gate: an AI agent writes config.env containing a leaked aws_access_key_id and reports 'Done - config added.'; Agentic OS runs scan_credentials.py, which detects the credential with the value redacted, and the commit is BLOCKED — the agent said done, the machine said no. Reproduce with bash demo/run.sh." width="820"/>
+</p>
 
 <details>
 <summary>Full terminal output</summary>
@@ -78,9 +81,27 @@ A rules file — Cursor Rules, a plain `AGENTS.md` — is a prompt the agent can
 
 The third row is the part a rules file can't reach: `validate.sh` parses each task's work log and fails if a required phase was skipped or its evidence is missing. The local pre-commit hook is opt-in and you can `--no-verify` past it; CI is the floor that can't be skipped. The Security badge above is this repo running the same credential and SAST gates on its own every push.
 
+## Sits under what you already have
+
+Agentic OS is the enforcement layer. A rules file or a skill pack tells your agent how to behave; this is the part that checks it actually did - in your git hooks and CI, where the agent's own report doesn't get a vote. Already have those? Keep them. This sits underneath and turns the discipline they ask for into a check that can fail your commit or your build.
+
 ## Gated phases, scaled to risk
 
 Every task runs a gated workflow, and the rigor scales to the risk. Skip a phase and `validate.sh` fails — but a typo doesn't run the same gauntlet as a feature:
+
+```text
+  tiny-fix    classify --> execute --> evidence --> done
+  quick-win   bootstrap --> plan --> implement --> evidence --> ship
+  feature     bootstrap --> spec --> plan --> implement --> review --> test --> ship
+
+  And the ship gate is not a formality:
+
+  ship attempt --> [ no review/test evidence ] --> BLOCKED
+  ship attempt --> [ evidence on record ]      --> SHIPPED
+
+  The agent can still cut a corner. It just can't cut this one
+  past a check it doesn't control.
+```
 
 <p align="center">
   <img src="docs/assets/pipeline-demo.gif" alt="A diagram of the Agentic OS workflow: a tiny-fix task flows through a short three-step path (classify, execute, done) and ships, while a feature task runs the full gated pipeline (bootstrap, plan, implement, review, test, ship) and is blocked at the ship gate for skipping tests, then passes once the test evidence is recorded." width="820"/>

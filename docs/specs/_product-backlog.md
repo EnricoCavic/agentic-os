@@ -3,7 +3,7 @@ status: living
 title: Product Backlog
 source: governance-bloat-review-2026-04-12 + optimization-round-2026-05-04 + optimization-research-2026-06-02
 created: 2026-04-12
-last_updated: 2026-06-24
+last_updated: 2026-06-28
 ---
 
 # Product Backlog
@@ -63,6 +63,7 @@ Governance file bloat review (2026-04-12) identified 10 findings across P0–P2:
 | 94 | Rename drifted lifecycle-token test names — `test_quick_win_current_total_under_29k` asserts 30000 and `..._under_350k` asserts 354000 (name/assertion mismatch) | framework | test-hygiene | P3 | — | tiny-fix | Pending | — | — |
 | 95 | Delete orphaned + duplicate `docs/guides/superpowers-playbook.md` (+ its `.agent/workflows/` stub) — content duplicates the phase tables already in reference.md/READMEs; reachable only via the stub | docs | cleanup | P3 | — | tiny-fix | Pending | — | — |
 | 96 | Link `docs/ai-contributors.md` from a human-facing index (README Docs table or CONTRIBUTING) — human-facing contributor guide currently reachable only from copilot-instructions + a guard test | docs | discoverability | P3 | — | tiny-fix | Pending | — | — |
+| 97 | routing_actions staleness escalation — `validate.sh`/`.ps1` WARN on `status: pending` routing actions older than N days (config-driven, parallel to existing lock + spec-index staleness checks) so a cross-domain orphan can't sit unwatched; today routing_actions get field-validation + a ship-time check only for pending actions targeting the *current* primary_domain | framework | governance | P3 | — | quick-win | Pending | — | — |
 
 > Rows whose GH issue is CLOSED-premature (#7, #13, #18, #21, #33) are kept deliberately as
 > future directions — reopen the issue when a concrete signal appears (2026-06-02 curation).
@@ -74,6 +75,8 @@ Governance file bloat review (2026-04-12) identified 10 findings across P0–P2:
 > 2026-06-20 batch close-out: #84 shipped (PR #263). A cross-platform entry-point diagnosis + the README follow-ups spawned: **Copilot deploy parity** (PR #264 — `.github/copilot-instructions.md` now ships downstream), **ship.md Ship-History ordering fix** (PR #265), **#86 README de-dup prose** (PR #266), and the **using-git-worktrees Step-0 DO-NOW** from #83 (PR #267). **#86 → Shipped** (prose de-dup done; the GIF-unification half is a reopen-trigger — needs binary-asset re-render + visual verification we can't reliably do). **#83 → Cancelled** (skill content verified SOUND vs superpowers v6 by independent experts; broad "needs content optimization" premise disconfirmed; only the worktrees DO-NOW was actionable → PR #267; reopen only if a concise skill is shown to cause a real failure). **#85 stays Pending, blocked on owner Cursor access** — the Cursor compatibility *claim* is VERIFIED (Cursor natively reads AGENTS.md; PR #264 diagnosis), so the residual deliverable is a real in-Cursor screenshot/GIF (owner-only) + an optional Cursor platform guide + the `CLAUDE_PLATFORM_GUIDE.md` `_zh-TW` twin.
 
 > 2026-06-20 (zh-twin ship, branch `docs/claude-guide-zh-tw`): **#85 → Cancelled.** The `CLAUDE_PLATFORM_GUIDE_zh-TW.md` twin (the AI-doable residual) shipped, now deploys downstream (deploy.sh glob + managed[]), and is linked from the 繁中 README. Verified the **Cursor (AGENTS.md native read; README:159/195) + Copilot (`.github/copilot-instructions.md`, deployed #264) entry points already ship** — so an earlier "cancel Cursor support" framing was WRONG; what's cancelled is only the **owner-only in-Cursor screenshot/GIF** (owner has no Cursor — marketing polish, not a functional gap). **Reopen-trigger:** owner gains Cursor access + wants the visual. Cursor platform guide **declined** (thin; README/reference already document the Cursor entry). Spawned **#87** (INSTALL zh-TW twin — the #84 EN-only `docs/INSTALL.md` residual).
+
+> 2026-06-28: #97 surfaced by a governance-only comparison sweep against a reference implementation; verified absent here (routing_actions has field-validation + a ship-time current-domain check, but no age escalation — a pending action for a non-current domain can persist unwatched). Backlog-only per issue-exposure policy (small hardening of an existing gate, not feature-like; no observed incident → P3).
 
 ## Status Key
 
