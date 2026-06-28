@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.8.3] - 2026-06-28
+
+Patch release: downstream-adaptability honesty + hardening notes (PR #293), from a read-only 3-axis adaptability diagnosis. **Engine behavior unchanged** — docs + one bootstrap default.
+
+- **`skill-ecosystem.md` status note**: the doc read like a shipped registry/trust-tier/discovery *platform*; added a "direction vs shipped" callout — shipped = `manifest.yaml` + `custom-*` + the ADR-007 declaration seam; roadmap = auto-discovery / registry resolution / capability sandbox. Reaffirms third-party skills are opt-in, never auto-activated (ADR-007).
+- **`docs/INSTALL.md` monorepo note**: "one deploy = one project root" — the framework deliberately doesn't partition shared SSoT across sub-packages (ADR-004/005). Sets adopter expectations.
+- **`bootstrap.md` Owner default**: derive `Owner` from `git config user.name` (fallback session-id) so the multi-person collision key stays consistent.
+- Backlog #98–101 (SSoT section-append, partial-adoption on-ramp) + report-trigger issues #291 (autopilot fan-out lock) / #292 (foreign-skill opt-in detector) tracked from the research; not built (no verified consumer — evidence-before-adding).
+
 ## [1.8.2] - 2026-06-28
 
 Patch release: adoption + honesty. **Engine behavior unchanged** — docs/asset only.
