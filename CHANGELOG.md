@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.8.2] - 2026-06-28
+
+Patch release: adoption + honesty. **Engine behavior unchanged** — docs/asset only.
+
+**Honesty**
+- **Hero-line accuracy** (README): the landing pitch no longer implies CI catches skipped reviews/phases. Scoped to reality — leaked secrets and a green check over zero tests fail git hooks + CI; a skipped review or phase shows up when the validator reads the work trail (local). Matches the existing Rules-vs-enforcement table and the "machine-enforced, not self-report" positioning (removes an overclaim).
+
+**Adoption (README)**
+- **`docs/assets/demo-gate.gif`** + `demo/render_demo_gif.py`: a recording of the real `demo/run.sh` credential gate (an agent leaks an `aws_access_key_id` and reports "Done"; the scanner redacts the value and BLOCKS the commit), wired into the README "run a gate yourself" section *above* the clone — so a visitor watches the machine say no before deciding to adopt. Same PIL render pipeline as the existing GIFs; no new runtime dependency. (zh-TW GIF twin to follow.)
+- **Pipeline ASCII diagram** (README "Gated phases" section): a text-renderable companion to the pipeline GIF (shows in search snippets / no-image contexts) — the three risk-scaled lanes plus the ship-gate BLOCKED/SHIPPED truth-table.
+- **"Sits under what you already have"** positioning section: frames Agentic OS as the enforcement layer that complements an existing rules file or skill pack — by category, no named competitors.
+
+**Backlog**
+- #97 intake (routing_actions staleness escalation): a cross-domain `status: pending` routing action can sit unwatched (ship only resolves pending actions in the current `primary_domain`). Backlog-only hardening of an existing gate, no engine change.
+
 ## [1.8.1] - 2026-06-23
 
 Patch release: governance, KB seam, docs, and CI hardening wave. Packages #280–#284. **Adopters with no KB are behaviorally unaffected** — all engine behavior is unchanged; the eval, lifecycle, and CI changes are internal correctness fixes.

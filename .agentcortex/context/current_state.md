@@ -12,9 +12,9 @@
   - Active Work Log Path: derive <worklog-key> from the raw branch name using filesystem-safe normalization before any gate checks.
   - Workflows & Policies: `.agent/workflows/*.md`, `.agent/rules/*.md`
 - **Project Name**: (set by /app-init)
-- **Last Updated**: 2026-06-23T16:00:00+08:00
-- **Last Verified**: 2026-06-23
-- **Update Sequence**: 92
+- **Last Updated**: 2026-06-28T16:00:00+08:00
+- **Last Verified**: 2026-06-28
+- **Update Sequence**: 93
 - **ADR Index**:
   - docs/adr/ADR-001-governance-friction-tuning.md — ADR-001: Governance Friction Tuning, accepted 2026-04-23
   - docs/adr/ADR-002-guarded-governance-writes.md — ADR-002: Guarded Governance Writes (lock unification + CI lint + lifecycle frontmatter), accepted 2026-04-25
@@ -100,6 +100,10 @@
 - [Category: rule-placement][Severity: HIGH][Trigger: authoring-safety-rule-or-auditing-rule-surfaces][prev: 3b15e10b] Sort SAFETY rules by hazard reachability, not token cost. A rule that must hold during a 30-second out-of-phase action (destructive commands, secrets, untrusted tool output) MUST live on the always-loaded surface (AGENTS.md Core Directives invariant cluster, cap ~5) - phase/tier-scoped files and platform adapters are probabilistic gates, and a probabilistic gate on an irreversible failure is a design error regardless of token savings. Confirmed 2026-06-11: 'Destructive Command Blocking' was advertised in both READMEs and machine-guarded in ADAPTER copies (validators checked Codex/Antigravity retained it!) while the canonical loaded surface had nothing - a downstream rm -rf cascade destroyed a parent repo working tree. Placement test for every new MUST: hazard reachable from any tool call AND irreversible/exfiltrating -> always-loaded; else phase surface is fine but README/docs must not claim it is always-on.
 - [Category: eval-mapping][Severity: MEDIUM][Trigger: adding-or-retargeting-eval-protects-tag][prev: 14ac98ca] An eval case can silently guard an EMPTY rule: protects-tags resolve at section level, so a case pointing at a section that contains no text for the behavior it tests still 'resolves' and scores green off the model's general training - verifier-without-defense, the inverse of advertised-but-unenforced. Confirmed 2026-06-11: prompt-injection-in-tool-output protected 'AGENTS.md Core Directives' which contained zero injection text for ~2 months. Discipline: when ADDING a rule, land the guarding case in the SAME commit; when ADDING/RETARGETING a case, quote the exact rule sentence it protects in the PR description - if you cannot quote it, the rule does not exist and the case is theatre.
 ## Ship History
+
+### Ship-chore-v1.8.2-release-2026-06-28
+- **Branch `feat/preclone-proof-and-validator-honesty`** (quick-win, docs/adoption; tag `v1.8.2`) — Patch release: adoption + honesty, **no engine change**. (1) README hero-line scoped honestly — removed the implication that CI/the validator catch skipped reviews/phases; now: leaked secrets + zero-test green checks fail git hooks + CI, a skipped review/phase shows up when the validator reads the work trail (local). Aligns the pitch with the existing Rules-vs-enforcement table + the machine-enforced-not-self-report positioning (an honesty fix surfaced by a self-directed red-team of our own thesis-vs-wiring). (2) Pre-clone proof: `docs/assets/demo-gate.gif` + `demo/render_demo_gif.py` render the real `demo/run.sh` credential gate (agent leaks `aws_access_key_id` → scanner redacts + BLOCKS), wired into the README "run a gate yourself" section above the clone (the proof now sits in front of the clone decision, not behind it). Same PIL pipeline as the existing GIFs. (3) Backlog #97 intake (routing_actions staleness escalation). Version banners 1.8.1→1.8.2 (deploy.sh, CITATION.cff, Model Guide EN+zh, Testing Protocol EN+zh, antigravity-v5-runtime.md); CHANGELOG [1.8.2]; SSoT sequence 92→93. Follow-ups (NOT in this release): #6 `--no-python` reduced-assurance banner (gate-file change → own PR), zh-TW GIF twin.
+- Tests: validate.sh CI-equiv + README content-pin pytest (see PR).
 
 ### Ship-chore-v1.8.1-release-2026-06-23
 - Feature shipped: v1.8.1 patch release packaging PRs #280-#284 (governance eval hardening, ADR-010 frozen-spec lifecycle, KB absent-cost honesty + wiring probes, schema-v4 manifest accelerators, Windows pytest sharding). Version banners 1.8.0→1.8.1 across deploy.sh, CITATION.cff, Model Guide EN+zh, Testing Protocol EN+zh, antigravity-v5-runtime.md; CHANGELOG [1.8.1]; SSoT sequence 91→92. No engine/test/logic change.
