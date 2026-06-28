@@ -26,7 +26,7 @@ TARGET="${TARGET:-.}"
 TARGET="${TARGET%/}"
 
 MANIFEST_FILE="$TARGET/.agentcortex-manifest"
-ACX_VERSION="1.8.3"
+ACX_VERSION="1.8.4"
 
 # --- Self-deploy guard ---
 TARGET_ABS="$(cd "$TARGET" 2>/dev/null && pwd || echo "$TARGET")"
@@ -271,8 +271,10 @@ _deploy_file_now() {
                     cp ${CP_FLAG:+"$CP_FLAG"} "$src" "$dst.acx-incoming"
                     echo "  [SKIP] $rel (pre-existing/migrated; new version at $rel.acx-incoming — merge manually or ask AI agent to merge)"
                     COUNT_SKIPPED=$((COUNT_SKIPPED + 1))
-                    # Record the user's current normalized hash so future updates detect modification.
-                    record_deployed "$tier" "$rel" "$dst_hash"
+                    # Record the upstream baseline, never the preserved user hash.
+                    # Otherwise the next deploy treats unchanged user bytes as
+                    # framework-unmodified and overwrites them without a sidecar.
+                    record_deployed "$tier" "$rel" "$src_hash"
                     return 0
                 fi
                 # Same content — no-op; record the matching hash for future runs.
@@ -310,8 +312,10 @@ _deploy_file_now() {
                 cp ${CP_FLAG:+"$CP_FLAG"} "$src" "$dst.acx-incoming"
                 echo "  [SKIP] $rel (pre-existing; new version at $rel.acx-incoming — merge manually or ask AI agent to merge)"
                 COUNT_SKIPPED=$((COUNT_SKIPPED + 1))
-                # Record the USER's current normalized hash so future updates detect modification.
-                record_deployed "$tier" "$rel" "$dst_hash"
+                # Record the upstream baseline, never the preserved user hash.
+                # Otherwise the next deploy treats unchanged user bytes as
+                # framework-unmodified and overwrites them without a sidecar.
+                record_deployed "$tier" "$rel" "$src_hash"
                 return 0
             fi
             # Same content — safe to let it be (no cp needed since identical)

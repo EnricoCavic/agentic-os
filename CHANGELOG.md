@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.8.4] - 2026-06-28
+
+Patch release: **deploy data-loss fix** (confirmed live in v1.8.3).
+
+When deploy preserves a pre-existing scaffold/wrapper file that was absent from the old manifest, it recorded the *user's* hash as the baseline. The next deploy then treated the unchanged user bytes as framework-unmodified and could silently overwrite the user's customization. Fix: record the **upstream source hash** as the baseline at the two skip-preserve points, so future updates correctly detect the file as user-customized and preserve it (with a `.acx-incoming` sidecar).
+
+- `deploy.sh`: record `$src_hash` (upstream baseline), not `$dst_hash` (user hash), when skipping a preserved pre-existing file.
+- `tests/ci/test_deploy_tiering.py`: regression `test_preexisting_sidecar_file_stays_preserved_across_repeated_deploys` → suite **26 passed**.
+- Provenance: fix authored by Codex (cherry-picked from a deferred downstream-hotfix branch that was rolled back to CLASSIFIED for exceeding the hotfix size threshold; the eval/KB parts of that bundle shipped in v1.8.1, the deploy fixes did not). Necessity re-verified against v1.8.3. Follow-ons: §legacy poisoned-manifest migration → backlog; CP_FLAG core-backup → already shipped in main.
+
 ## [1.8.3] - 2026-06-28
 
 Patch release: downstream-adaptability honesty + hardening notes (PR #293), from a read-only 3-axis adaptability diagnosis. **Engine behavior unchanged** — docs + one bootstrap default.
