@@ -16,6 +16,14 @@ lifecycle:
 > This is the current strategic direction for Agentic OS skill evolution.
 > Decision history is in `docs/architecture/skill-ecosystem.log.md` (L2 — append-only).
 
+> **Status — direction vs shipped (read first).** This doc describes *direction*, not all-shipped state.
+> **Shipped today:** the `manifest.yaml` schema + lockfile tooling, `custom-*` skill declaration, and the
+> ADR-007 `downstream-capabilities.yaml` activation seam (opt-in, gate-capped). **Roadmap (NOT wired into
+> runtime):** auto-discovery of third-party skills, registry resolution, and the capability sandbox — see
+> the Near/Mid/Longer-Term sections below. By design the framework requires **opt-in declaration** and does
+> **not** auto-activate undeclared third-party skills (ADR-007: auto-activating unvetted skill descriptions
+> is an untrusted-activation surface).
+
 ## Current Direction
 
 Agentic OS should evolve from a repo that merely ships built-in skills into a **skill platform** that can safely absorb:

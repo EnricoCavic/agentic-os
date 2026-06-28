@@ -219,7 +219,7 @@ Write to `.agentcortex/context/work/<worklog-key>.md`:
 - `Classified by`: [AI Name]
 - `Frozen`: true
 - `Created Date`: [Date]
-- `Owner`: [user-name or session-id] — *(required for multi-person; see §11.1)*
+- `Owner`: [user-name or session-id] — *(required for multi-person; see §11.1)*. **Default**: if not explicitly provided, derive from `git config user.name`; fall back to session-id when unset (CI/headless). A consistent owner is the multi-person collision key — avoid ad-hoc free-text values.
 - `Guardrails Mode`: [Full|Quick|Lite] — *(auto-derived from classification per `engineering_guardrails.md` Reading Mode. Full for feature/architecture-change/hotfix, Quick for quick-win, Lite for tiny-fix.)*
 - `Current Phase`: bootstrap — *(updated by each workflow on entry; see §2b Phase Tracking.)*
 - `Checkpoint SHA`: N/A — *(`/implement` records HEAD before code changes; later phases SHOULD refresh after new commits.)*
