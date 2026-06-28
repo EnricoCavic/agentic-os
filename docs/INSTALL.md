@@ -39,6 +39,8 @@ bash installers/deploy_brain.sh .
 
 > **Existing files won't be overwritten.** If your project already has `AGENTS.md`, `CLAUDE.md`, or other framework-managed files, they are preserved. The new framework version is saved as `<filename>.acx-incoming` sidecar. Review and merge manually — or ask your AI agent: *"Merge each .acx-incoming into its target, preserving my project-specific content and adopting framework updates."*
 
+> **Monorepo / multi-package?** One deploy governs **one project root** — a single `.agentcortex/` state machine (SSoT, Work Logs, specs) at the target you pass. Agentic OS deliberately does **not** partition shared state across sub-packages (ADR-004/005). For a monorepo, either pick one governed root, or deploy per-package (each sub-project gets its own independent `.agentcortex/`); sibling deploys don't share SSoT.
+
 > **AI-agent install:** If you're asking an AI assistant to install Agentic OS, point it to this file. The commands above are deterministic — no platform-specific heuristics required.
 
 **Optional local pre-commit validation:** enable the bundled Git hook sample to run Agentic OS validation before each commit.
