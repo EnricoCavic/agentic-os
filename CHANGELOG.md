@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.8.5] - 2026-06-28
+
+Patch release: **validator fail-closed hardening** (defense-in-depth, not a live exploit).
+
+The `downstream-capabilities gate-safety` check in `validate.sh`/`.ps1` previously **SKIPped** ("safe to ignore") whenever the capabilities validator tool was absent — even when an active `downstream-capabilities.yaml` was present and therefore could not be verified. It now **FAILs** when an active config exists but the validator is missing (fail-closed), directing the user to re-run deploy. Runtime enforcement was already fail-closed (bootstrap §1b applies the capability ceiling regardless), so this closes a *validate-time* defense-in-depth gap, not a runtime exploit.
+
+- `validate.sh` + `validate.ps1`: active config + missing validator → FAIL (was SKIP).
+- `tests/ci/test_validator_false_positives.py`: regression + sh/ps1 parity (suite 21 passed).
+- Provenance: Codex-authored (cherry-picked from the same deferred downstream-hotfix bundle as the v1.8.4 deploy fix). Audit of the remaining bundle complete: KB-eval already shipped via v1.8.1 #280; capability-schema type-checks already fail-closed in main (not needed); legacy poisoned-manifest migration → backlog #102; CP_FLAG core-backup already in main.
+
 ## [1.8.4] - 2026-06-28
 
 Patch release: **deploy data-loss fix** (confirmed live in v1.8.3).
