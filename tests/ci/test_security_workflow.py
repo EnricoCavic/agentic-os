@@ -299,6 +299,53 @@ class TestDependencyAuditJob(unittest.TestCase):
         )
 
 
+class TestCredentialScanFailClosed(unittest.TestCase):
+    """AC-8: credential-scan step must fail-closed on rc==3 (scanner execution error)."""
+
+    def setUp(self):
+        wf = _load_workflow()
+        self.job = (wf.get("jobs") or {}).get("credential-scan", {})
+
+    def test_ac8_credential_scan_job_exists(self):
+        self.assertTrue(self.job, "jobs.credential-scan missing")
+
+    def test_ac8_rc3_not_exit_zero(self):
+        """rc==3 (scanner could not run) must NOT be exit 0 — fail-closed required."""
+        run_steps = [s.get("run", "") for s in (self.job.get("steps") or [])]
+        combined = "\n".join(run_steps)
+        # Find the rc==3 branch — must exist and must NOT exit 0.
+        self.assertIn(
+            '"3"', combined,
+            "credential-scan step must handle rc==3 (scanner execution error)",
+        )
+        # Locate the rc==3 block and verify it does not contain a bare 'exit 0'.
+        # Split on the rc==3 guard, take the first block after it.
+        parts = combined.split('"3"')
+        self.assertGreater(
+            len(parts), 1,
+            "rc==3 guard not found in credential-scan step",
+        )
+        rc3_block = parts[1]
+        # The block ends at the next `fi` (end of if block). Extract up to that.
+        fi_pos = rc3_block.find("\n          fi\n")
+        if fi_pos != -1:
+            rc3_block = rc3_block[:fi_pos]
+        self.assertNotIn(
+            "exit 0", rc3_block,
+            "credential-scan: rc==3 branch must NOT exit 0 — must fail-closed (AC-8)",
+        )
+
+    def test_ac8_base_sha_missing_still_exits_zero(self):
+        """The base-sha-missing path (nothing to scan) must keep exit 0 — that is legitimate."""
+        run_steps = [s.get("run", "") for s in (self.job.get("steps") or [])]
+        combined = "\n".join(run_steps)
+        # The base-sha guard precedes the actual scan — it exits 0 legitimately.
+        self.assertIn(
+            "exit 0", combined,
+            "credential-scan: base-sha-missing path must still exit 0 (nothing to scan — AC-8)",
+        )
+
+
 class TestDependencyAuditCIManifest(unittest.TestCase):
     """AC-9: pip-audit must also scan .github/requirements-ci.txt (the repo's only real Python manifest)."""
 

@@ -137,8 +137,13 @@ jobs:
           rc=0
           python .agentcortex/tools/scan_credentials.py --range "${base}...${head}" || rc=$?
           if [ "$rc" = "3" ]; then
-            echo "::warning::credential-scan: scan could not run (git error) — relying on TruffleHog backstop"
-            exit 0
+            # rc==3 means the scanner itself could not run (git/tooling error).
+            # Fail-closed: an execution error is NOT a clean scan — surface it so
+            # the PR cannot silently merge with an unverified credential check.
+            # (The base-sha-missing path above already exits 0 — that is the
+            # legitimate "nothing to scan" case; this is a runtime failure.)
+            echo "::error::credential-scan: scanner execution error (git diff failed) — failing closed. Investigate CI environment or re-run."
+            exit 1
           fi
           exit "$rc"
 
