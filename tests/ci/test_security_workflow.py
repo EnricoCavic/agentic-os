@@ -299,6 +299,24 @@ class TestDependencyAuditJob(unittest.TestCase):
         )
 
 
+class TestDependencyAuditCIManifest(unittest.TestCase):
+    """AC-9: pip-audit must also scan .github/requirements-ci.txt (the repo's only real Python manifest)."""
+
+    def setUp(self):
+        wf = _load_workflow()
+        self.job = (wf.get("jobs") or {}).get("dependency-audit", {})
+
+    def test_ac9_ci_requirements_manifest_included(self):
+        run_steps = [s.get("run", "") for s in (self.job.get("steps") or [])]
+        combined = "\n".join(run_steps)
+        self.assertIn(
+            ".github/requirements-ci.txt",
+            combined,
+            "dependency-audit must include .github/requirements-ci.txt "
+            "(the repo's only real Python manifest — AC-9)",
+        )
+
+
 class TestVersionPinningGlobal(unittest.TestCase):
     """AC-5: no floating refs anywhere in the workflow file."""
 
