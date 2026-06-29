@@ -1021,6 +1021,18 @@ ACTIVE_WORKLOG_FAIL_THRESHOLD="${ACTIVE_WORKLOG_FAIL_THRESHOLD:-12}"
 ARCHIVE_SIZE_WARN_KB="${ARCHIVE_SIZE_WARN_KB:-10240}"
 WORKLOG_GATE_EVIDENCE_LEGACY_CUTOFF="${WORKLOG_GATE_EVIDENCE_LEGACY_CUTOFF:-2026-03-25}"
 WORKLOG_DIR="$ROOT/.agentcortex/context/work"
+# AC-6: resolve current-branch worklog key once (slash→dash normalization).
+# Detached HEAD, no git, or git unavailable → cur_key="" (safe degrade: all logs treated as historical).
+cur_key=""
+if command -v git >/dev/null 2>&1 && git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+  # Use symbolic-ref --short first: works on empty repos (no commits yet).
+  # Fall back to rev-parse --abbrev-ref for detached-HEAD scenarios where symbolic-ref fails.
+  _cur_branch="$(git -C "$ROOT" symbolic-ref --short HEAD 2>/dev/null)" \
+    || _cur_branch="$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null)" || true
+  if [[ -n "$_cur_branch" && "$_cur_branch" != "HEAD" ]]; then
+    cur_key="${_cur_branch//\//-}"
+  fi
+fi
 if [[ -d "$WORKLOG_DIR" ]]; then
   worklog_warnings=0
   worklog_count=0
@@ -1097,9 +1109,23 @@ if [[ -d "$WORKLOG_DIR" ]]; then
   handoff_resume_incomplete=0
   hotfix_ship_no_evidence=0
   adr_coverage_undocumented=0
+  # AC-6: current-branch gate invariant FAIL counter.
+  # Covers Resume block absent/incomplete + Test Gate Results missing at handoff/ship.
+  # ONE new native record_result FAIL site handles both (baseline +1).
+  current_branch_gate_fail=0
+  current_branch_gate_fail_list=""
   for wl in "$WORKLOG_DIR"/*.md; do
     [[ -f "$wl" ]] || continue
     wl_content="$(cat "$wl" 2>/dev/null)"
+    # AC-6: determine whether this Work Log is the current-branch log.
+    # Match <cur_key>.md OR <owner>-<cur_key>.md (owner prefix pattern).
+    is_current_branch=0
+    if [[ -n "$cur_key" ]]; then
+      wl_basename="$(basename "$wl")"
+      if [[ "$wl_basename" == "${cur_key}.md" ]] || [[ "$wl_basename" == *"-${cur_key}.md" ]]; then
+        is_current_branch=1
+      fi
+    fi
     created_date="$(printf '%s' "$wl_content" | sed -n 's/^- \*\*Created Date\*\*:[[:space:]]*//p' | head -n 1 | tr -d '\r')"
     legacy_gate_evidence=0
     if [[ -n "$created_date" ]] && [[ "$created_date" < "$WORKLOG_GATE_EVIDENCE_LEGACY_CUTOFF" ]]; then
@@ -1390,8 +1416,8 @@ PYEOF
     fi
     # Test Gate Results — engineering_guardrails.md §12.2 requires evidence be recorded
     # under "Test Gate Results" for feature/architecture-change work logs that have
-    # reached the implement or later phase. WARN-only: converts §12.2 from honor-system
-    # to auditable evidence requirement.
+    # reached the implement or later phase. WARN-only for historical logs.
+    # AC-6: FAIL for current-branch log when at handoff/ship phase without Test Gate Results.
     # Parse classification from list form ("- Classification:") or table form ("| Classification |")
     if [[ -n "$PYTHON_BIN" ]]; then
       # Python via single-quoted heredoc -> variable (verbatim; no bash metachar parsing)
@@ -1411,7 +1437,20 @@ PYEOF
     if [[ "$wl_class" == "feature" || "$wl_class" == "architecture-change" ]]; then
       if printf '%s' "$wl_content" | grep -qi 'Gate: implement'; then
         if ! printf '%s' "$wl_content" | grep -qiE '^#+[[:space:]]+Test Gate Results'; then
-          test_gate_results_missing=$((test_gate_results_missing + 1))
+          # AC-6: current-branch at handoff/ship → FAIL; otherwise WARN.
+          # Use gate-receipt presence only here (wl_phase_for_resume is set later in this iteration).
+          wl_at_handoff_ship=0
+          if [[ "$is_current_branch" -eq 1 ]]; then
+            if printf '%s' "$wl_content" | grep -qiE 'Gate:[[:space:]]*(handoff|ship)[[:space:]]*\|[^|]*Verdict:[[:space:]]*PASS'; then
+              wl_at_handoff_ship=1
+            fi
+          fi
+          if [[ "$wl_at_handoff_ship" -eq 1 ]]; then
+            current_branch_gate_fail=$((current_branch_gate_fail + 1))
+            current_branch_gate_fail_list="${current_branch_gate_fail_list}  $(basename "$wl"): Test Gate Results section missing (required for architecture-change/feature at handoff/ship)\n"
+          else
+            test_gate_results_missing=$((test_gate_results_missing + 1))
+          fi
         fi
       fi
     fi
@@ -1461,10 +1500,12 @@ PYEOF
         reclassify_header_not_reset=$((reclassify_header_not_reset + 1))
       fi
     fi
-    # Finding 5 (MEDIUM): Handoff Resume Block completeness — prose rule (handoff.md §1a)
+    # Finding 5 (MEDIUM/HIGH): Handoff Resume Block completeness — prose rule (handoff.md §1a)
     # requires all sub-sections only once feature/architecture-change work reaches
     # handoff/ship. The Work Log template's pre-handoff `Resume: none` placeholder
     # is valid and quick-win/hotfix paths are exempt from /handoff.
+    # AC-6: current-branch + resume_required + (absent ## Resume OR missing subsections) → FAIL.
+    #        historical or present-with-incomplete → WARN.
     wl_phase_for_resume="$(printf '%s' "$wl_content" | grep -m1 -iE '^-[[:space:]]*\*?\*?Current Phase\*?\*?:' \
       | sed 's/.*Current Phase[^:]*:[[:space:]]*//' | tr -d '`\r' | tr '[:upper:]' '[:lower:]' | xargs)" || true
     resume_required=0
@@ -1474,16 +1515,31 @@ PYEOF
         resume_required=1
       fi
     fi
-    if [[ "$resume_required" -eq 1 ]] && printf '%s' "$wl_content" | grep -q '^## Resume'; then
-      resume_body="$(printf '%s' "$wl_content" | sed -n '/^## Resume/,/^## /p')"
-      missing_subsections=0
-      for subsec in "Read Map" "Skip List" "Context Snapshot"; do
-        if ! printf '%s' "$resume_body" | grep -qiE "^###[[:space:]]+${subsec}"; then
-          missing_subsections=$((missing_subsections + 1))
+    if [[ "$resume_required" -eq 1 ]]; then
+      if ! printf '%s' "$wl_content" | grep -q '^## Resume'; then
+        # AC-6: absent ## Resume section when required
+        if [[ "$is_current_branch" -eq 1 ]]; then
+          current_branch_gate_fail=$((current_branch_gate_fail + 1))
+          current_branch_gate_fail_list="${current_branch_gate_fail_list}  $(basename "$wl"): ## Resume section absent (required for architecture-change/feature at handoff/ship)\n"
+        else
+          handoff_resume_incomplete=$((handoff_resume_incomplete + 1))
         fi
-      done
-      if [[ "$missing_subsections" -gt 0 ]]; then
-        handoff_resume_incomplete=$((handoff_resume_incomplete + 1))
+      else
+        resume_body="$(printf '%s' "$wl_content" | sed -n '/^## Resume/,/^## /p')"
+        missing_subsections=0
+        for subsec in "Read Map" "Skip List" "Context Snapshot"; do
+          if ! printf '%s' "$resume_body" | grep -qiE "^###[[:space:]]+${subsec}"; then
+            missing_subsections=$((missing_subsections + 1))
+          fi
+        done
+        if [[ "$missing_subsections" -gt 0 ]]; then
+          if [[ "$is_current_branch" -eq 1 ]]; then
+            current_branch_gate_fail=$((current_branch_gate_fail + 1))
+            current_branch_gate_fail_list="${current_branch_gate_fail_list}  $(basename "$wl"): ## Resume missing required sub-sections (Read Map, Skip List, Context Snapshot)\n"
+          else
+            handoff_resume_incomplete=$((handoff_resume_incomplete + 1))
+          fi
+        fi
       fi
     fi
     # Finding 13 (MEDIUM): hotfix fast-path evidence check — hotfix is exempt from
@@ -1581,6 +1637,13 @@ PYEOF
     record_result WARN "work logs with ## Resume section missing required sub-sections (handoff.md §1a — Read Map, Skip List, Context Snapshot required): ${handoff_resume_incomplete}"
   elif [[ "$worklog_count" -gt 0 ]]; then
     record_result PASS "handoff Resume Blocks have required sub-sections where present"
+  fi
+  # AC-6: single FAIL record_result covering current-branch Resume + Test-Gate-Results invariants.
+  # Only fires when the current branch has a Work Log that is missing required evidence at handoff/ship.
+  # Historical logs and pre-handoff logs remain WARN (not counted here).
+  if [[ "$current_branch_gate_fail" -gt 0 ]]; then
+    record_result FAIL "current-branch work log missing required gate evidence at handoff/ship (AC-6 — Resume block and/or Test Gate Results absent): ${current_branch_gate_fail}"
+    printf '%b' "$current_branch_gate_fail_list"
   fi
   if [[ "$hotfix_ship_no_evidence" -gt 0 ]]; then
     record_result WARN "hotfix work logs shipped without ## Evidence (hotfix fast-path still requires diff + behavior verification per handoff.md §Trigger Conditions): ${hotfix_ship_no_evidence}"
