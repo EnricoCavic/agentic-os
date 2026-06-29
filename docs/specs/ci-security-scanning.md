@@ -14,7 +14,7 @@ Backlog item #20 — P1, security/ci.
 
 ## Goal
 
-Add automated security scanning to GitHub Actions CI so every PR to `main` is checked for code-level vulnerabilities (SAST), leaked credentials (secret detection), and known-CVE dependencies — before merge, with no human opt-in required.
+Add automated security scanning to GitHub Actions CI so every PR to `main` is checked for code-level vulnerabilities (SAST), leaked credentials (secret detection), and known-CVE dependencies. The security jobs run on every PR and push to `main` and are visible in the PR checks panel, but they are **not required merge checks** unless branch protection is explicitly configured to require them (see `docs/INSTALL.md §Turn on the CI floor`). The three required merge checks for this repo are `Framework Validation`, `ShellCheck`, and `Check Markdown Links`.
 
 ## Acceptance Criteria
 

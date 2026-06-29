@@ -379,6 +379,49 @@ class TestVersionPinningGlobal(unittest.TestCase):
         )
 
 
+class TestClaimsVsReality(unittest.TestCase):
+    """AC-7 (dev-flow-hardening): security spec must not overstate enforcement reality.
+
+    The security jobs run on every PR but are NOT required merge checks (branch
+    protection only requires Framework Validation, ShellCheck, Check Markdown Links).
+    The spec Goal must not claim security runs 'before merge … no human opt-in required'
+    as an unconditional guarantee.
+    """
+
+    _SPEC = ROOT / "docs" / "specs" / "ci-security-scanning.md"
+    # Phrases that incorrectly imply security is an unconditional pre-merge gate.
+    _FALSE_GATE_PHRASES = [
+        "before merge, with no human opt-in required",
+    ]
+
+    def test_ac7_spec_goal_does_not_claim_unconditional_pre_merge_gate(self):
+        if not self._SPEC.exists():
+            self.skipTest(f"Spec not found: {self._SPEC}")
+        content = self._SPEC.read_text(encoding="utf-8")
+        for phrase in self._FALSE_GATE_PHRASES:
+            self.assertNotIn(
+                phrase,
+                content,
+                f"ci-security-scanning.md Goal must not claim security is an unconditional "
+                f"pre-merge required gate (found: {phrase!r}). Security jobs are advisory "
+                f"unless branch protection requires them. (AC-7)",
+            )
+
+    def test_ac7_spec_documents_required_checks(self):
+        """Spec must document the actual required check set for this repo."""
+        if not self._SPEC.exists():
+            self.skipTest(f"Spec not found: {self._SPEC}")
+        content = self._SPEC.read_text(encoding="utf-8")
+        required_checks = ["Framework Validation", "ShellCheck", "Check Markdown Links"]
+        for check in required_checks:
+            self.assertIn(
+                check,
+                content,
+                f"ci-security-scanning.md must document the actual required merge check "
+                f"{check!r} so readers understand the real enforcement floor (AC-7)",
+            )
+
+
 class TestWorkflowIsolation(unittest.TestCase):
     """AC-10: security.yml is a separate file; security jobs do not bleed into validate.yml."""
 

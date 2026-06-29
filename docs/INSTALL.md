@@ -181,6 +181,19 @@ the floor, it does not make a bypass impossible; (3) keep the `setup-python` ste
 or the validator degrades to advisory `WARN`s and won't fail the build (see
 [Prerequisites](#prerequisites) for no-Python mode).
 
+> **Maintainer note — making security a required merge check (this repo):**
+> The `agentic-os` repo's branch protection currently requires exactly three checks:
+> `Framework Validation`, `ShellCheck`, and `Check Markdown Links`. The security
+> scanning jobs (`semgrep`, `trufflehog`, `credential-scan`, `dependency-audit`) run
+> on every PR and are visible in the checks panel, but they are **not** required merge
+> checks. To make them required: add each job name to the branch-protection required
+> status checks list (Settings → Branches → Branch protection rules → "Require status
+> checks to pass"). Important caveat for `semgrep`: the Semgrep job is gated on the
+> `changes` classifier (`heavy=true`) and is skipped on docs-only PRs. Requiring it as
+> a merge check would block docs-only PRs when the job is skipped (GitHub treats a
+> skipped required check as failing unless you use `if: always()` or rulesets with skip
+> semantics). Evaluate whether that trade-off is acceptable before requiring it.
+
 ## Customizing without conflicts (fork or clone)
 
 However you adopt Agentic OS — **fork** the repo, or **clone + `deploy_brain.sh`** into your project — the same rule keeps upgrades painless: **add your own files; never edit framework-owned files in place.** Put your customizations where the framework guarantees never to touch them, and they survive both `git pull upstream` (fork) and the next `deploy` (clone):
