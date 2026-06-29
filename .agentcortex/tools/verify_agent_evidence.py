@@ -89,6 +89,15 @@ def parse_args() -> argparse.Namespace:
         default=[],
         help="Explicit work log path to verify (can be repeated)",
     )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        default=False,
+        help=(
+            "Exit 1 (FAIL) when opted-in but no changed Work Log mirror is found, "
+            "instead of the default exit 0 (WARN)."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -397,19 +406,32 @@ def gha_annotate(level: str, message: str, path: Path | None = None) -> None:
         print(f"::{level} file={path.as_posix()}::{message}")
 
 
-def emit_skip_warning(changed: list[str], *, opted_in: bool) -> None:
+def emit_skip_warning(changed: list[str], *, opted_in: bool, strict: bool = False) -> None:
     if not changed:
+        # No diff context at all — not a CI diff run, silent pass.
         print("No changed reviewable Work Logs found.")
         return
     if not opted_in:
-        print("No changed reviewable Work Logs found; PR-visible evidence checks are not enabled for this repo.")
+        # Repo has not opted into review mirrors: skip with reduced-assurance note.
+        print(
+            "SKIP: No review mirror directory found. "
+            "Evidence verification skipped (reduced assurance) — "
+            f"opt in by creating `{REVIEWABLE_WORKLOG_DIR}` with a `.gitkeep` file."
+        )
         return
+    # Repo opted in but no Work Log mirror was changed in this diff.
     message = (
-        "No changed reviewable Work Logs found. Evidence verification was skipped; "
-        f"commit a mirror under `{REVIEWABLE_WORKLOG_DIR}` if this repo opts into PR-visible evidence checks."
+        "No changed reviewable Work Log mirrors found. "
+        "Evidence verification skipped for this diff"
+        f" (commit a mirror under `{REVIEWABLE_WORKLOG_DIR}` to enable PR-visible evidence checks). "
+        "Pass --strict to treat this as a FAIL."
     )
-    print(f"WARNING: {message}")
-    gha_annotate("warning", message)
+    if strict:
+        print(f"FAIL: {message}")
+        gha_annotate("error", message)
+    else:
+        print(f"WARNING: {message}")
+        gha_annotate("warning", message)
 
 
 def main() -> int:
@@ -427,7 +449,10 @@ def main() -> int:
     opted_in = review_mirror_opted_in(root)
 
     if not work_logs:
-        emit_skip_warning(changed, opted_in=opted_in)
+        emit_skip_warning(changed, opted_in=opted_in, strict=args.strict)
+        # Strict mode + opted-in + no mirror changed = FAIL.
+        if args.strict and opted_in and changed:
+            return 1
         return 0
 
     high_lessons = load_high_lessons(state_path)
@@ -440,7 +465,8 @@ def main() -> int:
 
     for log_path in work_logs:
         if not log_path.is_file():
-            errors.append(f"{log_path}: missing active Work Log file.")
+            # Explicit --path to a file that does not exist: FAIL (uninspectable evidence = no assurance).
+            errors.append(f"{log_path}: Work Log file not found; cannot verify evidence (FAIL — explicit path must be inspectable).")
             continue
         work_log = parse_work_log(log_path)
         relative_path = log_path.relative_to(root)

@@ -365,7 +365,9 @@ class VerifyAgentEvidenceTests(unittest.TestCase):
             head_sha,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("PR-visible evidence checks are not enabled", result.stdout)
+        # AC-5: not-opted-in must say "SKIP" and "reduced assurance" (not imply inspection happened)
+        self.assertIn("SKIP", result.stdout)
+        self.assertIn("reduced assurance", result.stdout)
 
     def test_diff_mode_warns_when_opted_in_repo_skips_reviewable_log_update(self) -> None:
         git(self.root, "init")
@@ -394,7 +396,9 @@ class VerifyAgentEvidenceTests(unittest.TestCase):
             head_sha,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("Evidence verification was skipped", result.stdout)
+        # AC-5: opted-in but no mirror changed must say WARNING and "skipped" (not "was skipped" — old misleading form)
+        self.assertIn("WARNING", result.stdout)
+        self.assertIn("skipped", result.stdout.lower())
 
     def test_suspicious_evidence_argument_is_marked_unverified(self) -> None:
         write_file(
@@ -421,6 +425,98 @@ class VerifyAgentEvidenceTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Verified `python -m pytest -q test_sample.py --tb=short`", result.stdout)
         self.assertIn("UNVERIFIED: command `python -m pytest /etc/passwd` contains suspicious arguments.", result.stdout)
+
+
+    # AC-5: --strict flag behavior -------------------------------------------
+
+    def test_strict_opted_in_no_mirror_changed_exits_1(self) -> None:
+        """AC-5 strict: opted-in repo with changed non-mirror files -> exit 1."""
+        git(self.root, "init")
+        git(self.root, "config", "user.email", "codex@example.com")
+        git(self.root, "config", "user.name", "Codex")
+        # Create opt-in marker
+        write_file(self.root / ".agentcortex/context/review/.gitkeep", "")
+        write_file(self.root / "README.md", "baseline\n")
+        git(self.root, "add", ".")
+        git(self.root, "commit", "-m", "baseline")
+        base_sha = git(self.root, "rev-parse", "HEAD").stdout.strip()
+
+        write_file(self.root / "README.md", "updated\n")
+        git(self.root, "add", "README.md")
+        git(self.root, "commit", "-m", "docs change")
+        head_sha = git(self.root, "rev-parse", "HEAD").stdout.strip()
+
+        result = run_tool(
+            self.root,
+            "--root", ".",
+            "--base-sha", base_sha,
+            "--head-sha", head_sha,
+            "--strict",
+        )
+        self.assertNotEqual(result.returncode, 0, "strict + opted-in + no mirror changed must exit 1")
+        self.assertIn("FAIL", result.stdout)
+
+    def test_strict_opted_in_no_mirror_changed_exits_0_without_flag(self) -> None:
+        """AC-5 non-strict: opted-in repo with no mirror changed -> exit 0 WARN."""
+        git(self.root, "init")
+        git(self.root, "config", "user.email", "codex@example.com")
+        git(self.root, "config", "user.name", "Codex")
+        write_file(self.root / ".agentcortex/context/review/.gitkeep", "")
+        write_file(self.root / "README.md", "baseline\n")
+        git(self.root, "add", ".")
+        git(self.root, "commit", "-m", "baseline")
+        base_sha = git(self.root, "rev-parse", "HEAD").stdout.strip()
+
+        write_file(self.root / "README.md", "updated\n")
+        git(self.root, "add", "README.md")
+        git(self.root, "commit", "-m", "docs change")
+        head_sha = git(self.root, "rev-parse", "HEAD").stdout.strip()
+
+        result = run_tool(
+            self.root,
+            "--root", ".",
+            "--base-sha", base_sha,
+            "--head-sha", head_sha,
+            # no --strict
+        )
+        self.assertEqual(result.returncode, 0, "non-strict + opted-in + no mirror changed must exit 0")
+        self.assertIn("WARNING", result.stdout)
+        self.assertIn("skipped", result.stdout.lower())
+
+    def test_not_opted_in_shows_reduced_assurance_skip(self) -> None:
+        """AC-5 case 1: repo not opted in -> SKIP with reduced-assurance wording."""
+        git(self.root, "init")
+        git(self.root, "config", "user.email", "codex@example.com")
+        git(self.root, "config", "user.name", "Codex")
+        write_file(self.root / "README.md", "baseline\n")
+        git(self.root, "add", ".")
+        git(self.root, "commit", "-m", "baseline")
+        base_sha = git(self.root, "rev-parse", "HEAD").stdout.strip()
+
+        write_file(self.root / "README.md", "updated\n")
+        git(self.root, "add", "README.md")
+        git(self.root, "commit", "-m", "change")
+        head_sha = git(self.root, "rev-parse", "HEAD").stdout.strip()
+
+        result = run_tool(
+            self.root,
+            "--root", ".",
+            "--base-sha", base_sha,
+            "--head-sha", head_sha,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("SKIP", result.stdout)
+        self.assertIn("reduced assurance", result.stdout)
+
+    def test_explicit_path_missing_file_exits_1(self) -> None:
+        """AC-5 case 3: explicit --path to non-existent file -> exit 1 (uninspectable)."""
+        result = run_tool(
+            self.root,
+            "--root", ".",
+            "--path", ".agentcortex/context/work/nonexistent.md",
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("cannot verify evidence", result.stderr)
 
 
 if __name__ == "__main__":
