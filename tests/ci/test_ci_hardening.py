@@ -12,6 +12,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+PYTEST_INI = ROOT / "pytest.ini"
 REQS = ROOT / ".github" / "requirements-ci.txt"
 WORKFLOW = ROOT / ".github" / "workflows" / "validate.yml"
 SECURITY_WORKFLOW = ROOT / ".github" / "workflows" / "security.yml"
@@ -113,3 +114,32 @@ def test_ac12_context_not_on_inert_arm_security_yml() -> None:
         ".agentcortex/context/* must NOT be on an active inert skip arm in security.yml "
         "(SSoT/runtime state is security-relevant — AC-12)"
     )
+
+
+# AC-10: default pytest command must be safe — no root-level *_test.py demo files
+# that require unavailable secrets, and pytest.ini must prune non-test recursion.
+
+
+def test_ac10_no_tracked_root_cache_test_py() -> None:
+    """cache_test.py was renamed to cache_demo.py (AC-10). Ensure it cannot regress."""
+    collision = ROOT / "cache_test.py"
+    assert not collision.exists(), (
+        "cache_test.py must not exist at repo root — it matches pytest's *_test.py "
+        "collection pattern and requires ANTHROPIC_API_KEY at import, breaking bare "
+        "pytest runs (AC-10). Rename to cache_demo.py or any non-test name."
+    )
+
+
+def test_ac10_pytest_ini_has_norecursedirs() -> None:
+    """pytest.ini must prune non-test dirs so bare pytest does not collect demo files."""
+    assert PYTEST_INI.exists(), "pytest.ini must exist at repo root"
+    txt = PYTEST_INI.read_text(encoding="utf-8")
+    assert "norecursedirs" in txt, (
+        "pytest.ini must contain norecursedirs to prune temp/scratch/demo directories (AC-10)"
+    )
+    # Spot-check the entries most likely to harbour non-test scripts.
+    for entry in ("temp_downstream", "scratch", "demo"):
+        assert entry in txt, (
+            f"pytest.ini norecursedirs must include {entry!r} to prevent collecting "
+            f"non-test files from that directory (AC-10)"
+        )
