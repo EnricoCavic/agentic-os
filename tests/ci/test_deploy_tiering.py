@@ -844,3 +844,93 @@ def test_no_migration_banner_on_clean_update() -> None:
         assert second.returncode == 0
         assert "Migrating from legacy paths" not in second.stdout, \
             "routine re-deploy (manifest present, no legacy dirs) must not print the migration banner"
+
+
+# ---------------------------------------------------------------------------
+# AC-13: anchored deploy-manifest snapshot (demonstration over green gates)
+# ---------------------------------------------------------------------------
+
+FIXTURES_DIR = ROOT / "tests" / "ci" / "fixtures"
+DEPLOY_MANIFEST_GOLDEN = FIXTURES_DIR / "deploy_manifest_golden.txt"
+
+
+def _normalize_manifest(manifest_path: Path) -> list[str]:
+    """Return sorted 'tier rel_path' lines from the manifest.
+
+    Normalizes away: sha256 hashes, version strings, timestamps, and temp
+    paths — so the golden is stable across redeploys and version bumps.
+    Only the tier classification and relative path are asserted.
+
+    To regenerate the golden after a legitimate deploy-set change:
+        python -m pytest tests/ci/test_deploy_tiering.py \
+            -k test_deploy_manifest_snapshot --regen-golden
+    Or manually:
+        grep -E '^(core|scaffold|wrapper) ' <manifest> | awk '{print $1,$2}' | sort \
+            > tests/ci/fixtures/deploy_manifest_golden.txt
+    """
+    lines = []
+    for line in manifest_path.read_text(encoding="utf-8").splitlines():
+        parts = line.split()
+        if len(parts) >= 2 and parts[0] in ("core", "scaffold", "wrapper"):
+            lines.append(f"{parts[0]} {parts[1]}")
+    return sorted(lines)
+
+
+@requires_bash
+def test_deploy_manifest_snapshot(request: pytest.FixtureRequest) -> None:
+    """AC-13: the normalized deploy-manifest (tier + rel-path) must match the
+    committed golden snapshot.
+
+    This is the CI-enforced anchor for demonstration over green gates: a hand-
+    faked golden diverges from what deploy.sh actually produces and stays red.
+    When deploy intentionally changes (new file added, tier reclassified, file
+    removed), regenerate the golden via the instructions in _normalize_manifest.
+
+    Regen flag: pass --regen-golden on the pytest command line to write the
+    golden in-place instead of asserting (requires --co not to be set).
+    """
+    regen = request.config.getoption("--regen-golden", default=False)
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "proj"
+        target.mkdir()
+        result = _deploy(target)
+        assert result.returncode == 0, (
+            f"deploy failed (cannot snapshot a broken deploy):\n{result.stderr}"
+        )
+        manifest = target / ".agentcortex-manifest"
+        assert manifest.exists(), "manifest not written by deploy"
+
+        actual = _normalize_manifest(manifest)
+
+        if regen:
+            FIXTURES_DIR.mkdir(parents=True, exist_ok=True)
+            DEPLOY_MANIFEST_GOLDEN.write_text(
+                "\n".join(actual) + "\n", encoding="utf-8"
+            )
+            pytest.skip(f"golden regenerated at {DEPLOY_MANIFEST_GOLDEN} ({len(actual)} entries)")
+            return
+
+        assert DEPLOY_MANIFEST_GOLDEN.exists(), (
+            f"Golden fixture missing: {DEPLOY_MANIFEST_GOLDEN}\n"
+            "Run with --regen-golden to create it from a real deploy."
+        )
+        expected = sorted(
+            line
+            for line in DEPLOY_MANIFEST_GOLDEN.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        )
+
+        added = sorted(set(actual) - set(expected))
+        removed = sorted(set(expected) - set(actual))
+        if added or removed:
+            diff_lines = []
+            for entry in added:
+                diff_lines.append(f"  + {entry}")
+            for entry in removed:
+                diff_lines.append(f"  - {entry}")
+            pytest.fail(
+                "Deploy manifest diverged from golden "
+                f"(tests/ci/fixtures/deploy_manifest_golden.txt).\n"
+                "If this change is intentional, regenerate with --regen-golden.\n"
+                "Diff:\n" + "\n".join(diff_lines)
+            )
