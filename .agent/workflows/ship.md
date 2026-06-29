@@ -58,11 +58,16 @@ Record the warning in `## Known Risk` if the section is otherwise empty.
 
 Scan Work Log `## Gate Evidence` for receipts from required prior phases:
 - `feature` / `architecture-change`: bootstrap, plan, implement, review, test, handoff receipts required
-- `quick-win`: bootstrap, plan, implement receipts required (implement receipt always present — no plan→ship edge exists)
-- `hotfix`: bootstrap, plan, implement, review, test receipts required (hotfix MUST reach TESTED; plan is mandatory per §10.2 — no implement-only shortcuts)
+- `quick-win`: bootstrap, plan, implement receipts required
+- `hotfix`: bootstrap, plan, implement, review, test receipts required (plan is mandatory per §10.2)
 
-For each missing receipt output: `"⚠️ Missing gate receipt for: [phase]. Run that phase or provide evidence before shipping."`
-User may acknowledge and proceed. Missing receipts do NOT auto-fail the gate.
+**Source repo / direct-file-access platforms** (the Work Log is directly readable): if any required receipt for `feature` or `architecture-change` classification is absent, this is a hard **`verdict: fail`**. The machine-enforced check in `validate.sh` will also catch this during validation. For each missing receipt output:
+`"FAIL: Missing required gate receipt for: [phase]. Run that phase and record the gate receipt before shipping."`
+
+**Platforms without direct Work Log file access** (e.g., Codex Web, API-only contexts): the gate receipt audit runs in **reduced-assurance mode**. If any required receipt is absent, you MUST paste the full Gate Evidence section into chat so the receipt can be verified manually. Output:
+`"[reduced assurance] Gate receipt for [phase] not verified from file. Paste the ## Gate Evidence section or run on a platform with direct file access for full assurance."`
+
+For `quick-win` and `hotfix`, missing receipts produce a WARN (not hard fail) since these fast-paths may legitimately omit handoff and the advisory path still applies.
 
 ### Confidence Trace Audit (/ship only)
 
