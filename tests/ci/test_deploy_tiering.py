@@ -140,6 +140,13 @@ def test_preexisting_sidecar_file_stays_preserved_across_repeated_deploys(
         deploy_script.parent.mkdir(parents=True)
         shutil.copy2(DEPLOY_SH, deploy_script)
 
+        # deploy.sh fail-closes unless the downstream current_state template is
+        # present in the source repo; seed it so the precheck passes and this
+        # test can exercise the sidecar-preservation path it actually targets.
+        state_template = source_root / ".agentcortex" / "templates" / "current_state.md"
+        state_template.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / ".agentcortex" / "templates" / "current_state.md", state_template)
+
         source = source_root / rel_path
         source.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / rel_path, source)
