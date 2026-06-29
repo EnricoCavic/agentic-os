@@ -201,6 +201,15 @@ Then tell your agent: *"Read `AGENTS.md` and follow it. Do not claim completion 
 
 Existing files are never overwritten (saved as `.acx-incoming` sidecars to merge). Windows / no-Python mode, updating, customizing without conflicts, turning the CI floor into a required check, and the full entry-point templates → **[docs/INSTALL.md](docs/INSTALL.md)**.
 
+## Running the tests
+
+```bash
+# Fast local loop — mirrors what CI runs; skip the slow subprocess tests
+python -m pytest tests/ci/ tests/guard/ .agentcortex/tests/ -m "not slow"
+```
+
+Full details and the `slow` suite → [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## FAQ
 
 **What is Agentic OS?**
