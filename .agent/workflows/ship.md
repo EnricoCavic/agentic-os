@@ -58,11 +58,12 @@ Record the warning in `## Known Risk` if the section is otherwise empty.
 
 Scan Work Log `## Gate Evidence` for receipts from required prior phases:
 - `feature` / `architecture-change`: bootstrap, plan, implement, review, test, handoff receipts required
-- `quick-win`: bootstrap, plan, implement receipts required (implement receipt always present — no plan→ship edge exists)
-- `hotfix`: bootstrap, plan, implement, review, test receipts required (hotfix MUST reach TESTED; plan is mandatory per §10.2 — no implement-only shortcuts)
+- `quick-win`: bootstrap, plan, implement receipts required
+- `hotfix`: bootstrap, plan, implement, review, test receipts required (plan is mandatory per §10.2)
 
-For each missing receipt output: `"⚠️ Missing gate receipt for: [phase]. Run that phase or provide evidence before shipping."`
-User may acknowledge and proceed. Missing receipts do NOT auto-fail the gate.
+**Direct-file-access platforms** (Work Log readable): a missing required receipt for `feature`/`architecture-change` is a hard **`verdict: fail`** (also enforced by `validate.sh`). Output: `"FAIL: Missing required gate receipt for: [phase]."`
+**No-file-access platforms** (Codex Web, API-only): **reduced-assurance mode** — paste the `## Gate Evidence` section into chat for manual verification. Output: `"[reduced assurance] Gate receipt for [phase] not verified from file."`
+`quick-win`/`hotfix`: missing receipts are a WARN (fast-paths may omit handoff).
 
 ### Confidence Trace Audit (/ship only)
 

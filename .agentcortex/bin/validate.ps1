@@ -1058,6 +1058,8 @@ if (Test-Path -Path $worklogDir -PathType Container) {
     $handoffResumeIncomplete = 0
     $hotfixShipNoEvidence = 0
     $adrCoverageUndocumented = 0
+    $currentBranchGateFail = 0
+    $currentBranchGateFailList = New-Object System.Collections.Generic.List[string]
     # Legal phase transitions for gate evidence validation (classification-aware)
     # quick-win / unknown: implement can go directly to ship (fast path)
     $legalDefault = @{
@@ -1089,9 +1091,33 @@ if (Test-Path -Path $worklogDir -PathType Container) {
         'test'      = @('ship','implement')
         'ship'      = @()
     }
+    # AC-6: resolve current-branch worklog key once (slash→dash normalization).
+    $curKey = ''
+    try {
+        $gitAvailable = (Get-Command git -ErrorAction SilentlyContinue) -ne $null
+        if ($gitAvailable) {
+            # Use symbolic-ref --short first: works on empty repos (no commits yet).
+            # Fall back to rev-parse --abbrev-ref for detached-HEAD scenarios.
+            $curBranch = & git -C $root symbolic-ref --short HEAD 2>$null
+            if ($LASTEXITCODE -ne 0 -or -not $curBranch) {
+                $curBranch = & git -C $root rev-parse --abbrev-ref HEAD 2>$null
+            }
+            if ($LASTEXITCODE -eq 0 -and $curBranch -and $curBranch -ne 'HEAD') {
+                $curKey = $curBranch.Trim() -replace '/', '-'
+            }
+        }
+    } catch {}
     foreach ($wl in $worklogs) {
         $content = Get-Content -Path $wl.FullName -Raw -Encoding utf8 -ErrorAction SilentlyContinue
         if (-not $content) { continue }
+        # AC-6: flag whether this worklog belongs to the current branch.
+        $isCurrentBranch = $false
+        if ($curKey) {
+            $wlBasename = [System.IO.Path]::GetFileName($wl.FullName)
+            if ($wlBasename -eq "${curKey}.md" -or $wlBasename -like "*-${curKey}.md") {
+                $isCurrentBranch = $true
+            }
+        }
         # Select legal-transition dict based on classification (accept list and table form)
         $wlClassForGates = ''
         $wlClassForGatesMatch = [regex]::Match($content, '(?m)^-\s+(?:\*\*)?[Cc]lassification(?:\*\*)?\s*:\s+`?([a-zA-Z][\w-]*)`?')
@@ -1302,7 +1328,15 @@ if (Test-Path -Path $worklogDir -PathType Container) {
         if (($wlClass -eq 'feature' -or $wlClass -eq 'architecture-change') `
             -and ($content -match '(?i)Gate:\s*implement') `
             -and ($content -notmatch '(?im)^#+\s+Test Gate Results')) {
-            $testGateResultsMissing++
+            # AC-6: current-branch at handoff/ship → escalate to FAIL; historical → WARN.
+            # Use gate-receipt presence only here ($wlPhaseForResume is set later in this loop iteration).
+            $atHandoffOrShip = ($content -match '(?i)Gate:\s*(handoff|ship)\s*\|[^|\r\n]*Verdict:\s*PASS')
+            if ($isCurrentBranch -and $atHandoffOrShip) {
+                $currentBranchGateFail++
+                $currentBranchGateFailList.Add("  [Test Gate Results absent] $($wl.Name)")
+            } else {
+                $testGateResultsMissing++
+            }
         }
         # MEDIUM-1 (review PASS with UNPROVEN rows)
         if ($content -match '(?i)Gate:\s*review\s*\|[^|\r\n]*Verdict:\s*PASS') {
@@ -1348,14 +1382,32 @@ if (Test-Path -Path $worklogDir -PathType Container) {
         $resumeRequired = (($wlClass -eq 'feature' -or $wlClass -eq 'architecture-change') -and
             (($wlPhaseForResume -in @('handoff', 'ship')) -or
              ($content -match '(?i)Gate:\s*(handoff|ship)\s*\|[^|\r\n]*Verdict:\s*PASS')))
-        if ($resumeRequired -and $content -match '(?m)^## Resume') {
-            $resumeM = [regex]::Match($content, '(?ms)^## Resume\r?\n(.*?)(?=^## |\z)')
-            $resumeBody = if ($resumeM.Success) { $resumeM.Groups[1].Value } else { '' }
-            $missingSubsections = 0
-            foreach ($subsec in @('Read Map', 'Skip List', 'Context Snapshot')) {
-                if ($resumeBody -notmatch "(?im)^###\s+$subsec") { $missingSubsections++ }
+        if ($resumeRequired) {
+            if ($content -notmatch '(?m)^## Resume') {
+                # AC-6: Resume section entirely absent when required.
+                if ($isCurrentBranch) {
+                    $currentBranchGateFail++
+                    $currentBranchGateFailList.Add("  [Resume block absent] $($wl.Name)")
+                } else {
+                    $handoffResumeIncomplete++
+                }
+            } else {
+                $resumeM = [regex]::Match($content, '(?ms)^## Resume\r?\n(.*?)(?=^## |\z)')
+                $resumeBody = if ($resumeM.Success) { $resumeM.Groups[1].Value } else { '' }
+                $missingSubsections = 0
+                foreach ($subsec in @('Read Map', 'Skip List', 'Context Snapshot')) {
+                    if ($resumeBody -notmatch "(?im)^###\s+$subsec") { $missingSubsections++ }
+                }
+                if ($missingSubsections -gt 0) {
+                    # AC-6: incomplete Resume on current-branch → FAIL; historical → WARN.
+                    if ($isCurrentBranch) {
+                        $currentBranchGateFail++
+                        $currentBranchGateFailList.Add("  [Resume block incomplete ($missingSubsections subsection(s) missing)] $($wl.Name)")
+                    } else {
+                        $handoffResumeIncomplete++
+                    }
+                }
             }
-            if ($missingSubsections -gt 0) { $handoffResumeIncomplete++ }
         }
         # Finding 13 (MEDIUM): hotfix fast-path evidence check — hotfix is exempt from
         # /handoff but MUST provide evidence per handoff.md §Trigger Conditions.
@@ -1442,6 +1494,11 @@ if (Test-Path -Path $worklogDir -PathType Container) {
         Add-Result -Level 'WARN' -Message "work logs with ## Resume section missing required sub-sections (handoff.md §1a — Read Map, Skip List, Context Snapshot required): $handoffResumeIncomplete"
     } elseif ($worklogs.Count -gt 0) {
         Add-Result -Level 'PASS' -Message 'handoff Resume Blocks have required sub-sections where present'
+    }
+    # AC-6: current-branch work log missing required gate evidence at handoff/ship.
+    if ($currentBranchGateFail -gt 0) {
+        Add-Result -Level 'FAIL' -Message "current-branch work log missing required gate evidence at handoff/ship (AC-6 — Resume block and/or Test Gate Results absent): $currentBranchGateFail"
+        foreach ($entry in $currentBranchGateFailList) { Write-Output $entry }
     }
     if ($hotfixShipNoEvidence -gt 0) {
         Add-Result -Level 'WARN' -Message "hotfix work logs shipped without ## Evidence (hotfix fast-path still requires diff + behavior verification per handoff.md §Trigger Conditions): $hotfixShipNoEvidence"

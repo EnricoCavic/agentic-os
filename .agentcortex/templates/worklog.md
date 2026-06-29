@@ -16,7 +16,8 @@ usage: Used by /bootstrap workflow when creating a new Work Log at .agentcortex/
 - Owner: `<session-id or username>`
 - Guardrails Mode: `<Full | Quick | Lite>`
 - Current Phase: `<bootstrap | plan | implement | review | test | handoff | ship>`
-- Checkpoint SHA: `<git-sha or none>`
+- Diff Base SHA: `<git-sha or none>` <!-- immutable: set once on first /implement -->
+- Checkpoint SHA: `<git-sha or none>` <!-- mutable: refresh each commit -->
 - Recommended Skills: `<comma-separated skill IDs or none>`
 - Primary Domain Snapshot: `<domain | none>`
 - SSoT Sequence: `<N>`

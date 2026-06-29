@@ -577,3 +577,158 @@ def test_adr010_shipped_spec_not_indexed_fails_ps1() -> None:
             f"validate.ps1 must FAIL when a status:shipped spec is missing from Spec Index "
             f"(ADR-010 AC-2/AC-5). Output:\n{out[-600:]}"
         )
+
+
+# ---------------------------------------------------------------------------
+# AC-6: current-branch gate-evidence FAIL (dev-flow-hardening spec)
+#
+# Structural: verify the cur_key resolution and FAIL message are present in
+# both validators (fast, no subprocess).
+#
+# Behavioral (slow, subprocess): verify that a current-branch
+# architecture-change worklog at handoff without a Resume block → FAIL (not
+# WARN), while a same-content historical worklog (no git repo → curKey empty)
+# → WARN (preserved invariant). Windows-only for PS1 behavioral test.
+# ---------------------------------------------------------------------------
+
+AC6_FAIL_MSG = "current-branch work log missing required gate evidence at handoff/ship"
+AC6_SH_CURKEY_PATTERN = "cur_key="
+AC6_PS1_CURKEY_PATTERN = "$curKey"
+
+
+def test_ac6_cur_key_resolution_in_sh() -> None:
+    """validate.sh must contain cur_key resolution for AC-6."""
+    sh = VALIDATE_SH.read_text(encoding="utf-8")
+    assert AC6_SH_CURKEY_PATTERN in sh, "validate.sh missing cur_key resolution (AC-6)"
+
+
+def test_ac6_cur_key_resolution_in_ps1() -> None:
+    """validate.ps1 must contain $curKey resolution for AC-6."""
+    ps1 = VALIDATE_PS1.read_text(encoding="utf-8")
+    assert AC6_PS1_CURKEY_PATTERN in ps1, "validate.ps1 missing $curKey resolution (AC-6)"
+
+
+def test_ac6_fail_message_parity() -> None:
+    """Both validators must emit the same AC-6 FAIL message string."""
+    sh = VALIDATE_SH.read_text(encoding="utf-8")
+    ps1 = VALIDATE_PS1.read_text(encoding="utf-8")
+    assert AC6_FAIL_MSG in sh, f"validate.sh missing AC-6 FAIL message"
+    assert AC6_FAIL_MSG in ps1, f"validate.ps1 missing AC-6 FAIL message"
+
+
+def _deploy_with_git_branch(td: Path, branch: str) -> Path:
+    """Deploy validator fixture AND git-init the target with a named branch.
+
+    This lets validators see a real current branch via git rev-parse --abbrev-ref HEAD,
+    which is needed for AC-6 current-branch detection tests.
+    """
+    target = _deploy_for_validator_fixture(td)
+    # Try git init -b (requires git >= 2.28); fall back to init + symbolic-ref.
+    result = subprocess.run(
+        ["git", "init", "-b", branch, str(target)],
+        capture_output=True, text=True, encoding="utf-8",
+    )
+    if result.returncode != 0:
+        subprocess.run(["git", "init", str(target)], check=True, capture_output=True)
+        subprocess.run(
+            ["git", "-C", str(target), "symbolic-ref", "HEAD", f"refs/heads/{branch}"],
+            check=True, capture_output=True,
+        )
+    else:
+        # Verify via symbolic-ref (works on empty repos; rev-parse --abbrev-ref
+        # returns "HEAD" on an empty repo with no commits).
+        verify = subprocess.run(
+            ["git", "-C", str(target), "symbolic-ref", "--short", "HEAD"],
+            capture_output=True, text=True, encoding="utf-8",
+        )
+        if verify.returncode != 0 or verify.stdout.strip() != branch:
+            subprocess.run(
+                ["git", "-C", str(target), "symbolic-ref", "HEAD", f"refs/heads/{branch}"],
+                check=True, capture_output=True,
+            )
+    return target
+
+
+@pytest.mark.slow
+@requires_bash
+def test_ac6_current_branch_arch_change_at_handoff_no_resume_fails_sh() -> None:
+    """AC-6: architecture-change worklog at handoff with no Resume block on the
+    current branch must emit FAIL (not WARN) from validate.sh."""
+    with tempfile.TemporaryDirectory() as td:
+        branch = "feat/ac6-test"
+        worklog_name = "feat-ac6-test.md"  # slash→dash normalization
+        target = _deploy_with_git_branch(Path(td), branch)
+        _write_worklog(
+            target,
+            worklog_name,
+            classification="architecture-change",
+            phase="handoff",
+            gates=("bootstrap", "plan", "implement", "review", "test", "handoff"),
+            resume="none",  # pre-handoff placeholder — no ## sub-sections
+        )
+        out = _run_validate(target)
+        assert AC6_FAIL_MSG in out, (
+            f"validate.sh must FAIL for current-branch arch-change at handoff with no Resume block "
+            f"(AC-6). Output:\n{out[-1200:]}"
+        )
+        # Must NOT appear in the WARN bucket (should be escalated to FAIL)
+        assert _resume_warn_count(out) == 0 or _resume_warn_count(out) is None, (
+            f"validate.sh must not WARN for current-branch Resume missing (escalated to FAIL). "
+            f"Output:\n{out[-1200:]}"
+        )
+
+
+@pytest.mark.slow
+@requires_bash
+def test_ac6_historical_worklog_at_handoff_no_resume_still_warns_sh() -> None:
+    """AC-6: when there is NO git repo (historical / offline fixture), an
+    architecture-change worklog at handoff with no Resume must still emit WARN
+    (not FAIL) — preserving the existing invariant (_resume_warn_count == 1)."""
+    with tempfile.TemporaryDirectory() as td:
+        target = _deploy_for_validator_fixture(Path(td))
+        _write_worklog(
+            target,
+            "handoff-resume-missing.md",
+            classification="architecture-change",
+            phase="handoff",
+            gates=("bootstrap", "plan", "implement", "review", "test", "handoff"),
+            resume="none",
+        )
+        out = _run_validate(target)
+        assert _resume_warn_count(out) == 1, (
+            f"validate.sh must still WARN (not FAIL) for historical worklog with incomplete Resume "
+            f"(no git repo → curKey empty → AC-6 FAIL must not fire). Output:\n{out[-1200:]}"
+        )
+        assert AC6_FAIL_MSG not in out, (
+            f"validate.sh must not emit AC-6 FAIL for historical (no git repo) worklog. "
+            f"Output:\n{out[-1200:]}"
+        )
+
+
+@pytest.mark.slow
+@requires_windows
+@requires_bash
+@requires_powershell
+def test_ac6_current_branch_arch_change_at_handoff_no_resume_fails_ps1() -> None:
+    """AC-6 parity: same scenario as the sh test but via validate.ps1."""
+    with tempfile.TemporaryDirectory() as td:
+        branch = "feat/ac6-test"
+        worklog_name = "feat-ac6-test.md"
+        target = _deploy_with_git_branch(Path(td), branch)
+        _write_worklog(
+            target,
+            worklog_name,
+            classification="architecture-change",
+            phase="handoff",
+            gates=("bootstrap", "plan", "implement", "review", "test", "handoff"),
+            resume="none",
+        )
+        out = _run_validate_ps1(target)
+        assert AC6_FAIL_MSG in out, (
+            f"validate.ps1 must FAIL for current-branch arch-change at handoff with no Resume block "
+            f"(AC-6). Output:\n{out[-1200:]}"
+        )
+        assert _resume_warn_count(out) == 0 or _resume_warn_count(out) is None, (
+            f"validate.ps1 must not WARN for current-branch Resume missing (escalated to FAIL). "
+            f"Output:\n{out[-1200:]}"
+        )
