@@ -57,7 +57,9 @@ jobs:
             [ -z "$f" ] && continue
             case "$f" in
               README.md|README_*.md|llms.txt|LICENSE|CHANGELOG.md|CONTRIBUTING.md|CITATION.cff) ;;
-              docs/*|.agentcortex/context/*|.agentcortex/docs/*) ;;
+              docs/*|.agentcortex/docs/*) ;;
+              # .agentcortex/context/* is SSoT/runtime state — NOT inert; changes there
+              # must trigger security-relevant jobs (AC-12 threat-aware classifier).
               *) heavy=true; break ;;
             esac
           done <<< "$files"
@@ -135,8 +137,13 @@ jobs:
           rc=0
           python .agentcortex/tools/scan_credentials.py --range "${base}...${head}" || rc=$?
           if [ "$rc" = "3" ]; then
-            echo "::warning::credential-scan: scan could not run (git error) — relying on TruffleHog backstop"
-            exit 0
+            # rc==3 means the scanner itself could not run (git/tooling error).
+            # Fail-closed: an execution error is NOT a clean scan — surface it so
+            # the PR cannot silently merge with an unverified credential check.
+            # (The base-sha-missing path above already exits 0 — that is the
+            # legitimate "nothing to scan" case; this is a runtime failure.)
+            echo "::error::credential-scan: scanner execution error (git diff failed) — failing closed. Investigate CI environment or re-run."
+            exit 1
           fi
           exit "$rc"
 
@@ -163,6 +170,9 @@ jobs:
           for f in requirements*.txt; do
             [ -f "$f" ] && req_args+=(-r "$f")
           done
+          # Include the CI requirements manifest (contains real pinned deps installed
+          # in CI runners; previously skipped because it lives under .github/).
+          [ -f ".github/requirements-ci.txt" ] && req_args+=(-r ".github/requirements-ci.txt")
           if [ "${#req_args[@]}" -gt 0 ]; then
             pip-audit "${req_args[@]}" --vulnerability-service osv --strict
           elif [ -f pyproject.toml ] && grep -qE '^\[project\]|^\[build-system\]' pyproject.toml; then

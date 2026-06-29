@@ -1,7 +1,7 @@
 # Pinned CI test dependencies for reproducible runs (#163).
 # Maintained manually (Dependabot rejects this layout — see dependabot.yml note).
 # Must stay compatible with the CI Python matrix (3.9 and 3.12).
-pytest==8.4.1
+pytest==9.0.3
 PyYAML==6.0.2
 # pytest-split: shards the slow Windows pytest job across parallel matrix runners
 # (separate machines, no single-machine contention — pytest-xdist was measured SLOWER

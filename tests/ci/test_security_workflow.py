@@ -299,6 +299,71 @@ class TestDependencyAuditJob(unittest.TestCase):
         )
 
 
+class TestCredentialScanFailClosed(unittest.TestCase):
+    """AC-8: credential-scan step must fail-closed on rc==3 (scanner execution error)."""
+
+    def setUp(self):
+        wf = _load_workflow()
+        self.job = (wf.get("jobs") or {}).get("credential-scan", {})
+
+    def test_ac8_credential_scan_job_exists(self):
+        self.assertTrue(self.job, "jobs.credential-scan missing")
+
+    def test_ac8_rc3_not_exit_zero(self):
+        """rc==3 (scanner could not run) must NOT be exit 0 — fail-closed required."""
+        run_steps = [s.get("run", "") for s in (self.job.get("steps") or [])]
+        combined = "\n".join(run_steps)
+        # Find the rc==3 branch — must exist and must NOT exit 0.
+        self.assertIn(
+            '"3"', combined,
+            "credential-scan step must handle rc==3 (scanner execution error)",
+        )
+        # Locate the rc==3 block and verify it does not contain a bare 'exit 0'.
+        # Split on the rc==3 guard, take the first block after it.
+        parts = combined.split('"3"')
+        self.assertGreater(
+            len(parts), 1,
+            "rc==3 guard not found in credential-scan step",
+        )
+        rc3_block = parts[1]
+        # The block ends at the next `fi` (end of if block). Extract up to that.
+        fi_pos = rc3_block.find("\n          fi\n")
+        if fi_pos != -1:
+            rc3_block = rc3_block[:fi_pos]
+        self.assertNotIn(
+            "exit 0", rc3_block,
+            "credential-scan: rc==3 branch must NOT exit 0 — must fail-closed (AC-8)",
+        )
+
+    def test_ac8_base_sha_missing_still_exits_zero(self):
+        """The base-sha-missing path (nothing to scan) must keep exit 0 — that is legitimate."""
+        run_steps = [s.get("run", "") for s in (self.job.get("steps") or [])]
+        combined = "\n".join(run_steps)
+        # The base-sha guard precedes the actual scan — it exits 0 legitimately.
+        self.assertIn(
+            "exit 0", combined,
+            "credential-scan: base-sha-missing path must still exit 0 (nothing to scan — AC-8)",
+        )
+
+
+class TestDependencyAuditCIManifest(unittest.TestCase):
+    """AC-9: pip-audit must also scan .github/requirements-ci.txt (the repo's only real Python manifest)."""
+
+    def setUp(self):
+        wf = _load_workflow()
+        self.job = (wf.get("jobs") or {}).get("dependency-audit", {})
+
+    def test_ac9_ci_requirements_manifest_included(self):
+        run_steps = [s.get("run", "") for s in (self.job.get("steps") or [])]
+        combined = "\n".join(run_steps)
+        self.assertIn(
+            ".github/requirements-ci.txt",
+            combined,
+            "dependency-audit must include .github/requirements-ci.txt "
+            "(the repo's only real Python manifest — AC-9)",
+        )
+
+
 class TestVersionPinningGlobal(unittest.TestCase):
     """AC-5: no floating refs anywhere in the workflow file."""
 
@@ -312,6 +377,49 @@ class TestVersionPinningGlobal(unittest.TestCase):
             matches,
             f"Floating action refs in uses: lines: {matches} — must pin to tag or SHA (AC-5)",
         )
+
+
+class TestClaimsVsReality(unittest.TestCase):
+    """AC-7 (dev-flow-hardening): security spec must not overstate enforcement reality.
+
+    The security jobs run on every PR but are NOT required merge checks (branch
+    protection only requires Framework Validation, ShellCheck, Check Markdown Links).
+    The spec Goal must not claim security runs 'before merge … no human opt-in required'
+    as an unconditional guarantee.
+    """
+
+    _SPEC = ROOT / "docs" / "specs" / "ci-security-scanning.md"
+    # Phrases that incorrectly imply security is an unconditional pre-merge gate.
+    _FALSE_GATE_PHRASES = [
+        "before merge, with no human opt-in required",
+    ]
+
+    def test_ac7_spec_goal_does_not_claim_unconditional_pre_merge_gate(self):
+        if not self._SPEC.exists():
+            self.skipTest(f"Spec not found: {self._SPEC}")
+        content = self._SPEC.read_text(encoding="utf-8")
+        for phrase in self._FALSE_GATE_PHRASES:
+            self.assertNotIn(
+                phrase,
+                content,
+                f"ci-security-scanning.md Goal must not claim security is an unconditional "
+                f"pre-merge required gate (found: {phrase!r}). Security jobs are advisory "
+                f"unless branch protection requires them. (AC-7)",
+            )
+
+    def test_ac7_spec_documents_required_checks(self):
+        """Spec must document the actual required check set for this repo."""
+        if not self._SPEC.exists():
+            self.skipTest(f"Spec not found: {self._SPEC}")
+        content = self._SPEC.read_text(encoding="utf-8")
+        required_checks = ["Framework Validation", "ShellCheck", "Check Markdown Links"]
+        for check in required_checks:
+            self.assertIn(
+                check,
+                content,
+                f"ci-security-scanning.md must document the actual required merge check "
+                f"{check!r} so readers understand the real enforcement floor (AC-7)",
+            )
 
 
 class TestWorkflowIsolation(unittest.TestCase):

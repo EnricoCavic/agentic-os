@@ -79,7 +79,7 @@ A rules file — Cursor Rules, a plain `AGENTS.md` — is a prompt the agent can
 | "Tests pass" with no tests | CI runs the real suite | pull request |
 | A phase skipped with no evidence | `validate.sh` reads the work trail | pre-commit (local) |
 
-The third row is the part a rules file can't reach: `validate.sh` parses each task's work log and fails if a required phase was skipped or its evidence is missing. The local pre-commit hook is opt-in and you can `--no-verify` past it; CI is the floor that can't be skipped. The Security badge above is this repo running the same credential and SAST gates on its own every push.
+The third row is the part a rules file can't reach: `validate.sh` parses each task's work log and fails if a required phase was skipped or its evidence is missing. The local pre-commit hook is opt-in and you can `--no-verify` past it; the three required CI checks (`Framework Validation`, `ShellCheck`, `Check Markdown Links`) are the floor that can't be skipped — they must pass before any PR merges. The security scanning jobs (credential scan, SAST, dependency audit) run on every PR but are not required merge checks unless you add them to branch protection. The Security badge above is this repo running the same credential and SAST gates on its own every push.
 
 ## Sits under what you already have
 

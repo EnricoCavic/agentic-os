@@ -14,6 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 REQS = ROOT / ".github" / "requirements-ci.txt"
 WORKFLOW = ROOT / ".github" / "workflows" / "validate.yml"
+SECURITY_WORKFLOW = ROOT / ".github" / "workflows" / "security.yml"
 
 
 def test_requirements_file_pins_test_deps() -> None:
@@ -69,3 +70,46 @@ def test_workflow_has_utf8_sweep_and_critical_file_precheck() -> None:
     block = txt.split("utf8-and-critical-files:", 1)[1]
     for needle in ('decode("utf-8")', "AGENTS.md", "validate.ps1", "git", "ls-files"):
         assert needle in block, f"UTF-8 sweep job must contain {needle!r} (#163)"
+
+
+# AC-12: threat-aware classifier parity — .agentcortex/context/* must NOT be on
+# the inert skip arm in EITHER workflow (both classifiers must stay in sync).
+# The pattern matches an ACTIVE case arm (not a comment) — lines starting with
+# whitespace + a path glob followed by ) are case arms; lines starting with # are comments.
+_CONTEXT_INERT_ARM_RE = re.compile(
+    r"^\s+(?:[^#\n]*\|)?\.agentcortex/context/\*(?:\|[^)]*)?[)]\s*;;",
+    re.MULTILINE,
+)
+
+
+def _inert_arm_text(workflow_text: str) -> str:
+    """Extract the case-arm block (non-comment lines only) between 'case' and the heavy arm."""
+    m = re.search(r"case \"\$f\" in(.*?)\*\)\s*heavy=true", workflow_text, re.DOTALL)
+    if not m:
+        return ""
+    block = m.group(1)
+    # Strip comment lines so they don't affect the assertion.
+    non_comment_lines = [
+        ln for ln in block.splitlines() if not ln.lstrip().startswith("#")
+    ]
+    return "\n".join(non_comment_lines)
+
+
+def test_ac12_context_not_on_inert_arm_validate_yml() -> None:
+    txt = WORKFLOW.read_text(encoding="utf-8")
+    inert = _inert_arm_text(txt)
+    assert inert is not None, "Could not locate the case-arm classifier in validate.yml"
+    assert not _CONTEXT_INERT_ARM_RE.search(inert), (
+        ".agentcortex/context/* must NOT be on an active inert skip arm in validate.yml "
+        "(SSoT/runtime state is security-relevant — AC-12)"
+    )
+
+
+def test_ac12_context_not_on_inert_arm_security_yml() -> None:
+    txt = SECURITY_WORKFLOW.read_text(encoding="utf-8")
+    inert = _inert_arm_text(txt)
+    assert inert is not None, "Could not locate the case-arm classifier in security.yml"
+    assert not _CONTEXT_INERT_ARM_RE.search(inert), (
+        ".agentcortex/context/* must NOT be on an active inert skip arm in security.yml "
+        "(SSoT/runtime state is security-relevant — AC-12)"
+    )
