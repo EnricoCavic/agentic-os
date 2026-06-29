@@ -938,6 +938,7 @@ else
     '.agentcortex/context/work/*.md' \
     '.agentcortex/context/private/' \
     '.agentcortex/context/.guard_receipt.json' \
+    '.agentcortex/context/.guard_receipts/' \
     '.agentcortex/context/.guard_locks/' \
     '.agent/private/' \
     '.agentcortex-src/' \

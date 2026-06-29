@@ -58,6 +58,7 @@ VALIDATE_SH = ROOT / ".agentcortex" / "bin" / "validate.sh"
 VALIDATE_PS1 = ROOT / ".agentcortex" / "bin" / "validate.ps1"
 README = ROOT / "README.md"
 README_ZH = ROOT / "docs" / "README_zh-TW.md"
+INSTALL = ROOT / "docs" / "INSTALL.md"
 
 
 git_path = shutil.which("git")
@@ -88,6 +89,14 @@ def _deploy(target: Path, env: dict | None = None) -> subprocess.CompletedProces
         [bash, str(DEPLOY_SH), str(target)],
         capture_output=True, text=True, encoding="utf-8", errors="replace",
         cwd=str(ROOT), env=run_env,
+    )
+
+
+def _deploy_dry_run(target: Path) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [bash, str(DEPLOY_SH), "--dry-run", str(target)],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        cwd=str(ROOT),
     )
 
 
@@ -368,6 +377,75 @@ def test_deployed_governance_referenced_tools_are_deployed() -> None:
         # Sanity: the two tools this regression was opened for are now shipped.
         assert (tools_dir / "recover_worklog_lock.py").exists()
         assert (tools_dir / "lint_spec_drift.py").exists()
+
+
+@requires_bash
+def test_downstream_current_state_comes_from_template_only() -> None:
+    """AC-1: downstream runtime SSoT must be seeded from the template, never from
+    the source repo's live `.agentcortex/context/current_state.md`."""
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "proj"
+        target.mkdir()
+
+        first = _deploy(target)
+        assert first.returncode == 0, f"deploy failed:\n{first.stderr}"
+
+        deployed = target / ".agentcortex" / "context" / "current_state.md"
+        template = ROOT / ".agentcortex" / "templates" / "current_state.md"
+        source_live = ROOT / ".agentcortex" / "context" / "current_state.md"
+        assert deployed.read_text(encoding="utf-8") == template.read_text(encoding="utf-8")
+        assert deployed.read_text(encoding="utf-8") != source_live.read_text(encoding="utf-8")
+        assert "Self-managed Agent OS for AI coding agents" not in deployed.read_text(encoding="utf-8")
+
+
+@requires_bash
+def test_deploy_fails_closed_when_current_state_template_missing() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        source_root = Path(td) / "source"
+        deploy_script = source_root / ".agentcortex" / "bin" / "deploy.sh"
+        live_state = source_root / ".agentcortex" / "context" / "current_state.md"
+        deploy_script.parent.mkdir(parents=True)
+        live_state.parent.mkdir(parents=True)
+        shutil.copy2(DEPLOY_SH, deploy_script)
+        live_state.write_text("source live state must never deploy\n", encoding="utf-8")
+
+        target = Path(td) / "proj"
+        target.mkdir()
+        result = subprocess.run(
+            [bash, str(deploy_script), str(target)],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            cwd=str(source_root),
+        )
+
+        assert result.returncode != 0
+        assert "Missing downstream current_state template" in result.stderr
+        assert not (target / ".agentcortex" / "context" / "current_state.md").exists()
+
+
+@requires_bash
+def test_dry_run_discloses_generated_current_state_artifact() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "proj"
+        target.mkdir()
+        result = _deploy_dry_run(target)
+        assert result.returncode == 0, f"dry-run failed:\n{result.stderr}"
+        assert ".agentcortex/context/current_state.md" in result.stdout
+        assert ".agentcortex/templates/current_state.md" in result.stdout
+
+
+def test_source_and_downstream_ignore_guard_receipt_directory() -> None:
+    source_ignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
+    deploy_sh = DEPLOY_SH.read_text(encoding="utf-8")
+    assert ".agentcortex/context/.guard_receipts/" in source_ignore
+    assert ".agentcortex/context/.guard_receipts/" in deploy_sh
+
+
+def test_text_only_install_does_not_copy_runtime_context() -> None:
+    install = INSTALL.read_text(encoding="utf-8")
+    text_only = install.split("<summary><b>Text-only usage", 1)[1].split("</details>", 1)[0]
+    assert "Copy the `.agent/`, `.agents/`, and `AGENTS.md` files" in text_only
+    assert "copy `.agentcortex/context/`" not in text_only
+    assert "templates/current_state.md" in text_only
 
 
 @requires_bash
