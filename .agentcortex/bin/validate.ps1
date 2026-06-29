@@ -1,4 +1,5 @@
 ﻿param(
+    [Alias('no-python')]
     [switch]$NoPython
 )
 
@@ -886,6 +887,7 @@ else {
         '.agentcortex/context/work/*.md',
         '.agentcortex/context/private/',
         '.agentcortex/context/.guard_receipt.json',
+        '.agentcortex/context/.guard_receipts/',
         '.agentcortex/context/.guard_locks/',
         '.agent/private/',
         '.agentcortex-src/',
@@ -1333,9 +1335,20 @@ if (Test-Path -Path $worklogDir -PathType Container) {
                 $reclassifyHeaderNotReset++
             }
         }
-        # Finding 5 (MEDIUM): Handoff Resume Block completeness — warn when ## Resume
-        # section exists but is missing required sub-sections (handoff.md §1a).
-        if ($content -match '(?m)^## Resume') {
+        # Finding 5 (MEDIUM): Handoff Resume Block completeness — required only
+        # once feature/architecture-change work reaches handoff/ship. The Work Log
+        # template's pre-handoff `Resume: none` placeholder is valid, and quick-win
+        # / hotfix paths are exempt from /handoff.
+        $wlPhaseForResume = ''
+        $phaseM = [regex]::Match($content, '(?m)^-\s+\*?\*?Current Phase\*?\*?:\s*`?([A-Za-z][\w-]*)')
+        if (-not $phaseM.Success) {
+            $phaseM = [regex]::Match($content, '(?m)^\|\s*\*?\*?Current Phase\*?\*?\s*\|\s*`?([A-Za-z][\w-]*)')
+        }
+        if ($phaseM.Success) { $wlPhaseForResume = $phaseM.Groups[1].Value.ToLower() }
+        $resumeRequired = (($wlClass -eq 'feature' -or $wlClass -eq 'architecture-change') -and
+            (($wlPhaseForResume -in @('handoff', 'ship')) -or
+             ($content -match '(?i)Gate:\s*(handoff|ship)\s*\|[^|\r\n]*Verdict:\s*PASS')))
+        if ($resumeRequired -and $content -match '(?m)^## Resume') {
             $resumeM = [regex]::Match($content, '(?ms)^## Resume\r?\n(.*?)(?=^## |\z)')
             $resumeBody = if ($resumeM.Success) { $resumeM.Groups[1].Value } else { '' }
             $missingSubsections = 0

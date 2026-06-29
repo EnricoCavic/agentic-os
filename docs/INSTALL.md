@@ -99,8 +99,10 @@ powershell -ExecutionPolicy Bypass -File .\.agentcortex\bin\validate.ps1 -NoPyth
 If you only want the governance templates (Markdown files) without running any tooling:
 
 1. Copy the `.agent/`, `.agents/`, and `AGENTS.md` files into your project
-2. Optionally copy `.agentcortex/context/` and `.agentcortex/templates/` for state management
+2. Optionally copy `.agentcortex/templates/current_state.md` to `.agentcortex/context/current_state.md` as your project-owned starting state
 3. No Python, Bash, or other tools are needed — all governance is plain Markdown
+
+Do not copy this repository's `.agentcortex/context/` directory wholesale; it contains Agentic OS runtime state, archives, and guard receipts, not your downstream project's state.
 
 </details>
 

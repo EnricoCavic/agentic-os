@@ -706,6 +706,14 @@ if [ ! -w "$TARGET" ]; then
     exit 1
 fi
 
+DOWNSTREAM_CURRENT_STATE_TEMPLATE="$REPO_ROOT/.agentcortex/templates/current_state.md"
+if [ ! -f "$DOWNSTREAM_CURRENT_STATE_TEMPLATE" ]; then
+    echo "" >&2
+    echo "ERROR: Missing downstream current_state template: .agentcortex/templates/current_state.md" >&2
+    echo "Deploy refuses to install the source repository's live .agentcortex/context/current_state.md downstream." >&2
+    exit 1
+fi
+
 # --- Dry-run mode: preview only ---
 if $DRY_RUN; then
     echo ""
@@ -757,6 +765,8 @@ if $DRY_RUN; then
              "$REPO_ROOT"/.github/copilot-instructions.md; do
         _dry_print_file "$f" "${f#$REPO_ROOT/}"
     done
+    # Generated downstream runtime SSoT: source template installs to context/current_state.md.
+    _dry_print_file "$DOWNSTREAM_CURRENT_STATE_TEMPLATE" ".agentcortex/context/current_state.md"
     # Runtime tools (whitelist only — not all *.py)
     for _bname in $_runtime_tools; do
         f="$REPO_ROOT/.agentcortex/tools/$_bname"
@@ -956,11 +966,7 @@ fi
 # --- Deploy: .agentcortex/context/current_state.md (scaffold) ---
 # Use the downstream template (generic placeholders) instead of the
 # framework's own SSoT which contains Agentic OS project-specific content.
-if [ -f "$REPO_ROOT/.agentcortex/templates/current_state.md" ]; then
-    deploy_file "$REPO_ROOT/.agentcortex/templates/current_state.md" ".agentcortex/context/current_state.md"
-else
-    deploy_file "$REPO_ROOT/.agentcortex/context/current_state.md" ".agentcortex/context/current_state.md"
-fi
+deploy_file "$DOWNSTREAM_CURRENT_STATE_TEMPLATE" ".agentcortex/context/current_state.md"
 
 # --- Deploy: .agentcortex/templates (scaffold) ---
 for f in "$REPO_ROOT"/.agentcortex/templates/*; do
@@ -1074,6 +1080,7 @@ write_downstream_ignore_block() {
 .agentcortex/context/work/*.lock.json
 !.agentcortex/context/work/.gitkeep.md
 .agentcortex/context/.guard_receipt.json
+.agentcortex/context/.guard_receipts/
 .agentcortex/context/.guard_locks/
 .agentcortex/context/private/
 .agent/private/
@@ -1104,6 +1111,7 @@ strip_managed_ignore_blocks() {
         managed[".agentcortex/context/work/*.lock.json"] = 1
         managed["!.agentcortex/context/work/.gitkeep.md"] = 1
         managed[".agentcortex/context/.guard_receipt.json"] = 1
+        managed[".agentcortex/context/.guard_receipts/"] = 1
         managed[".agentcortex/context/.guard_locks/"] = 1
         managed[".agentcortex/context/private/"] = 1
         managed[".agent/private/"] = 1
