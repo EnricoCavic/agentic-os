@@ -115,6 +115,7 @@ Constraints: only `/ship` writes SSoT; do not mutate branch protection; small re
 - review: Independent fresh-context review. Verdict: Ready to merge yes. AC-3 fail-close verified in temp fixture; AC-6 false-positive surface exhaustively probed clean; sh/ps1 parity confirmed; scope clean; baseline bump correct. Remediation finding: implementer's "2 pre-existing failures" were actually Batch-2-caused (spec-drift test broken by AC-4; token ceiling 357224 breached); fixed in a99ccca (doc-prose trim 357224→354730 + owner-approved minimal ceiling bump 354k→355k + spec-drift assertion fix).
 - test: Full CI-equivalent suite green. test_validator_false_positives.py -m slow 16 passed; test_validator_native_check_ratchet.py 5 passed; verifier+spec-drift+token-ceiling 68 passed; full not-slow 554 passed; generate_compact_index.py --check fresh. validate.sh+ps1 pass=104 warn=11 fail=1 (gitignored-log compaction artifact only; CI sees fail=0).
 - handoff: Work Log complete with all gate receipts. doc=docs/specs/dev-flow-hardening.md code=.agentcortex/bin/validate.sh log=this file.
+- ship: PASS | merge commit 47c84cb4ee53759d0f9549ef5b56e5791feefd6d (PR #300) | archive .agentcortex/context/archive/claude-dev-flow-batch2-gate-evidence-20260630.md
 
 ---
 
