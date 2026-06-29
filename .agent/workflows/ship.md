@@ -71,7 +71,7 @@ Scan Work Log `## Phase Summary` and the plan's compact block for a `Confidence:
 
 ## Ship Checklist (mandatory — skip = ship fail)
 
-- [ ] Evidence recorded in Work Log `## Evidence` section (non-empty; bootstrap placeholder `"Pending: bootstrap only"` is NOT sufficient — Ref: `engineering_guardrails.md §5.2b`)
+- [ ] Evidence recorded in Work Log `## Evidence` section (non-empty; bootstrap placeholder `"Pending: bootstrap only"` is NOT sufficient — Ref: `engineering_guardrails.md §5.2b`). Changes touching deploy/validator output/README: add a `Demonstration:` line with recipe command + captured output (CI anchor: `test_deploy_manifest_snapshot`).
 - [ ] `current_state.md` updated
 - [ ] Active Work Log archived to `.agentcortex/context/archive/`
 - [ ] Spec-Test trace verified (feature / architecture-change only — see §Spec-Test Traceability below)
