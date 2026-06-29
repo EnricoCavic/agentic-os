@@ -21,11 +21,7 @@ If the active Work Log references a `docs/specs/<feature>.md` file, run the advi
 python .agentcortex/tools/lint_spec_drift.py --worklog .agentcortex/context/work/<worklog-key>.md --base <Diff Base SHA> --head HEAD
 ```
 
-Use `Diff Base SHA` from the Work Log header — this is the immutable pre-implementation SHA that gives the full implemented diff, not just recent commits (AC-4).
-
-**Legacy fallback** (Work Logs that pre-date AC-4 and lack `Diff Base SHA`): fall back to `Checkpoint SHA` with a one-time WARN: `"⚠️ Diff Base SHA absent — falling back to Checkpoint SHA for spec drift base. Add Diff Base SHA to the Work Log header to resolve."` Do NOT silently reinterpret Checkpoint SHA as Diff Base SHA.
-
-**Note**: "refresh Checkpoint SHA on new commit" applies to Checkpoint SHA only. Diff Base SHA is never refreshed.
+Use the immutable `Diff Base SHA` from the Work Log header (full implemented diff, not just recent commits — AC-4). **Legacy fallback** (logs lacking `Diff Base SHA`): use `Checkpoint SHA` with a one-time WARN; never silently reinterpret it as the diff base.
 
 This check is advisory and non-blocking. Warnings can inform review questions, but they do NOT change the review verdict rules; AC proof still comes from the Burden of Proof Protocol below.
 
