@@ -107,6 +107,8 @@ Turn the verified development-flow audit findings into a small set of machine-ch
 3. **CI/security enforcement truth**: reconcile branch-protection claims, docs-only skip behavior, dependency audit coverage, and credential scanner fail-open paths.
 4. **Developer command hygiene**: fix or document default pytest collection and PowerShell no-Python flag parity.
 
+- **AC-13 Demonstration over green gates**: Changes that touch user-facing surfaces (deploy output, validator output, README) require an anchored demonstration — a real run whose output is captured and CI-enforced — not just green correctness gates. For the deploy surface: a normalized manifest snapshot (`tests/ci/fixtures/deploy_manifest_golden.txt`) is committed and asserted by `test_deploy_manifest_snapshot` in `tests/ci/test_deploy_tiering.py`; CI re-runs the real `deploy.sh` so a hand-faked golden diverges and stays red. The paved one-command recipe is `.agentcortex/tools/demo_deploy.sh`. **Honest-ceiling clause**: surfaces that CI actually executes (deploy) get anchored enforcement; surfaces that nothing executes (README render, holistic "reads right") remain honestly ADVISORY — no screenshot/golden harness is built (there is no in-repo CI consumer for rendered README output).
+
 ## Verification Plan
 
 - Run source validator on Python-present and no-Python modes: `validate.ps1`, `validate.ps1 -NoPython`, and `validate.ps1 --no-python`.
