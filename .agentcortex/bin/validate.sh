@@ -1461,9 +1461,19 @@ PYEOF
       fi
     fi
     # Finding 5 (MEDIUM): Handoff Resume Block completeness — prose rule (handoff.md §1a)
-    # requires all sub-sections. Warn when ## Resume section exists but is missing
-    # any of the mandatory headings: Read Map, Skip List, Context Snapshot.
-    if printf '%s' "$wl_content" | grep -q '^## Resume'; then
+    # requires all sub-sections only once feature/architecture-change work reaches
+    # handoff/ship. The Work Log template's pre-handoff `Resume: none` placeholder
+    # is valid and quick-win/hotfix paths are exempt from /handoff.
+    wl_phase_for_resume="$(printf '%s' "$wl_content" | grep -m1 -iE '^-[[:space:]]*\*?\*?Current Phase\*?\*?:' \
+      | sed 's/.*Current Phase[^:]*:[[:space:]]*//' | tr -d '`\r' | tr '[:upper:]' '[:lower:]' | xargs)" || true
+    resume_required=0
+    if [[ "$wl_class" == "feature" || "$wl_class" == "architecture-change" ]]; then
+      if [[ "$wl_phase_for_resume" == "handoff" || "$wl_phase_for_resume" == "ship" ]] \
+         || printf '%s' "$wl_content" | grep -qiE 'Gate:[[:space:]]*(handoff|ship)[[:space:]]*\|[^|]*Verdict:[[:space:]]*PASS'; then
+        resume_required=1
+      fi
+    fi
+    if [[ "$resume_required" -eq 1 ]] && printf '%s' "$wl_content" | grep -q '^## Resume'; then
       resume_body="$(printf '%s' "$wl_content" | sed -n '/^## Resume/,/^## /p')"
       missing_subsections=0
       for subsec in "Read Map" "Skip List" "Context Snapshot"; do

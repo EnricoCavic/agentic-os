@@ -21,6 +21,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import re
 from pathlib import Path
 
 import pytest
@@ -48,6 +49,13 @@ requires_bash = pytest.mark.skipif(bash is None, reason="bash not available")
 
 powershell = shutil.which("pwsh") or shutil.which("powershell")
 requires_powershell = pytest.mark.skipif(powershell is None, reason="PowerShell not available")
+requires_windows = pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="validate.ps1 is the native Windows validator; running it under Linux "
+    "pwsh mis-resolves $root. Behavioral sh↔ps1 parity is a Windows concern — the "
+    "cross-platform regression guard is the structural test above. (The Linux CI "
+    "'CI Structural Tests' job must NOT execute the native PS validator.)",
+)
 
 
 def _run_validate_ps1(cwd: Path) -> str:
@@ -72,6 +80,12 @@ PHASE_SUMMARY_WARN = "with empty Phase Summary"     # #171 (WARN-specific; avoid
 #   matching the PASS line "...have non-empty Phase Summary")
 TEMPLATE_WARN = "project spec template missing"     # #172
 PROJECT_NAME_WARN = "Project Name field absent"     # #172
+RESUME_WARN = "work logs with ## Resume section missing required sub-sections"
+
+
+def _resume_warn_count(output: str) -> int | None:
+    match = re.search(rf"{re.escape(RESUME_WARN)}.*?:\s*(\d+)", output)
+    return int(match.group(1)) if match else None
 
 
 def _run_validate(cwd: Path) -> str:
@@ -81,6 +95,83 @@ def _run_validate(cwd: Path) -> str:
         cwd=str(cwd),
     )
     return proc.stdout + proc.stderr
+
+
+def _write_worklog(
+    target: Path,
+    name: str,
+    *,
+    classification: str,
+    phase: str,
+    gates: tuple[str, ...],
+    resume: str = "none",
+    include_test_results: bool = False,
+) -> None:
+    work_dir = target / ".agentcortex" / "context" / "work"
+    work_dir.mkdir(parents=True, exist_ok=True)
+    gate_lines = "\n".join(
+        f"- Gate: {gate} | Verdict: PASS | Classification: {classification} | Timestamp: 2026-06-29T00:00:00Z"
+        for gate in gates
+    )
+    test_section = (
+        "\n---\n\n## Test Gate Results\n\n- Command: `pytest tests/ci`\n- Result: pass\n"
+        if include_test_results else ""
+    )
+    (work_dir / name).write_text(
+        f"""# Work Log: {name}
+
+## Header
+
+- Branch: `test/{name}`
+- Classification: `{classification}`
+- Current Phase: `{phase}`
+- Checkpoint SHA: `0000000000000000000000000000000000000000`
+
+---
+
+## Phase Summary
+
+Validator false-positive fixture. ACX
+
+---
+
+## Gate Evidence
+
+{gate_lines}
+
+---
+
+## Drift Log
+
+- ADR Coverage Check: test fixture.
+{test_section}
+---
+
+## Resume
+
+{resume}
+
+---
+
+## Evidence
+
+- Fixture evidence.
+""",
+        encoding="utf-8",
+        newline="\n",
+    )
+
+
+def _deploy_for_validator_fixture(td: Path) -> Path:
+    target = td / "proj"
+    target.mkdir()
+    first = subprocess.run(
+        [bash, str(DEPLOY_SH), str(target)],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        cwd=str(ROOT),
+    )
+    assert first.returncode == 0, f"deploy failed:\n{first.stderr}"
+    return target
 
 
 @pytest.fixture(scope="module")
@@ -182,6 +273,74 @@ def test_172_governance_only_adrs_do_not_fire() -> None:
         )
 
 
+@pytest.mark.slow
+@requires_bash
+def test_resume_none_before_handoff_is_not_warned_but_handoff_is_sh() -> None:
+    """`## Resume: none` is valid before handoff and for quick-win ship paths,
+    but feature/architecture-change handoff still requires the three subsections."""
+    with tempfile.TemporaryDirectory() as td:
+        target = _deploy_for_validator_fixture(Path(td))
+        _write_worklog(
+            target,
+            "plan-resume-none.md",
+            classification="architecture-change",
+            phase="plan",
+            gates=("bootstrap", "plan"),
+        )
+        _write_worklog(
+            target,
+            "quickwin-resume-none.md",
+            classification="quick-win",
+            phase="ship",
+            gates=("bootstrap", "plan", "implement", "ship"),
+        )
+        _write_worklog(
+            target,
+            "handoff-resume-missing.md",
+            classification="architecture-change",
+            phase="handoff",
+            gates=("bootstrap", "plan", "implement", "review", "test", "handoff"),
+            include_test_results=True,
+        )
+
+        out = _run_validate(target)
+        assert _resume_warn_count(out) == 1, out[-1200:]
+
+
+@pytest.mark.slow
+@requires_windows
+@requires_bash
+@requires_powershell
+def test_resume_none_before_handoff_is_not_warned_but_handoff_is_ps1() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        target = _deploy_for_validator_fixture(Path(td))
+        _write_worklog(
+            target,
+            "plan-resume-none.md",
+            classification="architecture-change",
+            phase="plan",
+            gates=("bootstrap", "plan"),
+        )
+        _write_worklog(
+            target,
+            "quickwin-resume-none.md",
+            classification="quick-win",
+            phase="ship",
+            gates=("bootstrap", "plan", "implement", "ship"),
+        )
+        _write_worklog(
+            target,
+            "handoff-resume-missing.md",
+            classification="architecture-change",
+            phase="handoff",
+            gates=("bootstrap", "plan", "implement", "review", "test", "handoff"),
+            include_test_results=True,
+        )
+
+        out = _run_validate_ps1(target)
+        assert _resume_warn_count(out) == 1, out[-1200:]
+
+
 # ---------------------------------------------------------------------------
 # Structural — cross-platform parity (sh ↔ ps1) of each fix
 # ---------------------------------------------------------------------------
@@ -221,21 +380,42 @@ def test_f4_deprecated_files_pass_branch_parity() -> None:
     assert msg in VALIDATE_PS1.read_text(encoding="utf-8")
 
 
+def test_validate_ps1_declares_unix_style_no_python_alias() -> None:
+    ps1 = VALIDATE_PS1.read_text(encoding="utf-8-sig")
+    assert "[Alias('no-python')]" in ps1
+
+
+@pytest.mark.slow
+@requires_windows
+@requires_powershell
+def test_validate_ps1_unix_style_no_python_enters_reduced_assurance_mode() -> None:
+    proc = subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(VALIDATE_PS1),
+            "--no-python",
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        cwd=str(ROOT),
+    )
+    out = proc.stdout + proc.stderr
+    assert "python checks disabled (--NoPython)" in out
+    assert "Summary:" in out
+
+
 def test_global_lessons_count_uses_match_count_in_ps1() -> None:
     """PowerShell must count regex matches, not the single Measure-Object result."""
     ps1 = VALIDATE_PS1.read_text(encoding="utf-8")
 
     assert "Measure-Object).Count" not in ps1
     assert "([regex]::Matches($csContent, '(?m)^- \\[Category:')).Count" in ps1
-
-
-requires_windows = pytest.mark.skipif(
-    sys.platform != "win32",
-    reason="validate.ps1 is the native Windows validator; running it under Linux "
-    "pwsh mis-resolves $root. Behavioral sh↔ps1 parity is a Windows concern — the "
-    "cross-platform regression guard is the structural test above. (The Linux CI "
-    "'CI Structural Tests' job must NOT execute the native PS validator.)",
-)
 
 
 @pytest.mark.slow
