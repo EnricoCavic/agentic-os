@@ -14,6 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 REQS = ROOT / ".github" / "requirements-ci.txt"
 WORKFLOW = ROOT / ".github" / "workflows" / "validate.yml"
+SECURITY_WORKFLOW = ROOT / ".github" / "workflows" / "security.yml"
 
 
 def test_requirements_file_pins_test_deps() -> None:
@@ -69,3 +70,36 @@ def test_workflow_has_utf8_sweep_and_critical_file_precheck() -> None:
     block = txt.split("utf8-and-critical-files:", 1)[1]
     for needle in ('decode("utf-8")', "AGENTS.md", "validate.ps1", "git", "ls-files"):
         assert needle in block, f"UTF-8 sweep job must contain {needle!r} (#163)"
+
+
+# AC-12: threat-aware classifier parity — .agentcortex/context/* must NOT be on
+# the inert skip arm in EITHER workflow (both classifiers must stay in sync).
+_CONTEXT_SKIP_PATTERN = re.compile(r"\.agentcortex/context/\*")
+
+
+def _inert_arm_text(workflow_text: str) -> str:
+    """Extract the case-arm block that handles inert/skip patterns (docs-only path)."""
+    # Both classifiers use a case statement with a trailing `*) heavy=true` arm.
+    # Capture everything between the opening `case "$f" in` and `*) heavy=true`.
+    m = re.search(r"case \"\$f\" in(.*?)\*\)\s*heavy=true", workflow_text, re.DOTALL)
+    return m.group(1) if m else ""
+
+
+def test_ac12_context_not_on_inert_arm_validate_yml() -> None:
+    txt = WORKFLOW.read_text(encoding="utf-8")
+    inert = _inert_arm_text(txt)
+    assert inert, "Could not locate the case-arm classifier in validate.yml"
+    assert not _CONTEXT_SKIP_PATTERN.search(inert), (
+        ".agentcortex/context/* must NOT be on the inert skip arm in validate.yml "
+        "(SSoT/runtime state is security-relevant — AC-12)"
+    )
+
+
+def test_ac12_context_not_on_inert_arm_security_yml() -> None:
+    txt = SECURITY_WORKFLOW.read_text(encoding="utf-8")
+    inert = _inert_arm_text(txt)
+    assert inert, "Could not locate the case-arm classifier in security.yml"
+    assert not _CONTEXT_SKIP_PATTERN.search(inert), (
+        ".agentcortex/context/* must NOT be on the inert skip arm in security.yml "
+        "(SSoT/runtime state is security-relevant — AC-12)"
+    )

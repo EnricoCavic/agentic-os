@@ -57,7 +57,9 @@ jobs:
             [ -z "$f" ] && continue
             case "$f" in
               README.md|README_*.md|llms.txt|LICENSE|CHANGELOG.md|CONTRIBUTING.md|CITATION.cff) ;;
-              docs/*|.agentcortex/context/*|.agentcortex/docs/*) ;;
+              docs/*|.agentcortex/docs/*) ;;
+              # .agentcortex/context/* is SSoT/runtime state — NOT inert; changes there
+              # must trigger security-relevant jobs (AC-12 threat-aware classifier).
               *) heavy=true; break ;;
             esac
           done <<< "$files"

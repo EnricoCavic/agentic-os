@@ -67,7 +67,9 @@ jobs:
             case "$f" in
               # Inert documentation surfaces — never exercised by the test suite.
               README.md|README_*.md|llms.txt|LICENSE|CHANGELOG.md|CONTRIBUTING.md|CITATION.cff) ;;
-              docs/*|.agentcortex/context/*|.agentcortex/docs/*) ;;
+              docs/*|.agentcortex/docs/*) ;;
+              # .agentcortex/context/* is SSoT/runtime state — NOT inert; changes there
+              # must trigger security-relevant jobs (AC-12 threat-aware classifier).
               # Anything else (code, AGENTS.md/.agent governance, tests, CI) is heavy.
               *) heavy=true; break ;;
             esac
