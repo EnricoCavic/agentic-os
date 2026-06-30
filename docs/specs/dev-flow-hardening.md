@@ -1,5 +1,5 @@
 ---
-status: draft
+status: shipped
 classification: architecture-change
 primary_domain: governance-runtime
 signal_tier: T1
@@ -116,3 +116,11 @@ Turn the verified development-flow audit findings into a small set of machine-ch
 - Run a temp downstream deploy and inspect the installed `.agentcortex/context/current_state.md`.
 - Run dry-run deploy and compare the previewed install artifacts against real deploy outputs.
 - Run branch-protection inspection via `gh api` when GitHub auth is available, and document the exact required-check result as evidence.
+
+## Enforcement Notes (post-ship)
+
+All 13 ACs are implemented and shipped (PRs #299 AC-1/2/11, #300 AC-3/4/5/6, #301 AC-13, #302 AC-7/8/9/12 + the pytest 9.0.3 bump fixing CVE-2025-71176 that AC-9 surfaced, #303 AC-10). Each AC's rule lives in an AI-loaded surface (worklog template, ship/implement/review/handoff workflows) and/or is machine-enforced by a fail-closing validator/test/CI job — none is spec-only advisory prose. Honest residual notes:
+
+- **AC-2**: the "created from template" provenance is asserted at the install-path level (dry-run/real-deploy agree on the artifact); the disclosure *wording* lives in a `deploy.sh` comment, not a test string.
+- **AC-5**: `verify_agent_evidence.py --strict` is CI-invoked, not wired into `validate.sh`/`validate.ps1` — by design (the honesty fix is internal to the tool).
+- **AC-13 enforcement reaches CI, not the merge gate**: `test_deploy_manifest_snapshot` runs in the `CI Structural Tests` job, which is `heavy`-gated and **non-required** for branch protection (only `Framework Validation`, `ShellCheck`, `Check Markdown Links` are required). A faked golden therefore reddens CI but does not block auto-merge. This is a deliberate, documented trade-off consistent with AC-7 ("do not mutate branch protection from code") and the repo's intentional minimal-required-checks posture: promoting `CI Structural Tests` to a required check is **rejected** because the job is `heavy`-gated, so a required-but-skipped check would permanently block docs-only PRs (the same footgun AC-7 documents for Semgrep). Making AC-13 a true merge floor is a maintainer-owned branch-protection decision, not an automated one.
