@@ -12,9 +12,9 @@
   - Active Work Log Path: derive <worklog-key> from the raw branch name using filesystem-safe normalization before any gate checks.
   - Workflows & Policies: `.agent/workflows/*.md`, `.agent/rules/*.md`
 - **Project Name**: (set by /app-init)
-- **Last Updated**: 2026-06-30T20:05:00Z
+- **Last Updated**: 2026-06-30T21:00:00Z
 - **Last Verified**: 2026-06-30
-- **Update Sequence**: 100
+- **Update Sequence**: 101
 - **ADR Index**:
   - docs/adr/ADR-001-governance-friction-tuning.md — ADR-001: Governance Friction Tuning, accepted 2026-04-23
   - docs/adr/ADR-002-guarded-governance-writes.md — ADR-002: Guarded Governance Writes (lock unification + CI lint + lifecycle frontmatter), accepted 2026-04-25
@@ -46,6 +46,7 @@
   - docs/specs/kb-seam-hardening.md — KB-Seam Hardening + Dogfood (`${ACX_KB_PATH}` resolution + path trust model [no guard] + 1 injection-decline eval + §6.1 vocab pin), [Shipped 2026-06-21] (ADR-009 follow-up)
   - docs/specs/frozen-spec-lifecycle.md — Frozen-Spec Lifecycle Fix (narrow Spec-Index-completeness validator to skip draft/frozen/cancelled; require-in-index only for shipped/living; reconcile spec.md↔spec-intake.md; plan.md reads disk status), [Shipped 2026-06-22] (ADR-010)
   - docs/specs/kb-seam-accelerator-consumption.md — KB-Seam Accelerator Consumption (consume OPTIONAL schema-v4 manifest fields: kb_version fingerprint in §1b health, approx_tokens budgeting + candidate-pool applicability in §3.6, UNREADABLE covers malformed, delete dead kb_path_env, adopter guide; graceful for absent/BYO-no-manifest), [Shipped 2026-06-23] (ADR-009 follow-up)
+  - docs/specs/dev-flow-hardening.md — Development Flow Hardening (downstream state isolation, gate/evidence honesty, CI/security enforcement truth, demonstration over green gates), [Shipped 2026-06-30] (AC-1..AC-13, PRs #299-#303)
 - **Canonical Commands**:
   - `/spec-intake`: Import external specs (from other LLMs, documents, or natural language). Handles large product specs via decomposition. Runs before `/bootstrap`.
   - `/bootstrap`: Task initialization & classification freeze.
@@ -100,6 +101,10 @@
 - [Category: rule-placement][Severity: HIGH][Trigger: authoring-safety-rule-or-auditing-rule-surfaces][prev: 3b15e10b] Sort SAFETY rules by hazard reachability, not token cost. A rule that must hold during a 30-second out-of-phase action (destructive commands, secrets, untrusted tool output) MUST live on the always-loaded surface (AGENTS.md Core Directives invariant cluster, cap ~5) - phase/tier-scoped files and platform adapters are probabilistic gates, and a probabilistic gate on an irreversible failure is a design error regardless of token savings. Confirmed 2026-06-11: 'Destructive Command Blocking' was advertised in both READMEs and machine-guarded in ADAPTER copies (validators checked Codex/Antigravity retained it!) while the canonical loaded surface had nothing - a downstream rm -rf cascade destroyed a parent repo working tree. Placement test for every new MUST: hazard reachable from any tool call AND irreversible/exfiltrating -> always-loaded; else phase surface is fine but README/docs must not claim it is always-on.
 - [Category: eval-mapping][Severity: MEDIUM][Trigger: adding-or-retargeting-eval-protects-tag][prev: 14ac98ca] An eval case can silently guard an EMPTY rule: protects-tags resolve at section level, so a case pointing at a section that contains no text for the behavior it tests still 'resolves' and scores green off the model's general training - verifier-without-defense, the inverse of advertised-but-unenforced. Confirmed 2026-06-11: prompt-injection-in-tool-output protected 'AGENTS.md Core Directives' which contained zero injection text for ~2 months. Discipline: when ADDING a rule, land the guarding case in the SAME commit; when ADDING/RETARGETING a case, quote the exact rule sentence it protects in the PR description - if you cannot quote it, the rule does not exist and the case is theatre.
 ## Ship History
+
+### Ship-claude-dev-flow-spec-settle-2026-06-30
+- **Branch `claude/dev-flow-spec-settle`** (quick-win, governance-runtime) — dev-flow-hardening spec finalized `status: draft` → `status: shipped`; `## Enforcement Notes (post-ship)` section added (AC-2/AC-5 honesty caveats + AC-13 non-required-check rationale + AC-7 no-mutation stance); Spec Index entry added to SSoT (SSoT Spec Index completeness FAIL → PASS). All 13 ACs complete (PRs #299–#303). SSoT sequence 100→101.
+- Tests: SSoT Spec Index completeness PASS; validate.sh CI-equiv fail=0 (only pre-existing gitignored Work Log compaction artifact). Rollback = revert PR.
 
 ### Ship-claude-dev-flow-ac10-pytest-hygiene-2026-06-30
 - **Branch `claude/dev-flow-ac10-pytest-hygiene` (PR #303, merge d8fa426)** (quick-win, developer-experience) — **AC-10 (default pytest command safety)**: bare `pytest --collect-only -q` from repo root now exits 0 with 628 tests collected (was broken: `KeyError: ANTHROPIC_API_KEY` from `cache_test.py` at import). `cache_test.py` renamed `cache_demo.py` + `.gitignore` updated; `pytest.ini` gains `norecursedirs` (temp_downstream*, scratch, demo, codex, installers, __pycache__, .pytest_cache, .git, .acx-local); README "Running the tests" section added with canonical local command (`pytest tests/ci/ tests/guard/ .agentcortex/tests/ -m "not slow"`); 2 regression lock tests added. **This is the LAST AC — all 13 ACs of `docs/specs/dev-flow-hardening.md` are now implemented** (AC-1/2/11 PR #299; AC-3/4/5/6 PR #300; AC-13 PR #301; AC-7/8/9/12 PR #302; AC-10 this PR). Spec stays `status: draft` pending a separate settle decision. SSoT sequence 99→100.
