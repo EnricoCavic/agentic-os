@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.8.6] - 2026-06-30
+
+Development-flow hardening: 13 acceptance criteria across downstream-state isolation, gate/evidence honesty, CI/security enforcement truth, demonstration-over-green-gates, and developer-command hygiene (PRs #299–#304). Net effect: more governance MUSTs are now machine-enforced rather than self-reported. (v1.8.5 was cut and reverted for a capabilities CI regression; this release skips that number.)
+
+- **Downstream SSoT isolation + dry-run honesty (AC-1/AC-2, #299)**: deploy installs `.agentcortex/context/current_state.md` only from the template and fails closed if it is absent — the source repo's live SSoT is never shipped downstream; dry-run discloses the generated artifact.
+- **Gate/evidence honesty (AC-3/4/5/6, #300)**: `/ship` gate-receipt audit hard-fails on missing required receipts for feature/architecture-change; `Diff Base SHA` split from `Checkpoint SHA`; `verify_agent_evidence.py --strict` + honest 3-state wording; validator escalates current-branch Resume/Test-Gate gaps at handoff/ship to FAIL (historical stays WARN), sh/ps1 parity.
+- **Demonstration over green gates (AC-13, #301)**: user-facing-surface changes require an anchored demonstration — for deploy, a normalized manifest golden asserted against a CI re-run of real `deploy.sh`; honest-ceiling: non-executed surfaces (README render) stay advisory, no screenshot harness.
+- **CI/security enforcement truth (AC-7/8/9/12, #302)**: docs reconciled to the real required-check set; credential scan fails closed on scanner execution error; dependency audit now covers `.github/requirements-ci.txt` — which surfaced **CVE-2025-71176 in pytest 8.4.1**, fixed by bumping to pytest 9.0.3; the docs-only CI classifier no longer lets `.agentcortex/context/*` runtime state skip security-relevant jobs.
+- **Developer-command hygiene (AC-10/AC-11)**: bare `pytest` from repo root no longer dies on a gitignored cache demo (`norecursedirs` + rename + documented canonical command); `validate.ps1 --no-python` is a real alias of `-NoPython`.
+- Spec `docs/specs/dev-flow-hardening.md` finalized `draft → shipped` + indexed (#304).
+
 ## [1.8.4] - 2026-06-28
 
 Patch release: **deploy data-loss fix** (confirmed live in v1.8.3).
