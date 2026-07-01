@@ -12,9 +12,9 @@
   - Active Work Log Path: derive <worklog-key> from the raw branch name using filesystem-safe normalization before any gate checks.
   - Workflows & Policies: `.agent/workflows/*.md`, `.agent/rules/*.md`
 - **Project Name**: (set by /app-init)
-- **Last Updated**: 2026-06-30T23:00:00Z
-- **Last Verified**: 2026-06-30
-- **Update Sequence**: 102
+- **Last Updated**: 2026-07-01T13:10:00Z
+- **Last Verified**: 2026-07-01
+- **Update Sequence**: 103
 - **ADR Index**:
   - docs/adr/ADR-001-governance-friction-tuning.md — ADR-001: Governance Friction Tuning, accepted 2026-04-23
   - docs/adr/ADR-002-guarded-governance-writes.md — ADR-002: Guarded Governance Writes (lock unification + CI lint + lifecycle frontmatter), accepted 2026-04-25
@@ -29,7 +29,7 @@
 - **Active Backlog**: `docs/specs/_product-backlog.md` (15 active items; Kind/Labels/Priority columns active 2026-05-06)
 - **Spec Index** (shipped specs at `docs/specs/`; drafts/research tracked in `_product-backlog.md`):
   - docs/specs/lock-unification.md — Guarded Governance Writes implementation spec, [Shipped 2026-04-25] (ADR-002)
-  - docs/specs/ci-security-scanning.md — CI Security Scanning (Semgrep + TruffleHog + dependency audit), [Shipped 2026-05-11] (backlog #20)
+  - docs/specs/ci-security-scanning.md — CI Security Scanning (Semgrep + TruffleHog + dependency audit), [Shipped 2026-05-11] (backlog #20) [Updated: 2026-07-01 — AC-5 first-party SHA-pin]
   - docs/specs/audit-chain-tamper-evidence.md — Audit-Chain Tamper-Evidence Hardening (C1 truncation + C2 migrate), [Shipped 2026-05-29] (ADR-003 amendment, backlog #42)
   - docs/specs/handoff-trigger-policy.md — Handoff-Trigger Policy: turn-count → context-occupancy + phase-boundary (cross-platform, advisory), [Shipped 2026-05-31] (ADR-001 domain)
   - docs/specs/downstream-fork-accommodation.md — Downstream Fork/Clone Accommodation (override layer activation + deploy skill-sidecar tiering + README fork stance + custom/* namespace), [Shipped 2026-06-03] (ADR-004 + ADR-005)
@@ -101,6 +101,10 @@
 - [Category: rule-placement][Severity: HIGH][Trigger: authoring-safety-rule-or-auditing-rule-surfaces][prev: 3b15e10b] Sort SAFETY rules by hazard reachability, not token cost. A rule that must hold during a 30-second out-of-phase action (destructive commands, secrets, untrusted tool output) MUST live on the always-loaded surface (AGENTS.md Core Directives invariant cluster, cap ~5) - phase/tier-scoped files and platform adapters are probabilistic gates, and a probabilistic gate on an irreversible failure is a design error regardless of token savings. Confirmed 2026-06-11: 'Destructive Command Blocking' was advertised in both READMEs and machine-guarded in ADAPTER copies (validators checked Codex/Antigravity retained it!) while the canonical loaded surface had nothing - a downstream rm -rf cascade destroyed a parent repo working tree. Placement test for every new MUST: hazard reachable from any tool call AND irreversible/exfiltrating -> always-loaded; else phase surface is fine but README/docs must not claim it is always-on.
 - [Category: eval-mapping][Severity: MEDIUM][Trigger: adding-or-retargeting-eval-protects-tag][prev: 14ac98ca] An eval case can silently guard an EMPTY rule: protects-tags resolve at section level, so a case pointing at a section that contains no text for the behavior it tests still 'resolves' and scores green off the model's general training - verifier-without-defense, the inverse of advertised-but-unenforced. Confirmed 2026-06-11: prompt-injection-in-tool-output protected 'AGENTS.md Core Directives' which contained zero injection text for ~2 months. Discipline: when ADDING a rule, land the guarding case in the SAME commit; when ADDING/RETARGETING a case, quote the exact rule sentence it protects in the PR description - if you cannot quote it, the rule does not exist and the case is theatre.
 ## Ship History
+
+### Ship-codex-governance-premortem-audit-2026-07-01
+- **Branch `codex/governance-premortem-audit`** (quick-win, ci-security + governance) — merged PR #306 (squash `59e4a34`). Codex premortem audit (2026-07-01 round 1+2) + takeover follow-through: (1) supply-chain — all GitHub Actions incl. first-party pinned to commit SHA in `security.yml`/`validate.yml`, dependabot `github-actions` cooldown 7d, enforcing tests; (2) governance metabolism — validator WARN for stale pending `routing_actions` (config `routing_actions_pending_warn_days: 14`, sh+ps1 parity), 2026-06-16 audit actions closed into `document-governance.log`, framework-no-stale regression test. Takeover reconciliation (this session): AC-5 spec first-party carve-out removed to match shipped SHA enforcement (+ Domain Decision recording tighten-vs-relax), stale `_FLOATING_REF_RE` comment fixed, governance-log placeholder normalized then backfilled to `59e4a34`, 4 pending premortem findings tracked as backlog #103. SSoT sequence 102→103.
+- Tests: CI 18/18 green; validate.sh fail=0; test_security_workflow.py 40/40; routing-actions validator tests pass; independent fresh-context review PASS. Rollback = revert PR #306.
 
 ### Ship-chore-v1.8.6-release-2026-06-30
 - Feature shipped: v1.8.6 bundles PRs #299–#304 (dev-flow-hardening, all 13 ACs). Banners bumped 1.8.4→1.8.6 across 7 files (deploy.sh ACX_VERSION, CITATION.cff, Model Guide EN+zh-TW, Testing Protocol EN+zh-TW, antigravity-v5-runtime.md). CHANGELOG [1.8.6] prepended. v1.8.5 was cut and reverted (capabilities CI regression); this release skips that number. SSoT sequence 101→102.
