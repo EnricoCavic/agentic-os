@@ -12,9 +12,9 @@
   - Active Work Log Path: derive <worklog-key> from the raw branch name using filesystem-safe normalization before any gate checks.
   - Workflows & Policies: `.agent/workflows/*.md`, `.agent/rules/*.md`
 - **Project Name**: (set by /app-init)
-- **Last Updated**: 2026-07-02T08:25:00Z
+- **Last Updated**: 2026-07-02T08:55:00Z
 - **Last Verified**: 2026-07-02
-- **Update Sequence**: 107
+- **Update Sequence**: 108
 - **ADR Index**:
   - docs/adr/ADR-001-governance-friction-tuning.md — ADR-001: Governance Friction Tuning, accepted 2026-04-23
   - docs/adr/ADR-002-guarded-governance-writes.md — ADR-002: Guarded Governance Writes (lock unification + CI lint + lifecycle frontmatter), accepted 2026-04-25
@@ -47,6 +47,7 @@
   - docs/specs/frozen-spec-lifecycle.md — Frozen-Spec Lifecycle Fix (narrow Spec-Index-completeness validator to skip draft/frozen/cancelled; require-in-index only for shipped/living; reconcile spec.md↔spec-intake.md; plan.md reads disk status), [Shipped 2026-06-22] (ADR-010)
   - docs/specs/kb-seam-accelerator-consumption.md — KB-Seam Accelerator Consumption (consume OPTIONAL schema-v4 manifest fields: kb_version fingerprint in §1b health, approx_tokens budgeting + candidate-pool applicability in §3.6, UNREADABLE covers malformed, delete dead kb_path_env, adopter guide; graceful for absent/BYO-no-manifest), [Shipped 2026-06-23] (ADR-009 follow-up)
   - docs/specs/dev-flow-hardening.md — Development Flow Hardening (downstream state isolation, gate/evidence honesty, CI/security enforcement truth, demonstration over green gates), [Shipped 2026-06-30] (AC-1..AC-13, PRs #299-#303)
+  - docs/specs/governance-self-audit-workflow.md — Governance Self-Audit Workflow (/govern-audit: report-only, verified-findings + disposition funnel + routing_actions), [Shipped 2026-07-02] (backlog #104, PR #311)
 - **Canonical Commands**:
   - `/spec-intake`: Import external specs (from other LLMs, documents, or natural language). Handles large product specs via decomposition. Runs before `/bootstrap`.
   - `/bootstrap`: Task initialization & classification freeze.
@@ -58,6 +59,7 @@
   - `/decide`: Record key decisions with reasoning to prevent cross-session re-derivation.
   - `/test-classify`: Auto-select test depth and evidence format based on task classification.
   - `/ship`: Consolidate evidence and update/archive state.
+  - `/govern-audit`: Audit the governance system itself (report-only; verified findings + routed dispositions).
   - `ask-openrouter`: [OPTIONAL] External model delegation. See `.agent/workflows/ask-openrouter.md`.
   - `codex-cli`: [OPTIONAL] Codex CLI delegation. See `.agent/workflows/codex-cli.md`.
 - **References**:
@@ -101,6 +103,10 @@
 - [Category: rule-placement][Severity: HIGH][Trigger: authoring-safety-rule-or-auditing-rule-surfaces][prev: 3b15e10b] Sort SAFETY rules by hazard reachability, not token cost. A rule that must hold during a 30-second out-of-phase action (destructive commands, secrets, untrusted tool output) MUST live on the always-loaded surface (AGENTS.md Core Directives invariant cluster, cap ~5) - phase/tier-scoped files and platform adapters are probabilistic gates, and a probabilistic gate on an irreversible failure is a design error regardless of token savings. Confirmed 2026-06-11: 'Destructive Command Blocking' was advertised in both READMEs and machine-guarded in ADAPTER copies (validators checked Codex/Antigravity retained it!) while the canonical loaded surface had nothing - a downstream rm -rf cascade destroyed a parent repo working tree. Placement test for every new MUST: hazard reachable from any tool call AND irreversible/exfiltrating -> always-loaded; else phase surface is fine but README/docs must not claim it is always-on.
 - [Category: eval-mapping][Severity: MEDIUM][Trigger: adding-or-retargeting-eval-protects-tag][prev: 14ac98ca] An eval case can silently guard an EMPTY rule: protects-tags resolve at section level, so a case pointing at a section that contains no text for the behavior it tests still 'resolves' and scores green off the model's general training - verifier-without-defense, the inverse of advertised-but-unenforced. Confirmed 2026-06-11: prompt-injection-in-tool-output protected 'AGENTS.md Core Directives' which contained zero injection text for ~2 months. Discipline: when ADDING a rule, land the guarding case in the SAME commit; when ADDING/RETARGETING a case, quote the exact rule sentence it protects in the PR description - if you cannot quote it, the rule does not exist and the case is theatre.
 ## Ship History
+
+### Ship-feat-govern-audit-workflow-2026-07-02
+- **Branch `feat/govern-audit-workflow`** (feature, document-governance) — merged PR #311 (squash `fe87034`). Backlog **#104**: `/govern-audit`, a first-class report-only gate-exempt workflow for auditing the GOVERNANCE SYSTEM itself (previously done by overloading `/audit` ad-hoc — 3 waves/12 subagents on 2026-07-01/02). Encodes the proven method: baseline-first (validator + prior snapshots + backlog dedup), findings-are-hypotheses (verify BOTH cited sides before reporting, [audit-verification]), disposition funnel (do-now/backlog/close-with-reason; "deferred" prohibited), same-vendor external-signal caveat ([audit-method]), scope-qualified snapshot naming + mandatory routing_actions. Gate-exempt but abuse-proof: exhaustive PERMITTED-WRITES list (snapshot/routing_actions/backlog) blocks SSoT/rule writes. Wiring: routing.md §1 row + §4 audit-vs-govern-audit disambiguation + §5 registry; `.claude/commands` stub; `check_command_sync.py` EXPECTED_COMMANDS; deploy manifest golden +2. Zero always-loaded token cost. **Full feature flow ran**: spec (frozen→shipped) → plan → implement → INDEPENDENT fresh-context review (PASS, 6/6 AC PROVEN, adversarial passes clean) → test → handoff → ship. The validator FAILed an over-eager `Gate: spec` receipt mid-flight (receipt vocabulary = 7 parser phases) — fixed per convention; its CI run also exposed the pre-existing Windows lock bug shipped separately as PR #312. SSoT sequence 107→108.
+- Tests: full CI-equiv 570 passed; deploy manifest snapshot green; token tests unchanged (no ceiling bump); validate.sh fail=0; PR #311 CI 18 pass post-#312. Rollback = revert PR #311.
 
 ### Ship-fix-guard-lock-win-delete-pending-2026-07-02
 - **Branch `fix/guard-lock-win-delete-pending`** (quick-win, governance-runtime) — merged PR #312 (squash `ea9c0b0`). Fixes a PRE-EXISTING cross-process lock bug exposed by PR #311's Windows CI failing twice on `test_d2_1_guard_race`: on Windows, `os.open(O_CREAT|O_EXCL)` on a lock file in the **delete-pending** state (previous holder mid-`unlink`, or AV/indexer briefly holding it) raises `PermissionError` — not `FileExistsError` — and `guard_context_write.py file_lock`'s retry loop caught only the latter, crashing the acquirer (the unlink side documented the sibling WinError 32 quirk; the open side was missed). Fix: a `PermissionError` retry arm (same busy backoff; past deadline → re-raise the ORIGINAL PermissionError so genuine ACL errors stay diagnosable). Cross-platform, no platform gate → 2 deterministic regression tests (one-shot injected denial retried to acquisition; persistent denial re-raises after deadline). Attribution: not #311's diff (touches no guard code); the 2-core hosted runner widens the delete-pending window that local machines rarely hit. SSoT sequence 106→107.
