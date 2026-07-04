@@ -12,9 +12,9 @@
   - Active Work Log Path: derive <worklog-key> from the raw branch name using filesystem-safe normalization before any gate checks.
   - Workflows & Policies: `.agent/workflows/*.md`, `.agent/rules/*.md`
 - **Project Name**: (set by /app-init)
-- **Last Updated**: 2026-07-04T12:00:00Z
+- **Last Updated**: 2026-07-04T13:50:00Z
 - **Last Verified**: 2026-07-04
-- **Update Sequence**: 113
+- **Update Sequence**: 114
 - **ADR Index**:
   - docs/adr/ADR-001-governance-friction-tuning.md — ADR-001: Governance Friction Tuning, accepted 2026-04-23
   - docs/adr/ADR-002-guarded-governance-writes.md — ADR-002: Guarded Governance Writes (lock unification + CI lint + lifecycle frontmatter), accepted 2026-04-25
@@ -105,6 +105,10 @@
 - [Category: rule-placement][Severity: HIGH][Trigger: authoring-safety-rule-or-auditing-rule-surfaces][prev: 3b15e10b] Sort SAFETY rules by hazard reachability, not token cost. A rule that must hold during a 30-second out-of-phase action (destructive commands, secrets, untrusted tool output) MUST live on the always-loaded surface (AGENTS.md Core Directives invariant cluster, cap ~5) - phase/tier-scoped files and platform adapters are probabilistic gates, and a probabilistic gate on an irreversible failure is a design error regardless of token savings. Confirmed 2026-06-11: 'Destructive Command Blocking' was advertised in both READMEs and machine-guarded in ADAPTER copies (validators checked Codex/Antigravity retained it!) while the canonical loaded surface had nothing - a downstream rm -rf cascade destroyed a parent repo working tree. Placement test for every new MUST: hazard reachable from any tool call AND irreversible/exfiltrating -> always-loaded; else phase surface is fine but README/docs must not claim it is always-on.
 - [Category: eval-mapping][Severity: MEDIUM][Trigger: adding-or-retargeting-eval-protects-tag][prev: 14ac98ca] An eval case can silently guard an EMPTY rule: protects-tags resolve at section level, so a case pointing at a section that contains no text for the behavior it tests still 'resolves' and scores green off the model's general training - verifier-without-defense, the inverse of advertised-but-unenforced. Confirmed 2026-06-11: prompt-injection-in-tool-output protected 'AGENTS.md Core Directives' which contained zero injection text for ~2 months. Discipline: when ADDING a rule, land the guarding case in the SAME commit; when ADDING/RETARGETING a case, quote the exact rule sentence it protects in the PR description - if you cannot quote it, the rule does not exist and the case is theatre.
 ## Ship History
+
+### Ship-fix-ask-local-discovery-surfaces-2026-07-04
+- **Branch `fix/ask-local-discovery-surfaces`** (quick-win, document-governance) — merged PR #319 (squash `0efab29`). Post-v1.8.8 wrap-up driven by two fresh-context AI-adopter sims (discovery walkthrough + 6-scenario discipline dry-run): the module routes and governs correctly (6/6 discipline cases decided by quoted text), but three enumeration/readability gaps were fixed — `templates/current_state.md` Canonical Commands seed was missing `ask-local` AND pre-existing `claude-cli` (fresh adopters' SSoT would never mention local-model delegation); both validators' optional-module file group +`ask-local.md` (parity, 3→4 items, same single check); `ask-local.md §2.4` clarified "auto-execute" = cost-pause only, never gate-skip (the one mid-tier misread risk found). Also filed backlog **#117** (P2): Global Lessons cap-archival vs hash-chain contradiction — retro.md §3's archive-oldest-LOW procedure is unexecutable (chain breaks on any removal; first hit at cap 20/20 while attempting the registry-surface-sync lesson append); chain left untouched, lesson content preserved in #117. SSoT sequence 113→114.
+- Tests: full CI-equiv 574 passed; validate.sh/.ps1 parity pass=97 warn=3 fail=0; PR #319 CI 18 pass. Rollback = revert PR #319.
 
 ### Ship-chore-v1.8.8-release-2026-07-04
 - Feature shipped: v1.8.8 packages the 2026-07-04 local-model delegation wave (PRs #316–#317): `/ask-local` optional module (#115) + codex `--oss` variant + the HANDEDOFF→IMPLEMENTING validator reverse-edge fix. Version banners 1.8.7→1.8.8 across 7 files (deploy.sh ACX_VERSION, CITATION.cff [+date-released], Model Guide EN+zh-TW, Testing Protocol EN+zh-TW, antigravity-v5-runtime.md); CHANGELOG [1.8.8]. No engine/test/logic change in the release cut itself. SSoT sequence 112→113.
