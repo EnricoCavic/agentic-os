@@ -12,9 +12,9 @@
   - Active Work Log Path: derive <worklog-key> from the raw branch name using filesystem-safe normalization before any gate checks.
   - Workflows & Policies: `.agent/workflows/*.md`, `.agent/rules/*.md`
 - **Project Name**: (set by /app-init)
-- **Last Updated**: 2026-07-02T12:55:00Z
+- **Last Updated**: 2026-07-04T11:30:00Z
 - **Last Verified**: 2026-07-04
-- **Update Sequence**: 111
+- **Update Sequence**: 112
 - **ADR Index**:
   - docs/adr/ADR-001-governance-friction-tuning.md — ADR-001: Governance Friction Tuning, accepted 2026-04-23
   - docs/adr/ADR-002-guarded-governance-writes.md — ADR-002: Guarded Governance Writes (lock unification + CI lint + lifecycle frontmatter), accepted 2026-04-25
@@ -48,6 +48,7 @@
   - docs/specs/kb-seam-accelerator-consumption.md — KB-Seam Accelerator Consumption (consume OPTIONAL schema-v4 manifest fields: kb_version fingerprint in §1b health, approx_tokens budgeting + candidate-pool applicability in §3.6, UNREADABLE covers malformed, delete dead kb_path_env, adopter guide; graceful for absent/BYO-no-manifest), [Shipped 2026-06-23] (ADR-009 follow-up)
   - docs/specs/dev-flow-hardening.md — Development Flow Hardening (downstream state isolation, gate/evidence honesty, CI/security enforcement truth, demonstration over green gates), [Shipped 2026-06-30] (AC-1..AC-13, PRs #299-#303)
   - docs/specs/governance-self-audit-workflow.md — Governance Self-Audit Workflow (/govern-audit: report-only, verified-findings + disposition funnel + routing_actions), [Shipped 2026-07-02] (backlog #104, PR #311)
+  - docs/specs/local-model-delegation.md — Local-Model Delegation Entry (/ask-local optional module + codex --oss variant; junior-executor patch contract, §8.2 reused unchanged), [Shipped 2026-07-04] (backlog #115, PR #316)
 - **Canonical Commands**:
   - `/spec-intake`: Import external specs (from other LLMs, documents, or natural language). Handles large product specs via decomposition. Runs before `/bootstrap`.
   - `/bootstrap`: Task initialization & classification freeze.
@@ -62,6 +63,7 @@
   - `/govern-audit`: Audit the governance system itself (report-only; verified findings + routed dispositions).
   - `ask-openrouter`: [OPTIONAL] External model delegation. See `.agent/workflows/ask-openrouter.md`.
   - `codex-cli`: [OPTIONAL] Codex CLI delegation. See `.agent/workflows/codex-cli.md`.
+  - `ask-local`: [OPTIONAL] Local-model (OpenAI-compatible endpoint) delegation. See `.agent/workflows/ask-local.md`.
 - **References**:
   - `AGENTS.md`
   - `.agent/rules/engineering_guardrails.md`
@@ -103,6 +105,10 @@
 - [Category: rule-placement][Severity: HIGH][Trigger: authoring-safety-rule-or-auditing-rule-surfaces][prev: 3b15e10b] Sort SAFETY rules by hazard reachability, not token cost. A rule that must hold during a 30-second out-of-phase action (destructive commands, secrets, untrusted tool output) MUST live on the always-loaded surface (AGENTS.md Core Directives invariant cluster, cap ~5) - phase/tier-scoped files and platform adapters are probabilistic gates, and a probabilistic gate on an irreversible failure is a design error regardless of token savings. Confirmed 2026-06-11: 'Destructive Command Blocking' was advertised in both READMEs and machine-guarded in ADAPTER copies (validators checked Codex/Antigravity retained it!) while the canonical loaded surface had nothing - a downstream rm -rf cascade destroyed a parent repo working tree. Placement test for every new MUST: hazard reachable from any tool call AND irreversible/exfiltrating -> always-loaded; else phase surface is fine but README/docs must not claim it is always-on.
 - [Category: eval-mapping][Severity: MEDIUM][Trigger: adding-or-retargeting-eval-protects-tag][prev: 14ac98ca] An eval case can silently guard an EMPTY rule: protects-tags resolve at section level, so a case pointing at a section that contains no text for the behavior it tests still 'resolves' and scores green off the model's general training - verifier-without-defense, the inverse of advertised-but-unenforced. Confirmed 2026-06-11: prompt-injection-in-tool-output protected 'AGENTS.md Core Directives' which contained zero injection text for ~2 months. Discipline: when ADDING a rule, land the guarding case in the SAME commit; when ADDING/RETARGETING a case, quote the exact rule sentence it protects in the PR description - if you cannot quote it, the rule does not exist and the case is theatre.
 ## Ship History
+
+### Ship-feat-local-model-delegation-2026-07-04
+- **Branch `feat/local-model-delegation`** (feature, document-governance) — merged PR #316 (squash `6095c9c`). Adopter-facing ENTRY for local models: new `[OPTIONAL MODULE]` **`/ask-local`** — an installer's local model (Ollama / LM Studio / vLLM, any OpenAI-compatible endpoint) joins the governed flow as a **delegated junior executor**: explicit opt-in only (routing §2 row, MUST NOT auto-trigger), endpoint resolution + silent availability probe (zero-cost-absent), `review`/`code` modes with a classification cap (arch-change ❌, hotfix code ❌, feature sub-tasks only), **patch contract** (local model NEVER writes files; primary reviews then applies; scope violation rejects the WHOLE patch), §8.2 reused UNCHANGED — zero new gates/MUSTs (spec signal_tier T1 = command-sync + manifest golden). Plus codex-cli §5a `--oss` local variant (same tightened caps), command stub, EXPECTED_COMMANDS 27, deploy golden +2. Spec `local-model-delegation.md` (9 AC) frozen→shipped. **Verification wave (user-mandated depth)**: independent fresh-context review (9/9 AC PROVEN, red-team 6-vector clean) + 3 subagent sims — regression 7/7 (zero regression; sync negative-test has teeth), fresh-adopter deploy 7/7 (202 files, downstream validate fail=0, zero-cost-absent verified), e2e fake-endpoint (module EXECUTABLE; injected-backdoor whole-patch reject held) → e2e findings (1 MEDIUM + 4 LOW doc gaps) fixed pre-merge + delta re-review PASS. **Dogfood dividend**: the pre-merge quality loop exposed a validator-lags-state-machine defect (HANDEDOFF→IMPLEMENTING reverse edge unrepresentable) — fixed as PR #317 (sh+ps1 + 3 regression tests incl. M10 negative control) and merged FIRST. Side-finding routed: backlog #116 (EXPECTED_COMMANDS tracks 27 of 30 command stubs — pre-existing). SSoT sequence 111→112.
+- Tests: CI-equiv 574 passed (×3 runs); validate.sh/.ps1 parity fail=0; PR #316 CI 18-pass on 2 heads; PR #317 CI 18-pass. Rollback = revert PR #316 (+ #317 independently revertible).
 
 ### Ship-chore-archive-stale-worklogs-2026-07-02
 - **Branch `chore/archive-stale-worklogs`** (quick-win, governance-runtime) — merged PR #315 (squash `682098f`). Background-debt cleanup: archived the 6 pre-existing stale active Work Logs left in the gitignored `work/` dir before this session (none had a ship receipt) — active logs 6→0; validator WARN 5→3, fail=0. Merged status verified via `gh pr list` (in-log receipt is not proof): arch/kb-seam-hardening→#275, codex/zh-readme-faq-mirror→#287, codex/governance-premortem-audit→#306 (already archived in a prior session; work/ leftover removed, no new chain entry); codex-research-main / codex-v18-review-main / main are branch=main catch-alls (no PR) archived to preserve content, not deleted. 5 new INDEX.jsonl chain entries. **Self-caught pre-push remediation**: my first pass re-archived the already-archived codex-gov-premortem → a duplicate INDEX entry (grep=2); caught by my own verification, restored INDEX from origin/main, re-appended only the 5 legit entries, verified chain, amended + force-with-lease pushed. The 3 remaining WARNs are pre-existing historical-archive receipts (point-in-time, not edited) + the eval-coverage-28 advisory. SSoT sequence 110→111.

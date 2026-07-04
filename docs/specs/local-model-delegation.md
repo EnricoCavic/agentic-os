@@ -1,5 +1,5 @@
 ---
-status: frozen
+status: shipped
 date: 2026-07-04
 classification: feature
 primary_domain: document-governance

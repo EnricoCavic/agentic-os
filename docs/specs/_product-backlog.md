@@ -3,7 +3,7 @@ status: living
 title: Product Backlog
 source: governance-bloat-review-2026-04-12 + optimization-round-2026-05-04 + optimization-research-2026-06-02
 created: 2026-04-12
-last_updated: 2026-07-01
+last_updated: 2026-07-04
 ---
 
 # Product Backlog
@@ -81,6 +81,7 @@ Governance file bloat review (2026-04-12) identified 10 findings across P0–P2:
 | 112 | CI docs-only gate hole — README/INSTALL/spec content-pin tests (`test_readme_fork_guidance_parity`, `test_text_only_install_does_not_copy_runtime_context`, `test_ac4_ac5_readme_documents_pre_commit_hook_setup`, `TestClaimsVsReality`) live in pytest jobs gated `heavy == 'true'`, and README/docs paths classify inert → the pins never run on the docs-only PRs most likely to break them. Fix direction: a fast ungated "docs-pins" job (pure file-read tests, seconds) that runs when heavy=false. Also: audit-chain git append-only witness has NO behavioral test (only source-substring presence) — add slow behavioral tests (truncated/edited INDEX in a temp git repo). From 2026-07-02 test-quality audit (both P1s) | framework | ci | P2 | — | quick-win | Shipped | — | PR #310 |
 | 113 | `--no-python` validator undersells reduced assurance — the bash gate-progression fallback checks only that plan+implement receipts are PRESENT, not phase ordering/completeness, so in `--no-python` mode a feature Work Log that skips review/test/handoff (but keeps plan+implement) prints top-line "integrity check passed". The only tell is the SKIP count jump (13 vs 4). Fix direction: the fallback can grep required-receipt PRESENCE per classification (no Python needed for presence-counting, only for ordering-legality), OR the top-line verdict should say "reduced assurance" when python is off. Connects #103b reduced-assurance labeling. From 2026-07-02 stability-sim red-team (Attack 9) | framework | governance | P2 | — | quick-win | Pending | — | — |
 | 114 | tiny-fix self-labeling has no validator visibility — a large semantic change mislabeled `tiny-fix` ships with one receipt and a clean pass because tiny-fix has NO Work Log (validator never sees it) and `required=set()`. No file-count/diff-size check exists. Honor-system limit inherent to the no-worklog fast path; a real guard would need a pre-commit/CI diff-size heuristic outside the work-log validator. Related to #103c quick-win pressure-valve. From 2026-07-02 stability-sim red-team (Attack 3) | framework | governance | P3 | — | quick-win | Pending | — | — |
+| 116 | check_command_sync EXPECTED_COMMANDS coverage gap — the checker tracks 27 of 30 `.claude/commands/` stubs (`app-init`, `execute-plan`, `write-plan` untracked), so a deployed adopter counting files vs the printed "N commands verified" sees a confusing mismatch; decide track-all vs document-exclusions at implement. Pre-existing, surfaced by the PR #316 fresh-adopter deploy sim | framework | tooling | P3 | — | quick-win | Pending | — | — |
 
 > Rows whose GH issue is CLOSED-premature (#7, #13, #18, #21, #33) are kept deliberately as
 > future directions — reopen the issue when a concrete signal appears (2026-06-02 curation).
