@@ -18,7 +18,9 @@ An engine profile fills the four slots the OS needs to let agents **verify their
 
 1. Deploy the Agentic OS normally (`installers/deploy_brain.ps1 -Target <project>`).
 2. Copy `skills/gamemaker-gml/SKILL.md` → `<project>/.agents/skills/gamemaker-gml/SKILL.md`,
-   and create the metadata stub dir `<project>/.agent/skills/gamemaker-gml/`.
+   and copy `skills/gamemaker-gml/stub.md` → `<project>/.agent/skills/gamemaker-gml` — an
+   **extensionless file**, not a directory: `.agent/skills/` entries are frontmatter stubs
+   pointing at the full `.agents/skills/<name>/SKILL.md` body.
    Replace the `<PROJECT>` placeholders (or let `/app-init` do it — point it at this file).
 3. Copy `tools/*.ps1` → `<project>/tools/`. Override `-Runtime` if not on the LTS default path.
 4. Vendor **GMTL** (DAndrewBox/GM-Testing-Library) into `scripts/GMTL_*`, then set its
